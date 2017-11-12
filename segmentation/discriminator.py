@@ -85,3 +85,9 @@ class ConvDiscriminator(BaseModel):
             print '\t p_real', p_real.get_shape()
 
             return p_real
+
+    def print_info(self):
+        print '------------------------ ConvDiscriminator ---------------------- '
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '------------------------ ConvDiscriminator ---------------------- '

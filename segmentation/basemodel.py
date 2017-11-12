@@ -36,6 +36,11 @@ class BaseModel(object):
     def loss_op(self):
         raise Exception(NotImplementedError)
 
+    def snapshot(self, step):
+        raise Exception(NotImplementedError)
+
+    def restore(self, path):
+        raise Exception(NotImplementedError)
 
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)

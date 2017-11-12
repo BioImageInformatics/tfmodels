@@ -35,7 +35,7 @@ debug_dir = 'ccrcc/debug'
 
 
 epochs = 100
-iterations = 1000
+iterations = 100
 
 with tf.Session(config=config) as sess:
     model = GenericSegmentation(sess=sess,
@@ -74,6 +74,9 @@ with tf.Session(config=config) as sess:
             model.train_step(global_step)
 
         print 'Epoch [{}] step [{}]'.format(epx, global_step)
+
+        model.snapshot(global_step)
+
         x_in, y_in, y_hat = model.test_step()
         # print '\t x_in', x_in.shape, x_in.dtype, x_in.min(), x_in.max()
         # print '\t y_in', y_in.shape, y_in.dtype, y_in.min(), y_in.max(), np.unique(y_in)
