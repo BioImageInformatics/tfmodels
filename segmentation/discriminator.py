@@ -29,13 +29,19 @@ class ConvDiscriminator(BaseModel):
         self.p_real_real = self.model(self.x_real, reuse=True)
         self.loss = self.loss_op()
 
+        self.var_list = self.get_update_list()
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='DiscAdam')
-        self.training_op = self.optimizer.minimize(self.loss)
+        self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
 
         self.training_op_list.append(self.training_op)
 
         discrim_loss_sum = tf.summary.scalar('discrim_loss', self.loss)
         self.summary_op_list.append(discrim_loss_sum)
+
+
+    def get_update_list(self):
+        t_vars = tf.trainable_variables()
+        return [var for var in t_vars if 'ConvDiscriminator' in var.name]
 
 
     def loss_op(self):
