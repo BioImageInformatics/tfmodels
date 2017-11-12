@@ -52,8 +52,9 @@ class GenericSegmentation(BaseModel):
         self.loss = self.loss_op()
 
         ## ------------------- Training ops ------------------- ##
+        self.var_list = self.get_update_list()
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='GenSegAdam')
-        self.training_op = self.optimizer.minimize(self.loss)
+        self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
         self.training_op_list.append(self.training_op)
 
         ## ------------------- Gather Summary ops ------------------- ##
@@ -67,6 +68,10 @@ class GenericSegmentation(BaseModel):
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
+
+    def get_update_list(self):
+        t_vars = tf.trainable_variables()
+        return [var for var in t_vars if 'GenericSeg' in var.name]
 
     def summaries(self):
         x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
