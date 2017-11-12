@@ -7,15 +7,23 @@ from segmentation.generic import GenericSegmentation
 from utilities.datasets import ImageMaskDataSet
 from utilities.general import save_image_stack
 
-data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
-image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
-mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
 
-dataset = ImageMaskDataSet(batch_size=8,
+#data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
+#image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
+#mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
+
+data_home = '/home/nathan/data/ccrcc_tiles'
+image_dir = '{}/he'.format(data_home)
+mask_dir = '{}/hmm/4class'.format(data_home)
+
+dataset = ImageMaskDataSet(batch_size=64,
     image_dir=image_dir,
     mask_dir=mask_dir,
-    capacity=500,
-    min_holding=100,
+    capacity=1500,
+    min_holding=500,
+    threads=8,
     crop_size=512,
     ratio=0.5)
 dataset.print_info()
@@ -27,16 +35,16 @@ debug_dir = 'ccrcc/debug'
 
 
 epochs = 100
-iterations = 100
+iterations = 1000
 
-with tf.Session() as sess:
+with tf.Session(config=config) as sess:
     model = GenericSegmentation(sess=sess,
         dataset=dataset,
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
-        learning_rate=1e-3)
-        # adversarial=True)
+        learning_rate=1e-3,)
+        #adversarial=True)
     model.print_info()
 
     ## ------------------- Input Coordinators ------------------- ##
@@ -67,9 +75,9 @@ with tf.Session() as sess:
 
         print 'Epoch [{}] step [{}]'.format(epx, global_step)
         x_in, y_in, y_hat = model.test_step()
-        print '\t x_in', x_in.shape, x_in.dtype, x_in.min(), x_in.max()
-        print '\t y_in', y_in.shape, y_in.dtype, y_in.min(), y_in.max(), np.unique(y_in)
-        print '\t y_hat', y_hat.shape, y_hat.dtype, y_hat.min(), y_hat.max(), np.unique(y_hat)
+        # print '\t x_in', x_in.shape, x_in.dtype, x_in.min(), x_in.max()
+        # print '\t y_in', y_in.shape, y_in.dtype, y_in.min(), y_in.max(), np.unique(y_in)
+        # print '\t y_hat', y_hat.shape, y_hat.dtype, y_hat.min(), y_hat.max(), np.unique(y_hat)
 
         # save_image_stack(x_in[:,:,:,::-1], debug_dir, prefix='x_in_{}'.format(epx))
         # save_image_stack(y_in, debug_dir, prefix='y_in_{}'.format(epx), onehot=True, scale=3)

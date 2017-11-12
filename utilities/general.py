@@ -34,6 +34,6 @@ def save_image_stack(stack, writeto, prefix='img', ext='jpg', onehot=False, scal
 
     for nx in xrange(n_imgs):
         img = np.squeeze(stack[nx,...])
-        img_name = '{}/{}_{}.{}'.format(
+        img_name = '{}/{}_{:04d}.{}'.format(
             writeto, prefix, nx, ext )
         cv2.imwrite(img_name, img)
