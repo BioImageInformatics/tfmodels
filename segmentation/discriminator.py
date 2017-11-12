@@ -12,15 +12,15 @@ from ops import (
 
 class ConvDiscriminator(BaseModel):
     defaults={
-        x_real: None,
-        x_fake: None,
-        learning_rate: 1e-4,
-        kernels: [32, 64, 512],
-        name: 'ConvDiscriminator'}
+        'x_real': None,
+        'x_fake': None,
+        'learning_rate': 1e-4,
+        'kernels': [32, 64, 512],
+        'name': 'ConvDiscriminator'}
 
     def __init__(self, **kwargs):
-        defaults.update(kwargs)
-        super(ConvDiscriminator, self).__init__(**defaults)
+        self.defaults.update(kwargs)
+        super(ConvDiscriminator, self).__init__(**self.defaults)
 
         assert self.x_real is not None
         assert self.x_fake is not None
@@ -29,7 +29,7 @@ class ConvDiscriminator(BaseModel):
         self.p_real_real = self.model(self.x_real, reuse=True)
         self.loss = self.loss_op()
 
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='DiscAdam')
         self.training_op = self.optimizer.minimize(self.loss)
 
         self.training_op_list.append(self.training_op)
@@ -49,23 +49,33 @@ class ConvDiscriminator(BaseModel):
         return (loss_real + loss_fake) / 2.0
 
 
-    def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
+    def model(self, x_hat, keep_prob=0.5, reuse=False, training=True):
         print 'Convolutional Discriminator'
         with tf.variable_scope('ConvDiscriminator') as scope:
             if reuse:
                 scope.reuse_variables()
+            print '\t x_hat', x_hat.get_shape()
+
             h0 = conv(x_hat, self.kernels[0], var_scope='h0')
             h0 = batch_norm(h0, training=training, reuse=reuse, var_scope='h0_bn')
             h0 = lrelu(h0)
 
-            h1 = conv(h0, self.kernels[1], var_scope='h1')
+            h0_pool = tf.nn.max_pool(h0, [1,3,3,1], [1,3,3,1], padding='VALID', name='h0_pool')
+            print '\t h0_pool', h0_pool.get_shape()
+
+            h1 = conv(h0_pool, self.kernels[1], var_scope='h1')
             h1 = batch_norm(h1, training=training, reuse=reuse, var_scope='h1_bn')
             h1 = lrelu(h1)
 
-            h1_flat = tf.contrib.layers.flatten(h1)
+            h1_pool = tf.nn.max_pool(h1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h1_pool')
+            print '\t h1_pool', h1_pool.get_shape()
+
+            h1_flat = tf.contrib.layers.flatten(h1_pool)
             h2 = lrelu(linear(h1_flat, self.kernels[2], var_scope='h2'))
             h2 = tf.nn.dropout(h2, keep_prob=keep_prob, name='h2_do')
+            print '\t h2', h2.get_shape()
 
-            p_real = linear(h2, 1, name='p_real')
+            p_real = linear(h2, 1, var_scope='p_real')
+            print '\t p_real', p_real.get_shape()
 
             return p_real

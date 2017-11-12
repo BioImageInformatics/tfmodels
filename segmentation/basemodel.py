@@ -5,23 +5,32 @@ import numpy as np
 class BaseModel(object):
     ## Defaults
     defaults={
-        sess: None,
-        log_dir: None,
-        save_dir: None,
-        training_op_list: [],
-        summary_op_list: [] }
+        'sess': None,
+        'log_dir': None,
+        'save_dir': None,
+        'training_op_list': [],
+        'summary_op_list': [] }
 
     def __init__(self, **kwargs):
-        for key, value in defaults.items():
-            setattr(self, key, value)
+        self.sess = None
+        self.log_dir = None
+        self.save_dir = None
+        self.training_op_list = []
+        self.summary_op_list = []
+        # self.defaults.update(**kwargs)
+        # print self.defaults
+        # for key, value in self.defaults.items():
+        #     setattr(self, key, value)
         for key, value in kwargs.items():
             setattr(self, key, value)
 
         assert self.sess is not None
 
     def print_info(self):
-        for key, value in self.__dict__:
-            print key, value
+        print '------------------------ BaseModel ---------------------- '
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '------------------------ BaseModel ---------------------- '
 
 
     def loss_op(self):

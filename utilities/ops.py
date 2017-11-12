@@ -71,12 +71,12 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope=
 
         return out
 
-def batch_norm(features, training=True, reuse=False, var_scope='batch_norm'):
-    out = tf.contrib.layers.batch_norm(features, center=True, scale=True,
-        updates_collections=None, is_training=training, reuse=reuse,
-        scope=var_scope)
+def batch_norm(features, training=True, var_scope='batch_norm'):
+    with tf.variable_scope(var_scope) as scope:
+        out = tf.contrib.layers.batch_norm(features, center=True, scale=True,
+            updates_collections=None, is_training=training, scope=var_scope)
 
-    return out
+        return out
 
 
 def lrelu(features, alpha=0.2):

@@ -91,16 +91,16 @@ Assume the images and masks are named similarly and are in different folders
 
 class DataSet(object):
     defaults = {
-        batch_size: 64,
-        crop_size: 256,
-        ratio: 1.0,
-        capacity: 5000,
-        seed: 5555,
-        threads: 4,
-        min_holding: 1250,}
+        'batch_size': 64,
+        'crop_size': 256,
+        'ratio': 1.0,
+        'capacity': 5000,
+        'seed': 5555,
+        'threads': 4,
+        'min_holding': 1250,}
 
     def __init__(self, **kwargs):
-        for key, value in defaults.items():
+        for key, value in self.defaults.items():
             setattr(self, key, value)
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -108,8 +108,16 @@ class DataSet(object):
         assert self.image_dir is not None
 
 
+    def print_info(self):
+        print '------------------------ DataSet ---------------------- '
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '------------------------ DataSet ---------------------- '
+
+
     def _preprocessing(self, image, mask):
         raise Exception(NotImplementedError)
+
 
     def get_batch(self):
         raise Exception(NotImplementedError)
@@ -124,33 +132,52 @@ Required:
 '''
 class ImageMaskDataSet(DataSet):
     defaults = {
-        batch_size: 64,
-        crop_size: 256,
-        image_ext: 'jpg',
-        mask_ext: 'png',
-        ratio: 1.0,
-        capacity: 5000,
-        seed: 5555,
-        threads: 4,
-        min_holding: 1250,,
-        dstype: 'ImageMask' }
+        'batch_size': 16,
+        'crop_size': 256,
+        'image_dir': None,
+        'image_ext': 'jpg',
+        'mask_dir': None,
+        'mask_ext': 'png',
+        'ratio': 1.0,
+        'capacity': 5000,
+        'seed': 5555,
+        'threads': 4,
+        'min_holding': 1250,
+        'dstype': 'ImageMask' }
     def __init__(self, **kwargs):
-        defaults.update(kwargs)
-        super(ImageMaskDataSet, self).__init__(**defaults)
+        self.defaults.update(kwargs)
+        # print self.defaults
+        super(ImageMaskDataSet, self).__init__(**self.defaults)
+        assert self.image_dir is not None
+        assert self.mask_dir is not None
 
+        ## ----------------- Load Image Lists ------------------- ##
         self.image_names = tf.convert_to_tensor(sorted(glob.glob(
             os.path.join(self.image_dir, '*.'+self.image_ext) )))
         self.mask_names  = tf.convert_to_tensor(sorted(glob.glob(
             os.path.join(self.mask_dir, '*.'+self.mask_ext) )))
+
+        ## ----------------- Queue ops to feed ----------------- ##
+        self.feature_queue = tf.train.string_input_producer(
+            self.image_names,
+            shuffle=True,
+            seed=self.seed )
+        self.mask_queue    = tf.train.string_input_producer(
+            self.mask_names,
+            shuffle=True,
+            seed=self.seed )
 
         ## ----------------- TensorFlow ops ------------------- ##
         self.image_reader = tf.WholeFileReader()
         self.mask_reader = tf.WholeFileReader()
 
         image_key, image_file = self.image_reader.read(self.feature_queue)
-        image_op = tf.image.decode_image(image_file)
+        image_op = tf.image.decode_image(image_file, channels=3)
 
         mask_key, mask_file = self.image_reader.read(self.mask_queue)
+        # if self.mask_ext=='png':
+        #     mask_op = tf.image.decode_png(mask_file)
+        # else:
         mask_op = tf.image.decode_image(mask_file)
 
         image_op, mask_op = self._preprocessing(image_op, mask_op)
@@ -159,22 +186,35 @@ class ImageMaskDataSet(DataSet):
             capacity   = self.capacity,
             min_after_dequeue = self.min_holding,
             num_threads = self.threads,
-            name = 'Dataset',)
+            name = 'Dataset')
 
         self.image_op = image_op
         self.mask_op = tf.cast(mask_op, tf.uint8)
 
+        self.image_shape = self.image_op.get_shape()
+        self.mask_shape = self.mask_op.get_shape()
+
 
     def _preprocessing(self, image, mask):
         image = tf.divide(image, 255)
-        mask = tf.divide(mask, 255)
+        mask = tf.cast(mask, tf.float32)
+        # mask = tf.divide(mask, 255)
         image_mask = tf.concat([image, mask], -1)
-        last_dim = tf.shape(image_mask)[-1]
+        # input_dim = tf.shape()
+        # last_dim = tf.shape(image_mask)[-1]
 
         ## Cropping
         image_mask = tf.random_crop(image_mask,
-            [self.crop_size, self.crop_size, last_dim])
-        image, mask = tf.split(image_mask, 2, axis=2)
+            [self.crop_size, self.crop_size, 4])
+        image, mask = tf.split(image_mask, [3,1], axis=-1)
+
+        ## Resize ratio
+        target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
+        target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
+        image = tf.image.resize_images(image, [target_h, target_w])
+        mask = tf.image.resize_images(mask, [target_h, target_w],
+            method=1) ## nearest neighbor
+
         return image, mask
 
 
@@ -182,6 +222,12 @@ class ImageMaskDataSet(DataSet):
         image, mask = sess.run([self.image_op, self.mask_op])
         return image, mask
 
+
+    def print_info(self):
+        print '------------------------ ImageMaskDataSet ---------------------- '
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '------------------------ ImageMaskDataSet ---------------------- '
 
 
 # class ImageMaskDataSet(object):
