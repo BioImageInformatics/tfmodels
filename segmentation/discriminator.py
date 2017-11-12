@@ -63,14 +63,14 @@ class ConvDiscriminator(BaseModel):
             print '\t x_hat', x_hat.get_shape()
 
             h0 = conv(x_hat, self.kernels[0], var_scope='h0')
-            h0 = batch_norm(h0, training=training, reuse=reuse, var_scope='h0_bn')
+            h0 = batch_norm(h0, training=training, var_scope='h0_bn')
             h0 = lrelu(h0)
 
             h0_pool = tf.nn.max_pool(h0, [1,3,3,1], [1,3,3,1], padding='VALID', name='h0_pool')
             print '\t h0_pool', h0_pool.get_shape()
 
             h1 = conv(h0_pool, self.kernels[1], var_scope='h1')
-            h1 = batch_norm(h1, training=training, reuse=reuse, var_scope='h1_bn')
+            h1 = batch_norm(h1, training=training, var_scope='h1_bn')
             h1 = lrelu(h1)
 
             h1_pool = tf.nn.max_pool(h1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h1_pool')
