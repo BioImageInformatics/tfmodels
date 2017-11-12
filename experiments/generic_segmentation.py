@@ -18,7 +18,7 @@ data_home = '/home/nathan/data/ccrcc_tiles'
 image_dir = '{}/he'.format(data_home)
 mask_dir = '{}/hmm/4class'.format(data_home)
 
-dataset = ImageMaskDataSet(batch_size=72,
+dataset = ImageMaskDataSet(batch_size=64,
     image_dir=image_dir,
     mask_dir=mask_dir,
     capacity=1500,
@@ -43,8 +43,8 @@ with tf.Session(config=config) as sess:
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
-        learning_rate=1e-3)
-        # adversarial=True)
+        learning_rate=1e-3,)
+        #adversarial=True)
     model.print_info()
 
     ## ------------------- Input Coordinators ------------------- ##
