@@ -9,7 +9,6 @@ def save_image_stack(stack, writeto,
     prefix='img', ext='jpg', onehot=False, scale='max',
     stack_axis=0):
     assert os.path.exists(writeto)
-    print '\t saving {} stack: '.format(prefix), stack.shape, stack.dtype, stack.min(), stack.max()
     n_imgs = stack.shape[stack_axis]
 
     ## convert onehot to mask

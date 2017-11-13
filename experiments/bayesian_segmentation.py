@@ -37,7 +37,7 @@ log_dir = 'bayes/logs/{}'.format(expdate)
 save_dir = 'bayes/snapshots'
 debug_dir = 'bayes/debug'
 
-snapshot_restore = 'bayes/snapshots/generic_segmentation.ckpt-1000'
+snapshot_restore = 'bayes/snapshots/generic_segmentation.ckpt-8000'
 
 epochs = 100
 iterations = 1000
@@ -66,6 +66,7 @@ with tf.Session(config=config) as sess:
     print '\t test_x', test_x.shape, test_x.dtype, test_x.min(), test_x.max(), test_x_list[0].shape
     print '\t test_y', test_y.shape, test_y.dtype, test_y.min(), test_y.max(), np.unique(test_y)
 
+    save_image_stack(test_x[...,::-1], debug_dir, prefix='x_in_', scale='max', stack_axis=0)
     print 'Running initial test'
     for test_idx, test_img in enumerate(test_x_list):
         y_bar_mean, y_bar_var = bayesian_inference(model, test_img, 25)
