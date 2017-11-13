@@ -43,6 +43,6 @@ def bayesian_inference(model, x_in, samples):
         y_hat = np.concatenate([y_hat, np.expand_dims(y_hat_p, -1)], -1)
 
     y_bar_mean = np.mean(y_hat, axis=-1)
-    y_bar_var = np.std(y_hat, axis=-1)
+    y_bar_var = np.var(y_hat, axis=-1)
 
     return y_bar_mean, y_bar_var

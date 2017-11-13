@@ -12,21 +12,21 @@ from utilities.general import (
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
-data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
-image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
-mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
+#data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
+#image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
+#mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
-# data_home = '/home/nathan/data/ccrcc_tiles'
-# image_dir = '{}/he'.format(data_home)
-# mask_dir = '{}/hmm/4class'.format(data_home)
+data_home = '/home/nathan/data/ccrcc_tiles'
+image_dir = '{}/he'.format(data_home)
+mask_dir = '{}/hmm/4class'.format(data_home)
 
 assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
-dataset = ImageMaskDataSet(batch_size=16,
+dataset = ImageMaskDataSet(batch_size=64,
     image_dir=image_dir,
     mask_dir=mask_dir,
-    capacity=500,
-    min_holding=100,
+    capacity=2500,
+    min_holding=500,
     threads=8,
     crop_size=512,
     ratio=0.5)
@@ -37,10 +37,10 @@ log_dir = 'bayes/logs/{}'.format(expdate)
 save_dir = 'bayes/snapshots'
 debug_dir = 'bayes/debug'
 
-snapshot_restore = 'bayes/snapshots/generic_segmentation.ckpt-25'
+snapshot_restore = 'bayes/snapshots/generic_segmentation.ckpt-1000'
 
 epochs = 100
-iterations = 25
+iterations = 1000
 
 with tf.Session(config=config) as sess:
     model = GenericSegmentation(sess=sess,

@@ -21,8 +21,8 @@ class GenericSegmentation(BaseModel):
         'adversarial': False,
         'dataset': None,
         # 'x_size': [256, 256],
-        'conv_kernels': [32, 64],
-        'deconv_kernels': [16, 16, 32],
+        'conv_kernels': [64, 128],
+        'deconv_kernels': [32, 64, 128],
         'n_classes': None,
         'mode': 'TRAIN', }
 
