@@ -63,15 +63,17 @@ with tf.Session(config=config) as sess:
     test_x, test_y = dataset.get_batch(sess)
     test_x_list = np.split(test_x, test_x.shape[0], axis=0)
     test_y_list = np.split(test_y, test_y.shape[0], axis=0)
-    print '\t test_x', test_x.shape, test_x.dtype, test_x.min(), test_x.max(), test_x_list[0].shape
-    print '\t test_y', test_y.shape, test_y.dtype, test_y.min(), test_y.max(), np.unique(test_y)
+    print '\t test_x', test_x.shape
+    print '\t test_y', test_y.shape
 
     print 'Running initial test'
     for test_idx, test_img in enumerate(test_x_list):
         y_bar_mean, y_bar_var = bayesian_inference(model, test_img, 25)
-        save_image_stack(y_bar_mean, debug_dir, prefix='y_mean_{:04d}'.format(test_idx),
+        save_image_stack(y_bar_mean, debug_dir,
+            prefix='y_mean_{:04d}'.format(test_idx),
             scale='max', stack_axis=-1)
-        save_image_stack(y_bar_var, debug_dir, prefix='y_var_{:04d}'.format(test_idx),
+        save_image_stack(y_bar_var, debug_dir,
+            prefix='y_var_{:04d}'.format(test_idx),
             scale='max', stack_axis=-1)
 
     ## --------------------- Optimizing Loop -------------------- ##
@@ -87,9 +89,11 @@ with tf.Session(config=config) as sess:
 
         for test_idx, test_img in enumerate(test_x_list):
             y_bar_mean, y_bar_var = bayesian_inference(model, test_img, 25)
-            save_image_stack(y_bar_mean, debug_dir, prefix='y_mean_{:04d}'.format(test_idx),
+            save_image_stack(y_bar_mean, debug_dir,
+                prefix='y_mean_{:04d}'.format(test_idx),
                 scale='max', stack_axis=-1)
-            save_image_stack(y_bar_var, debug_dir, prefix='y_var_{:04d}'.format(test_idx),
+            save_image_stack(y_bar_var, debug_dir,
+                prefix='y_var_{:04d}'.format(test_idx),
                 scale='max', stack_axis=-1)
 
 

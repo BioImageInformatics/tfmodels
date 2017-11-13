@@ -14,7 +14,8 @@ def conv_cond_concat(x, y):
   return concat([
     x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
 
-def weight_variable(shape, name='weight', initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
+def weight_variable(shape, name='weight',
+    initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
     return tf.get_variable(name, shape=shape,
         initializer=initializer)
 
@@ -27,7 +28,8 @@ def linear(features, n_output, var_scope='linear', no_bias=False,
     initializer=tf.random_normal_initializer(mean=0.0, stddev=0.01)):
     with tf.variable_scope(var_scope) as scope:
         dim_in = features.get_shape().as_list()[-1]
-        weight = weight_variable([dim_in, n_output], name='w', initializer=initializer)
+        weight = weight_variable([dim_in, n_output], name='w',
+            initializer=initializer)
 
         if no_bias:
             return tf.matmul(features, weight)
@@ -44,13 +46,15 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv'):
         bias = bias_variable([n_kernel], name='b')
 
         ## WHYY
-        out = tf.nn.conv2d(features, weight, strides=[1, stride, stride, 1], padding=pad)
+        out = tf.nn.conv2d(features, weight, strides=[1, stride, stride, 1],
+            padding=pad)
         oH, oW, oC = out.get_shape().as_list()[1:]
         out = tf.reshape(tf.nn.bias_add(out, bias), [-1, oH, oW, oC])
         return out
 
 
-def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope='deconv'):
+def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
+    var_scope='deconv'):
     with tf.variable_scope(var_scope) as scope:
         dim_h_in, dim_w_in, dim_k_in = features.get_shape().as_list()[1:]
         ## output must be whole numbered

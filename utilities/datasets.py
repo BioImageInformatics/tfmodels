@@ -123,7 +123,6 @@ class DataSet(object):
         raise Exception(NotImplementedError)
 
 
-
 '''
 Required:
 :image_dir: string
