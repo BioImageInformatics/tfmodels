@@ -14,14 +14,14 @@ from utilities.ops import (
     deconv,
     batch_norm)
 
-class GenericSegmentation(BaseModel):
+class VGGSegmentation(BaseModel):
     defaults={
         'sess': None,
         'learning_rate': 1e-3,
         'adversarial': False,
         'dataset': None,
         # 'x_size': [256, 256],
-        'conv_kernels': [64, 128],
+        'conv_kernels': [32, 64, 128],
         'deconv_kernels': [32, 64, 128],
         'n_classes': None,
         'summary_iters': 50,
@@ -172,18 +172,17 @@ class GenericSegmentation(BaseModel):
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
-            c0 = conv(x_in, self.conv_kernels[0], var_scope='c0')
-            c0 = tf.nn.dropout(c0, keep_prob=keep_prob)
-            c0 = batch_norm(c0, training=training, var_scope='c0_bn')
-            c0 = lrelu(c0)
-            c0_pool = tf.nn.max_pool(c0, [1,2,2,1], [1,2,2,1], padding='VALID',
+            c0_0 = lrelu(conv(x_in, self.conv_kernels[0], stride=1,
+                var_scope='c0_0'))
+            c0_1 = lrelu(conv(c0_0, self.conv_kernels[0], stride=1,
+                var_scope='c0_1'))
+            c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
+            c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape()
 
-            c1 = conv(c0_pool, self.conv_kernels[1], var_scope='c1')
-            c1 = tf.nn.dropout(c1, keep_prob=keep_prob)
-            c1 = batch_norm(c1, training=training, var_scope='c1_bn')
-            c1 = lrelu(c1)
+            c1_0 = lrelu(conv(c0_pool, self.conv_kernels[1], var_scope='c1_0'))
+            c1_1 = lrelu(conv(c1_0, self.conv_kernels[1], var_scope='c1_1'))
             c1_pool = tf.nn.max_pool(c1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
             print '\t c1_pool', c1_pool.get_shape()
@@ -213,7 +212,7 @@ class GenericSegmentation(BaseModel):
 
 
     def print_info(self):
-        print '------------------------ GenericSegmentation ---------------------- '
+        print '------------------------ VGG ---------------------- '
         for key, value in sorted(self.__dict__.items()):
             print '|\t', key, value
-        print '------------------------ GenericSegmentation ---------------------- '
+        print '------------------------ VGG ---------------------- '

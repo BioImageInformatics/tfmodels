@@ -36,6 +36,12 @@ class BaseModel(object):
     def loss_op(self):
         raise Exception(NotImplementedError)
 
+    def train_step(self, global_step):
+        raise Exception(NotImplementedError)
+
+    def inference(self, x_in, keep_prob):
+        raise Exception(NotImplementedError)
+
     def snapshot(self, step):
         raise Exception(NotImplementedError)
 
