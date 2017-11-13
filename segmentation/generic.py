@@ -24,6 +24,7 @@ class GenericSegmentation(BaseModel):
         'conv_kernels': [64, 128],
         'deconv_kernels': [32, 64, 128],
         'n_classes': None,
+        'summary_iters': 50,
         'mode': 'TRAIN', }
 
     def __init__(self, **kwargs):
@@ -84,26 +85,35 @@ class GenericSegmentation(BaseModel):
         return [var for var in t_vars if 'GenericSeg' in var.name]
 
     def summaries(self):
+        ## Input image
         x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
 
+        ## Input mask
         y_in_mask = tf.expand_dims(tf.argmax(self.y_in, -1),-1)
         y_in_mask = tf.cast(y_in_mask, tf.float32)
         y_in_sum = tf.summary.image('y_in', y_in_mask, max_outputs=4)
         print '\t y_in_mask', y_in_mask.get_shape(), y_in_mask.dtype
 
+        ## Predicted mask
         y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
         y_hat_mask = tf.cast(y_hat_mask, tf.float32)
         y_hat_sum = tf.summary.image('y_hat', y_hat_mask, max_outputs=4)
         print '\t y_hat_mask', y_hat_mask.get_shape(), y_hat_mask.dtype
 
+        ## Loss scalar
         loss_sum = tf.summary.scalar('loss', self.loss)
+
+        ## Filters
+        # TODO
 
         return [x_in_sum, y_in_sum, y_hat_sum, loss_sum]
 
 
     def train_step(self, global_step):
         summary_str = self.sess.run(self.training_op_list)[-1]
-        self.summary_writer.add_summary(summary_str, global_step)
+
+        if global_step % self.summary_iters == 0:
+            self.summary_writer.add_summary(summary_str, global_step)
 
 
     def snapshot(self, step):
