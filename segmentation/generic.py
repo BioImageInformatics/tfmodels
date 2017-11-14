@@ -25,7 +25,8 @@ class GenericSegmentation(BaseModel):
         'deconv_kernels': [32, 64, 128],
         'n_classes': None,
         'summary_iters': 50,
-        'mode': 'TRAIN', }
+        'mode': 'TRAIN',
+        'name': 'generic'}
 
     def __init__(self, **kwargs):
         self.defaults.update(**kwargs)
@@ -51,8 +52,9 @@ class GenericSegmentation(BaseModel):
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[],
             name='keep_prob')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
-            training=True)
+        self.training = tf.placeholder_with_default(True, shape=[],
+            name='is_training')
+        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False, training=self.training)
         print 'Model output y_hat:', self.y_hat.get_shape()
         if self.adversarial:
             self.discriminator = ConvDiscriminator(sess=self.sess,
@@ -85,7 +87,7 @@ class GenericSegmentation(BaseModel):
 
     def get_update_list(self):
         t_vars = tf.trainable_variables()
-        return [var for var in t_vars if 'GenericSeg' in var.name]
+        return [var for var in t_vars if self.name in var.name]
 
     def summaries(self):
         ## Input image
@@ -140,8 +142,8 @@ class GenericSegmentation(BaseModel):
 
 
     def inference(self, x_in, keep_prob):
-        y_hat_ = self.sess.run([self.y_hat],
-            feed_dict={self.x_in: x_in, self.keep_prob: keep_prob})[0]
+        feed_dict = {self.x_in: x_in, self.keep_prob: keep_prob}
+        y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
 
         return y_hat_
 
@@ -167,13 +169,12 @@ class GenericSegmentation(BaseModel):
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'GenericSegmentation Model'
-        with tf.variable_scope('GenericSeg') as scope:
+        with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
             c0 = conv(x_in, self.conv_kernels[0], var_scope='c0')
-            c0 = tf.nn.dropout(c0, keep_prob=keep_prob)
             c0 = batch_norm(c0, training=training, var_scope='c0_bn')
             c0 = lrelu(c0)
             c0_pool = tf.nn.max_pool(c0, [1,2,2,1], [1,2,2,1], padding='VALID',
@@ -181,27 +182,22 @@ class GenericSegmentation(BaseModel):
             print '\t c0_pool', c0_pool.get_shape()
 
             c1 = conv(c0_pool, self.conv_kernels[1], var_scope='c1')
-            c1 = tf.nn.dropout(c1, keep_prob=keep_prob)
             c1 = batch_norm(c1, training=training, var_scope='c1_bn')
+            c1 = tf.nn.dropout(c1, keep_prob=keep_prob)
             c1 = lrelu(c1)
             c1_pool = tf.nn.max_pool(c1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
             print '\t c1_pool', c1_pool.get_shape()
 
-            d2 = deconv(c1_pool, self.deconv_kernels[2], var_scope='d2')
-            d2 = tf.nn.dropout(d2, keep_prob=keep_prob)
+            d2 = lrelu(deconv(c1_pool, self.deconv_kernels[2], var_scope='d2'))
             d2 = batch_norm(d2, training=training, var_scope='d2_bn')
-            d2 = lrelu(d2)
             print '\t d2', d2.get_shape()
 
-            d1 = deconv(d2, self.deconv_kernels[1], var_scope='d1')
-            d1 = tf.nn.dropout(d1, keep_prob=keep_prob)
+            d1 = lrelu(deconv(d2, self.deconv_kernels[1], var_scope='d1'))
             d1 = batch_norm(d1, training=training, var_scope='d1_bn')
-            d1 = lrelu(d1)
             print '\t d1', d1.get_shape()
 
             d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
-            d0 = tf.nn.dropout(d0, keep_prob=keep_prob)
             d0 = batch_norm(d0, training=training, var_scope='d0_bn')
             d0 = lrelu(d0)
             print '\t d0', d0.get_shape()

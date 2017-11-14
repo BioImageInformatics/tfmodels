@@ -105,6 +105,7 @@ class DataSet(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        assert self.batch_size >= 1
         assert self.image_dir is not None
 
 
@@ -133,6 +134,7 @@ class ImageMaskDataSet(DataSet):
     defaults = {
         'batch_size': 16,
         'crop_size': 256,
+        'channels': 3,
         'image_dir': None,
         'image_ext': 'jpg',
         'mask_dir': None,
@@ -171,12 +173,11 @@ class ImageMaskDataSet(DataSet):
         self.mask_reader = tf.WholeFileReader()
 
         image_key, image_file = self.image_reader.read(self.feature_queue)
-        image_op = tf.image.decode_image(image_file, channels=3)
+        image_op = tf.image.decode_image(image_file, channels=self.channels)
 
-        mask_key, mask_file = self.image_reader.read(self.mask_queue)
-        # if self.mask_ext=='png':
-        #     mask_op = tf.image.decode_png(mask_file)
-        # else:
+        mask_key, mask_file = self.mask_reader.read(self.mask_queue)
+        mask_file = tf.Print(mask_file,
+            [image_key, mask_key])
         mask_op = tf.image.decode_image(mask_file)
 
         image_op, mask_op = self._preprocessing(image_op, mask_op)
@@ -197,10 +198,7 @@ class ImageMaskDataSet(DataSet):
     def _preprocessing(self, image, mask):
         image = tf.divide(image, 255)
         mask = tf.cast(mask, tf.float32)
-        # mask = tf.divide(mask, 255)
         image_mask = tf.concat([image, mask], -1)
-        # input_dim = tf.shape()
-        # last_dim = tf.shape(image_mask)[-1]
 
         ## Cropping
         image_mask = tf.random_crop(image_mask,
@@ -211,8 +209,7 @@ class ImageMaskDataSet(DataSet):
         target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
         target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
         image = tf.image.resize_images(image, [target_h, target_w])
-        mask = tf.image.resize_images(mask, [target_h, target_w],
-            method=1) ## nearest neighbor
+        mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
         return image, mask
 

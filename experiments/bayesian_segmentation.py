@@ -4,6 +4,7 @@ import sys, datetime, os
 
 sys.path.insert(0, '..')
 from segmentation.generic import GenericSegmentation
+from segmentation.segnet import SegNet
 from utilities.datasets import ImageMaskDataSet
 from utilities.general import (
     save_image_stack,
@@ -22,37 +23,43 @@ mask_dir = '{}/hmm/4class'.format(data_home)
 
 assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
-dataset = ImageMaskDataSet(batch_size=64,
+## ------------------ Hyperparameters --------------------- ##
+epochs = 100
+iterations = 500
+batch_size = 32
+step_start = 0
+
+dataset = ImageMaskDataSet(batch_size=batch_size,
     image_dir=image_dir,
     mask_dir=mask_dir,
-    capacity=2500,
-    min_holding=500,
+    capacity=3500,
+    min_holding=1000,
     threads=8,
-    crop_size=512,
-    ratio=0.5)
+    crop_size=1024,
+    ratio=0.25)
 dataset.print_info()
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'bayes/logs/{}'.format(expdate)
-save_dir = 'bayes/snapshots'
-debug_dir = 'bayes/debug'
+log_dir = 'segnet/logs/{}'.format(expdate)
+save_dir = 'segnet/snapshots'
+debug_dir = 'segnet/debug'
 
-snapshot_restore = 'bayes/snapshots/generic_segmentation.ckpt-8000'
+snapshot_restore = 'segnet/snapshots/segnet_segmentation.ckpt-{}'.format(step_start)
 
-epochs = 100
-iterations = 1000
 
 with tf.Session(config=config) as sess:
-    model = GenericSegmentation(sess=sess,
+    model = SegNet(sess=sess,
         dataset=dataset,
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
+        conv_kernels=[32, 64, 64, 64],
+        deconv_kernels=[32, 64],
         learning_rate=1e-3,
         x_dims=[256, 256, 3])
         #adversarial=True)
     model.print_info()
-    model.restore(snapshot_restore)
+    # model.restore(snapshot_restore)
 
     ## ------------------- Input Coordinators ------------------- ##
     print 'Thread coordinators'
@@ -67,19 +74,23 @@ with tf.Session(config=config) as sess:
     print '\t test_y', test_y.shape
 
     save_image_stack(test_x[...,::-1], debug_dir, prefix='x_in_', scale='max', stack_axis=0)
+    save_image_stack(test_y, debug_dir, prefix='y_in_', scale=3, stack_axis=0)
     print 'Running initial test'
     for test_idx, test_img in enumerate(test_x_list):
-        y_bar_mean, y_bar_var = bayesian_inference(model, test_img, 25)
+        y_bar_mean, y_bar_var, y_bar = bayesian_inference(model, test_img, 25)
+        save_image_stack(y_bar, debug_dir,
+            prefix='y_bar_{:04d}'.format(test_idx),
+            scale=3, ext='png', stack_axis=0)
         save_image_stack(y_bar_mean, debug_dir,
             prefix='y_mean_{:04d}'.format(test_idx),
-            scale='max', stack_axis=-1)
+            scale='max', ext='png', stack_axis=-1)
         save_image_stack(y_bar_var, debug_dir,
             prefix='y_var_{:04d}'.format(test_idx),
-            scale='max', stack_axis=-1)
+            scale='max', ext='png', stack_axis=-1)
 
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
-    global_step = 0
+    global_step = step_start
     for epx in xrange(1, epochs):
         for itx in xrange(iterations):
             global_step += 1
@@ -89,15 +100,19 @@ with tf.Session(config=config) as sess:
         model.snapshot(global_step)
 
         for test_idx, test_img in enumerate(test_x_list):
-            y_bar_mean, y_bar_var = bayesian_inference(model, test_img, 25)
+            y_bar_mean, y_bar_var, y_bar = bayesian_inference(model, test_img, 25)
+            save_image_stack(y_bar, debug_dir,
+                prefix='y_bar_{:04d}'.format(test_idx),
+                scale=3, ext='png', stack_axis=0)
             save_image_stack(y_bar_mean, debug_dir,
                 prefix='y_mean_{:04d}'.format(test_idx),
-                scale='max', stack_axis=-1)
+                scale='max', ext='png', stack_axis=-1)
             save_image_stack(y_bar_var, debug_dir,
                 prefix='y_var_{:04d}'.format(test_idx),
-                scale='max', stack_axis=-1)
+                scale='max', ext='png', stack_axis=-1)
 
 
-
+    print 'Stopping threads'
     coord.request_stop()
     coord.join(threads)
+    print 'Done'

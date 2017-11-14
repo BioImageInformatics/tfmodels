@@ -21,15 +21,16 @@ class VGGSegmentation(BaseModel):
         'adversarial': False,
         'dataset': None,
         # 'x_size': [256, 256],
-        'conv_kernels': [32, 64, 128],
-        'deconv_kernels': [32, 64, 128],
+        'conv_kernels': [32, 64, 128, 256],
+        'deconv_kernels': [32, 64],
         'n_classes': None,
         'summary_iters': 50,
-        'mode': 'TRAIN', }
+        'mode': 'TRAIN',
+        'name': 'VGGSeg'}
 
     def __init__(self, **kwargs):
         self.defaults.update(**kwargs)
-        super(GenericSegmentation, self).__init__(**self.defaults)
+        super(VGGSegmentation, self).__init__(**self.defaults)
 
         assert self.n_classes is not None
         if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
@@ -65,7 +66,7 @@ class VGGSegmentation(BaseModel):
 
         ## ------------------- Training ops ------------------- ##
         self.var_list = self.get_update_list()
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='GenSegAdam')
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='VGGAdam')
         self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
         self.training_op_list.append(self.training_op)
 
@@ -78,14 +79,14 @@ class VGGSegmentation(BaseModel):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
-        self.save_dir = os.path.join(self.save_dir, 'generic_segmentation.ckpt')
+        self.save_dir = os.path.join(self.save_dir, 'vgg_segmentation.ckpt')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
 
     def get_update_list(self):
         t_vars = tf.trainable_variables()
-        return [var for var in t_vars if 'GenericSeg' in var.name]
+        return [var for var in t_vars if self.name in var.name]
 
     def summaries(self):
         ## Input image
@@ -166,47 +167,55 @@ class VGGSegmentation(BaseModel):
 
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'GenericSegmentation Model'
-        with tf.variable_scope('GenericSeg') as scope:
+        print 'VGG-FCN Model'
+        with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
-            c0_0 = lrelu(conv(x_in, self.conv_kernels[0], stride=1,
-                var_scope='c0_0'))
-            c0_1 = lrelu(conv(c0_0, self.conv_kernels[0], stride=1,
-                var_scope='c0_1'))
+            c0_0 = lrelu(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
+            c0_1 = lrelu(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
             c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
             c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
-            print '\t c0_pool', c0_pool.get_shape()
+            print '\t c0_pool', c0_pool.get_shape() ## 128
 
-            c1_0 = lrelu(conv(c0_pool, self.conv_kernels[1], var_scope='c1_0'))
-            c1_1 = lrelu(conv(c1_0, self.conv_kernels[1], var_scope='c1_1'))
-            c1_pool = tf.nn.max_pool(c1, [1,2,2,1], [1,2,2,1], padding='VALID',
+            c1_0 = lrelu(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
+            c1_1 = lrelu(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
+            c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
+            c1_pool = tf.nn.max_pool(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
-            print '\t c1_pool', c1_pool.get_shape()
+            print '\t c1_pool', c1_pool.get_shape() ## 64
 
-            d2 = deconv(c1_pool, self.deconv_kernels[2], var_scope='d2')
-            d2 = tf.nn.dropout(d2, keep_prob=keep_prob)
-            d2 = batch_norm(d2, training=training, var_scope='d2_bn')
-            d2 = lrelu(d2)
-            print '\t d2', d2.get_shape()
+            c2_0 = lrelu(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
+            c2_1 = lrelu(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
+            c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
+            c2_pool = tf.nn.max_pool(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+                name='c2_pool')
+            print '\t c2_pool', c2_pool.get_shape() ## 32
 
-            d1 = deconv(d2, self.deconv_kernels[1], var_scope='d1')
-            d1 = tf.nn.dropout(d1, keep_prob=keep_prob)
+            c3_0 = lrelu(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
+            c3_1 = lrelu(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
+            c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
+            c3_1 = tf.nn.dropout(c3_1, keep_prob=keep_prob)
+            c3_pool = tf.nn.max_pool(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+                name='c3_pool')
+            print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
+
+            d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
+            d1 = conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1')
             d1 = batch_norm(d1, training=training, var_scope='d1_bn')
             d1 = lrelu(d1)
-            print '\t d1', d1.get_shape()
+            print '\t d1', d1.get_shape() ## 16*4 = 64
 
             d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
-            d0 = tf.nn.dropout(d0, keep_prob=keep_prob)
+            d0 = conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0')
             d0 = batch_norm(d0, training=training, var_scope='d0_bn')
             d0 = lrelu(d0)
-            print '\t d0', d0.get_shape()
+            print '\t d0', d0.get_shape() ## 64*2 = 128
 
             y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
-            print '\t y_hat', y_hat.get_shape()
+            print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
 
             return y_hat
 

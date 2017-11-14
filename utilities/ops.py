@@ -78,10 +78,75 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
 def batch_norm(features, training=True, var_scope='batch_norm'):
     with tf.variable_scope(var_scope) as scope:
         out = tf.contrib.layers.batch_norm(features, center=True, scale=True,
-            updates_collections=None, is_training=training, scope=var_scope)
+            updates_collections=None, is_training=training, fused=True,
+            scope=var_scope)
+        # out = tf.layers.batch_normalization(features, center=True, scale=True,
+        #     updates_collections=None, is_training=training, fused=True,
+        #     zero_debias_moving_mean=True,
+        #     scope=var_scope)
 
         return out
 
 
 def lrelu(features, alpha=0.2):
     return tf.maximum(features*alpha, features)
+
+## https://github.com/tensorflow/tensorflow/issues/2169 // @Pepslee
+# def unpool(pool, ind, ksize=(1, 2, 2, 1), var_scope='unpool'):
+#     """
+#        Unpooling layer after max_pool_with_argmax.
+#        Args:
+#            pool:   max pooled output tensor
+#            ind:      argmax indices (produced by tf.nn.max_pool_with_argmax)
+#            ksize:     ksize is the same as for the pool
+#        Return:
+#            unpooled:    unpooling tensor
+#     """
+#     with tf.variable_scope(var_scope) as scope:
+#         pooled_shape = pool.get_shape().as_list()
+#
+#         # flatten_ind = tf.reshape(ind, (pooled_shape[0], pooled_shape[1]*pooled_shape[2]*pooled_shape[3]))
+#         flatten_ind = tf.reshape(ind, (-1, pooled_shape[1]*pooled_shape[2]*pooled_shape[3]))
+#         # sparse indices to dense ones_like matrics
+#         one_hot_ind = tf.one_hot(flatten_ind,  pooled_shape[1]*ksize[1]*pooled_shape[2]*ksize[2]*pooled_shape[3], on_value=1., off_value=0., axis=-1)
+#         one_hot_ind = tf.reduce_sum(one_hot_ind, axis=1)
+#         # one_like_mask = tf.reshape(one_hot_ind, (pooled_shape[0], pooled_shape[1]*ksize[1], pooled_shape[2]*ksize[2], pooled_shape[3]))
+#         one_like_mask = tf.reshape(one_hot_ind, (-1, pooled_shape[1]*ksize[1], pooled_shape[2]*ksize[2], pooled_shape[3]))
+#         # resize input array to the output size by nearest neighbor
+#         img = tf.image.resize_nearest_neighbor(pool, [pooled_shape[1]*ksize[1], pooled_shape[2]*ksize[2]])
+#         unpooled = tf.multiply(img, tf.cast(one_like_mask, img.dtype))
+#         return unpooled
+
+## https://github.com/tensorflow/tensorflow/issues/2169 // @ThomasWollmann
+def unpool(pool, ind, ksize=[1, 2, 2, 1], var_scope='unpool'):
+    """
+       Unpooling layer after max_pool_with_argmax.
+       Args:
+           pool:   max pooled output tensor
+           ind:      argmax indices
+           ksize:     ksize is the same as for the pool
+       Return:
+           unpool:    unpooling tensor
+    """
+    with tf.variable_scope(var_scope) as scope:
+        input_shape = tf.shape(pool)
+        output_shape = [input_shape[0], input_shape[1] * ksize[1], input_shape[2] * ksize[2], input_shape[3]]
+
+        flat_input_size = tf.reduce_prod(input_shape)
+        flat_output_shape = [output_shape[0], output_shape[1] * output_shape[2] * output_shape[3]]
+
+        pool_ = tf.reshape(pool, [flat_input_size])
+        batch_range = tf.reshape(tf.range(tf.cast(output_shape[0], tf.int64), dtype=ind.dtype),
+                                          shape=[input_shape[0], 1, 1, 1])
+        b = tf.ones_like(ind) * batch_range
+        b1 = tf.reshape(b, [flat_input_size, 1])
+        ind_ = tf.reshape(ind, [flat_input_size, 1])
+        ind_ = tf.concat([b1, ind_], 1)
+
+        ret = tf.scatter_nd(ind_, pool_, shape=tf.cast(flat_output_shape, tf.int64))
+        ret = tf.reshape(ret, output_shape)
+
+        set_input_shape = pool.get_shape()
+        set_output_shape = [set_input_shape[0], set_input_shape[1] * ksize[1], set_input_shape[2] * ksize[2], set_input_shape[3]]
+        ret.set_shape(set_output_shape)
+        return ret

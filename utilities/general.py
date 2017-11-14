@@ -30,18 +30,19 @@ def save_image_stack(stack, writeto,
         cv2.imwrite(img_name, img)
 
 
-def bayesian_inference(model, x_in, samples):
+def bayesian_inference(model, x_in, samples, keep_prob=0.5):
     ## check x_in for shape
     assert len(x_in.shape) == 4
     assert x_in.shape[0] == 1
 
-    y_hat = model.inference(x_in=x_in, keep_prob=0.5)
+    y_hat = model.inference(x_in=x_in, keep_prob=keep_prob)
     y_hat = np.expand_dims(y_hat, -1)
     for tt in xrange(1, samples):
-        y_hat_p = model.inference(x_in=x_in, keep_prob=0.5)
+        y_hat_p = model.inference(x_in=x_in, keep_prob=keep_prob)
         y_hat = np.concatenate([y_hat, np.expand_dims(y_hat_p, -1)], -1)
 
     y_bar_mean = np.mean(y_hat, axis=-1)
     y_bar_var = np.var(y_hat, axis=-1)
+    y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
 
-    return y_bar_mean, y_bar_var
+    return y_bar_mean, y_bar_var, y_bar
