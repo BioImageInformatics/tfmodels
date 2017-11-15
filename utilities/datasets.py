@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import os, glob, cv2
+from openslide import OpenSlide
 
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -228,74 +229,26 @@ class ImageMaskDataSet(DataSet):
         print '------------------------ ImageMaskDataSet ---------------------- '
 
 
-# """ Same as ImageMaskDataSet except images only """
-# class ImageDataSet(object):
-#     def __init__(self,
-#                  image_dir,
-#                  n_classes  = 2,
-#                  batch_size = 96,
-#                  crop_size  = 256,
-#                  ratio      = 1.0, ## for future
-#                  capacity   = 2000,
-#                  image_ext  = 'jpg',
-#                  seed       = 5555,
-#                  threads    = 4,
-#                  min_holding= 250):
-#
-#         self.image_names = tf.convert_to_tensor(sorted(glob.glob(
-#         os.path.join(image_dir, '*.'+image_ext) )))
-#         print '{} image files from {}'.format(self.image_names.shape, image_dir)
-#
-#         self.batch_size = batch_size
-#         self.crop_size  = crop_size
-#         self.ratio = ratio
-#         self.capacity  = capacity
-#         self.n_classes = n_classes
-#         self.threads = threads
-#         self.image_ext = image_ext
-#         self.min_holding = min_holding
-#         self.has_masks = False
-#         self.use_feed = False
-#
-#         self.preprocess_fn = self._preprocessing
-#
-#         self.feature_queue = tf.train.string_input_producer(
-#             self.image_names,
-#             shuffle=True,
-#             seed=seed )
-#
-#         self.image_reader = tf.WholeFileReader()
-#         self._setup_image_mask_ops()
-#
-#
-#
-#     def set_tf_sess(self, sess):
-#         self.sess = sess
-#
-#
-#     def _setup_image_mask_ops(self):
-#         print 'Setting up image and mask retrieval ops'
-#         with tf.name_scope('ImageDataSet'):
-#             image_key, image_file = self.image_reader.read(self.feature_queue)
-#             image_op = tf.image.decode_image(image_file)
-#
-#             image_op = self.preprocess_fn(image_op)
-#             image_op = tf.train.shuffle_batch([image_op],
-#                 batch_size = self.batch_size,
-#                 capacity   = self.capacity,
-#                 min_after_dequeue = self.min_holding,
-#                 num_threads = self.threads,
-#                 name = 'Dataset')
-#
-#             self.image_op = image_op
-#
-#
-#     def _preprocessing(self, image):
-#         ## TODO: setup preprocessing via input_fn
-#         image = tf.divide(image, 255)
-#
-#         ## Perform a random crop
-#         image = tf.random_crop(image,
-#             [self.crop_size, self.crop_size, 3])
-#
-#         return image
+
+
+class SVSDataSet(DataSet):
+    defaults = {
+        'batch_size': 16,
+        'crop_size': 256,
+        'svs_path': None,
+        'ratio': 1.0,
+        'capacity': 5000,
+        'threads': 4,
+        'min_holding': 1250,
+        'dstype': 'ImageMask' }
+    def __init__(self, **kwargs):
+        self.defaults.update(**kwargs)
+        super(SVSDataSet, self).__init__(**self.defaults)
+
+        assert self.svs_path is not None and os.path.exists(self.svs_path)
+
+        self.svs = OpenSlide(self.svs_path)
+
+        ## Compute a foreground mask
+
+        ## Somehow generate tiles from the file from area underneath the mask
