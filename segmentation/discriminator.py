@@ -44,6 +44,7 @@ class ConvDiscriminator(BaseModel):
         return [var for var in t_vars if 'ConvDiscriminator' in var.name]
 
 
+    ## TODO switch to Wasserstein loss. Remember to clip the outputs
     def loss_op(self):
         real_target = tf.ones_like(self.p_real_fake)
         fake_target = tf.zeros_like(self.p_real_real)
@@ -55,14 +56,14 @@ class ConvDiscriminator(BaseModel):
         return (loss_real + loss_fake) / 2.0
 
 
-    def model(self, x_hat, keep_prob=0.5, reuse=False, training=True):
+    def model(self, y_hat, keep_prob=0.5, reuse=False, training=True):
         print 'Convolutional Discriminator'
         with tf.variable_scope('ConvDiscriminator') as scope:
             if reuse:
                 scope.reuse_variables()
-            print '\t x_hat', x_hat.get_shape()
+            print '\t y_hat', y_hat.get_shape()
 
-            h0 = conv(x_hat, self.kernels[0], var_scope='h0')
+            h0 = conv(y_hat, self.kernels[0], var_scope='h0')
             h0 = batch_norm(h0, training=training, var_scope='h0_bn')
             h0 = lrelu(h0)
 
@@ -88,6 +89,7 @@ class ConvDiscriminator(BaseModel):
 
             return p_real
 
+            
     def print_info(self):
         print '------------------------ ConvDiscriminator ---------------------- '
         for key, value in sorted(self.__dict__.items()):

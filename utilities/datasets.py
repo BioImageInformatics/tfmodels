@@ -159,14 +159,12 @@ class ImageMaskDataSet(DataSet):
             os.path.join(self.mask_dir, '*.'+self.mask_ext) )))
 
         ## ----------------- Queue ops to feed ----------------- ##
-        self.feature_queue = tf.train.string_input_producer(
-            self.image_names,
+        self.feature_queue = tf.train.string_input_producer(self.image_names,
             shuffle=True,
-            seed=self.seed )
-        self.mask_queue    = tf.train.string_input_producer(
-            self.mask_names,
+            seed=self.seed)
+        self.mask_queue    = tf.train.string_input_producer(self.mask_names,
             shuffle=True,
-            seed=self.seed )
+            seed=self.seed)
 
         ## ----------------- TensorFlow ops ------------------- ##
         self.image_reader = tf.WholeFileReader()
@@ -176,15 +174,19 @@ class ImageMaskDataSet(DataSet):
         image_op = tf.image.decode_image(image_file, channels=self.channels)
 
         mask_key, mask_file = self.mask_reader.read(self.mask_queue)
-        mask_file = tf.Print(mask_file,
-            [image_key, mask_key])
+        # mask_file = tf.Print(mask_file, [image_key, mask_key])
         mask_op = tf.image.decode_image(mask_file)
 
         image_op, mask_op = self._preprocessing(image_op, mask_op)
-        image_op, mask_op = tf.train.shuffle_batch([image_op, mask_op],
+        # image_op, mask_op = tf.train.shuffle_batch([image_op, mask_op],
+        #     batch_size = self.batch_size,
+        #     capacity   = self.capacity,
+        #     min_after_dequeue = self.min_holding,
+        #     num_threads = self.threads,
+        #     name = 'Dataset')
+        image_op, mask_op = tf.train.batch([image_op, mask_op],
             batch_size = self.batch_size,
             capacity   = self.capacity,
-            min_after_dequeue = self.min_holding,
             num_threads = self.threads,
             name = 'Dataset')
 

@@ -20,7 +20,7 @@ class VGGSegmentation(BaseModel):
         'learning_rate': 1e-3,
         'adversarial': False,
         'dataset': None,
-        # 'x_size': [256, 256],
+        'x_size': [256, 256],
         'conv_kernels': [32, 64, 128, 256],
         'deconv_kernels': [32, 64],
         'n_classes': None,
@@ -46,6 +46,8 @@ class VGGSegmentation(BaseModel):
         if self.y_in.get_shape().as_list()[-1] != self.n_classes:
             self.y_in = tf.one_hot(self.y_in, depth=self.n_classes)
             self.y_in = tf.squeeze(self.y_in)
+            self.y_in = tf.reshape(self.y_in,
+                [-1, self.x_size[0], self.x_size[1], self.n_classes])
             print 'Converted y_in to one_hot: ', self.y_in.get_shape()
 
         ## ------------------- Model ops ------------------- ##
