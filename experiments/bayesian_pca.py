@@ -28,16 +28,16 @@ assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 100
-iterations = 500
+iterations = 1000
 batch_size = 64
-step_start = 0
+step_start = 500
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir = 'pca/logs/{}'.format(expdate)
 save_dir = 'pca/snapshots'
 debug_dir = 'pca/debug'
 
-snapshot_restore = 'pca/snapshots/segnet_segmentation.ckpt-{}'.format(step_start)
+snapshot_restore = 'pca/snapshots/vgg_segmentation.ckpt-{}'.format(step_start)
 
 
 with tf.Session(config=config) as sess:
@@ -62,7 +62,7 @@ with tf.Session(config=config) as sess:
         x_dims=[256, 256, 3],
         adversarial=True)
     model.print_info()
-    # model.restore(snapshot_restore)
+    model.restore(snapshot_restore)
 
     ## ------------------- Input Coordinators ------------------- ##
     print 'Thread coordinators'
