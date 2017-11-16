@@ -4,7 +4,7 @@ import sys, datetime, os
 
 sys.path.insert(0, '..')
 from segmentation.generic import GenericSegmentation
-from segmentation.vgg import VGGSegmentation
+from segmentation.vgg import VGGTraining
 from utilities.datasets import ImageMaskDataSet
 from utilities.general import (
     save_image_stack,
@@ -12,6 +12,7 @@ from utilities.general import (
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
+config.log_device_placement = True
 
 #data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
@@ -27,31 +28,32 @@ mask_dir = '{}/mask'.format(data_home)
 assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 100
-iterations = 1000
-batch_size = 64
-step_start = 500
+epochs = 500
+iterations = 100
+batch_size = 32
+step_start = 1000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir = 'pca/logs/{}'.format(expdate)
 save_dir = 'pca/snapshots'
 debug_dir = 'pca/debug'
-
 snapshot_restore = 'pca/snapshots/vgg_segmentation.ckpt-{}'.format(step_start)
 
 
 with tf.Session(config=config) as sess:
+    # with tf.device('/cpu:0'):
     dataset = ImageMaskDataSet(batch_size=batch_size,
         image_dir=image_dir,
         mask_dir=mask_dir,
         capacity=1250,
         min_holding=500,
-        threads=4,
+        threads=2,
         crop_size=512,
-        ratio=0.5)
+        ratio=0.5,
+        augmentation='random')
     dataset.print_info()
 
-    model = VGGSegmentation(sess=sess,
+    model = VGGTraining(sess=sess,
         dataset=dataset,
         n_classes=4,
         log_dir=log_dir,
@@ -60,9 +62,11 @@ with tf.Session(config=config) as sess:
         deconv_kernels=[32, 64],
         learning_rate=1e-3,
         x_dims=[256, 256, 3],
-        adversarial=True)
+        adversarial=True,
+        adversary_lr=1e-5)
     model.print_info()
-    model.restore(snapshot_restore)
+    if step_start > 0:
+        model.restore(snapshot_restore)
 
     ## ------------------- Input Coordinators ------------------- ##
     print 'Thread coordinators'

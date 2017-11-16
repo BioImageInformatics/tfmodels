@@ -14,8 +14,8 @@ class ConvDiscriminator(BaseModel):
     defaults={
         'x_real': None,
         'x_fake': None,
-        'learning_rate': 1e-4,
-        'kernels': [32, 64, 512],
+        'learning_rate': 5e-5,
+        'kernels': [16, 32, 256],
         'name': 'ConvDiscriminator'}
 
     def __init__(self, **kwargs):
@@ -31,7 +31,9 @@ class ConvDiscriminator(BaseModel):
 
         self.var_list = self.get_update_list()
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='DiscAdam')
-        self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
 
         self.training_op_list.append(self.training_op)
 
@@ -64,7 +66,7 @@ class ConvDiscriminator(BaseModel):
             print '\t y_hat', y_hat.get_shape()
 
             h0 = conv(y_hat, self.kernels[0], var_scope='h0')
-            h0 = batch_norm(h0, training=training, var_scope='h0_bn')
+            # h0 = batch_norm(h0, training=training, var_scope='h0_bn')
             h0 = lrelu(h0)
 
             h0_pool = tf.nn.max_pool(h0, [1,3,3,1], [1,3,3,1], padding='VALID',
@@ -72,7 +74,7 @@ class ConvDiscriminator(BaseModel):
             print '\t h0_pool', h0_pool.get_shape()
 
             h1 = conv(h0_pool, self.kernels[1], var_scope='h1')
-            h1 = batch_norm(h1, training=training, var_scope='h1_bn')
+            # h1 = batch_norm(h1, training=training, var_scope='h1_bn')
             h1 = lrelu(h1)
 
             h1_pool = tf.nn.max_pool(h1, [1,2,2,1], [1,2,2,1], padding='VALID',
@@ -80,6 +82,7 @@ class ConvDiscriminator(BaseModel):
             print '\t h1_pool', h1_pool.get_shape()
 
             h1_flat = tf.contrib.layers.flatten(h1_pool)
+            # h1_flat = tf.nn.dropout(h1_flat, keep_prob=keep_prob, name='h1_flat_do')
             h2 = lrelu(linear(h1_flat, self.kernels[2], var_scope='h2'))
             h2 = tf.nn.dropout(h2, keep_prob=keep_prob, name='h2_do')
             print '\t h2', h2.get_shape()
@@ -89,7 +92,7 @@ class ConvDiscriminator(BaseModel):
 
             return p_real
 
-            
+
     def print_info(self):
         print '------------------------ ConvDiscriminator ---------------------- '
         for key, value in sorted(self.__dict__.items()):
