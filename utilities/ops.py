@@ -76,12 +76,12 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
         return out
 
 ## BUG batch norm with trainig
-def batch_norm(features, training=True, var_scope='batch_norm'):
+def batch_norm(features, reuse=False, training=True, var_scope='batch_norm'):
     with tf.variable_scope(var_scope) as scope:
         # out = tf.contrib.layers.batch_norm(features, center=True, scale=True,
         #     updates_collections=None, is_training=training, fused=True,
         #     scope=var_scope)
-        out = tf.layers.batch_normalization(features, training=training)
+        out = tf.layers.batch_normalization(features, reuse=reuse, training=training)
 
         return out
 
