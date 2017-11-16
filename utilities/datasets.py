@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import os, glob, cv2
+from openslide import OpenSlide
 
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -261,3 +262,28 @@ class ImageMaskDataSet(DataSet):
         for key, value in sorted(self.__dict__.items()):
             print '|\t', key, value
         print '------------------------ ImageMaskDataSet ---------------------- '
+
+
+
+
+class SVSDataSet(DataSet):
+    defaults = {
+        'batch_size': 16,
+        'crop_size': 256,
+        'svs_path': None,
+        'ratio': 1.0,
+        'capacity': 5000,
+        'threads': 4,
+        'min_holding': 1250,
+        'dstype': 'ImageMask' }
+    def __init__(self, **kwargs):
+        self.defaults.update(**kwargs)
+        super(SVSDataSet, self).__init__(**self.defaults)
+
+        assert self.svs_path is not None and os.path.exists(self.svs_path)
+
+        self.svs = OpenSlide(self.svs_path)
+
+        ## Compute a foreground mask
+
+        ## Somehow generate tiles from the file from area underneath the mask
