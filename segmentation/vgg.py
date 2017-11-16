@@ -76,7 +76,7 @@ class VGGBase(BaseModel):
 
             c0_0 = lrelu(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
             c0_1 = lrelu(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
-            # c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
+            #c0_1 = batch_norm(c0_1, reuse=reuse, training=training, var_scope='c0_1_bn')
             c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape() ## 128
@@ -96,16 +96,16 @@ class VGGBase(BaseModel):
             print '\t c2_pool', c2_pool.get_shape() ## 32
 
             c3_0 = lrelu(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
+            c3_0 = tf.nn.dropout(c3_0, keep_prob=keep_prob)
             c3_1 = lrelu(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
             # c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
-            c3_1 = tf.nn.dropout(c3_1, keep_prob=keep_prob)
             c3_pool = tf.nn.max_pool(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c3_pool')
             print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
 
             d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
             d1 = conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1')
-            d1 = batch_norm(d1, training=training, var_scope='d1_bn')
+            #d1 = batch_norm(d1, reuse=reuse, training=training, var_scope='d1_bn')
             d1 = lrelu(d1)
             print '\t d1', d1.get_shape() ## 16*4 = 64
 
@@ -131,7 +131,6 @@ class VGGTraining(VGGBase):
     def __init__(self, **kwargs):
         self.train_defaults.update(**kwargs)
         super(VGGTraining, self).__init__(**self.train_defaults)
-
 
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
@@ -159,11 +158,9 @@ class VGGTraining(VGGBase):
         self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
         print 'Model output y_hat:', self.y_hat.get_shape()
 
-
         ## ------------------- Training ops ------------------- ##
         self.var_list = self.get_update_list()
         self.seg_optimizer = tf.train.AdamOptimizer(self.learning_rate, name='VGG_seg_Adam')
-
 
         if self.adversarial:
             self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
@@ -177,10 +174,10 @@ class VGGTraining(VGGBase):
         # self.loss = self.loss_op()
 
         ## ------------------- Testing ops ------------------- ##
-        self.x_test = tf.placeholder('float',
-            shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
-            name='x_test')
-        self.y_hat_test = self.model(self.x_test, keep_prob=self.keep_prob, reuse=True, training=True)
+        #self.x_test = tf.placeholder('float',
+        #    shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
+        #    name='x_test')
+        #self.y_hat_test = self.model(self.x_test, keep_prob=self.keep_prob, reuse=True, training=False)
 
         ## ------------------- Gather Summary ops ------------------- ##
         self.summary_op_list += self.summaries()
@@ -264,9 +261,9 @@ class VGGTraining(VGGBase):
             print 'Failed! Continuing without loading snapshot.'
 
     def inference(self, x_in, keep_prob):
-        feed_dict = {self.x_test: x_in,
+        feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob}
-        y_hat_ = self.sess.run([self.y_hat_test], feed_dict=feed_dict)[0]
+        y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
 
         return y_hat_
 

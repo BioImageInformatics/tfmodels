@@ -27,10 +27,10 @@ mask_dir = '{}/mask'.format(data_home)
 assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 500
-iterations = 100
+epochs = 1000
+iterations = 250
 batch_size = 32
-step_start = 1000
+step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir = 'pca/logs/{}'.format(expdate)
@@ -61,8 +61,8 @@ with tf.Session(config=config) as sess:
         deconv_kernels=[32, 64],
         learning_rate=1e-3,
         x_dims=[256, 256, 3],
-        adversarial=True,
-        adversary_lr=1e-5)
+        adversarial=True)
+        #adversary_lr=5e-5)
     model.print_info()
     if step_start > 0:
         model.restore(snapshot_restore)
