@@ -3,7 +3,6 @@ import numpy as np
 import sys, datetime, os
 
 sys.path.insert(0, '..')
-from segmentation.generic import GenericSegmentation
 from segmentation.vgg import VGGTraining
 from utilities.datasets import ImageMaskDataSet
 from utilities.general import (
