@@ -231,6 +231,7 @@ class ImageMaskDataSet(DataSet):
 
 
 
+## What I want is to asynchronously fill a queue with tiles from an SVS
 class SVSDataSet(DataSet):
     defaults = {
         'batch_size': 16,
