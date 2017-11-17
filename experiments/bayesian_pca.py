@@ -30,14 +30,14 @@ assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 1000
 iterations = 250
-batch_size = 32
+batch_size = 16
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'pca/logs/{}'.format(expdate)
-save_dir = 'pca/snapshots'
-debug_dir = 'pca/debug'
-snapshot_restore = 'pca/snapshots/vgg_segmentation.ckpt-{}'.format(step_start)
+log_dir = 'pca256/logs/{}'.format(expdate)
+save_dir = 'pca256/snapshots'
+debug_dir = 'pca256/debug'
+snapshot_restore = 'pca256/snapshots/vgg_segmentation.ckpt-{}'.format(step_start)
 
 
 with tf.Session(config=config) as sess:
@@ -58,12 +58,12 @@ with tf.Session(config=config) as sess:
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
-        conv_kernels=[32, 64, 64, 64],
-        deconv_kernels=[32, 64],
+        conv_kernels=[32, 64, 64, 128],
+        deconv_kernels=[64, 64],
         learning_rate=1e-3,
-        x_dims=[256, 256, 3],
-        adversarial=True)
-        #adversary_lr=5e-5)
+        x_dims=[128, 128, 3],
+        adversarial=True,
+        adversary_lr=5e-5)
     model.print_info()
     if step_start > 0:
         model.restore(snapshot_restore)
@@ -84,7 +84,8 @@ with tf.Session(config=config) as sess:
     save_image_stack(test_y, debug_dir, prefix='y__in_', scale=3, stack_axis=0)
     print 'Running initial test'
     for test_idx, test_img in enumerate(test_x_list):
-        y_bar_mean, y_bar_var, y_bar = bayesian_inference(model, test_img, 25)
+        y_bar_mean, y_bar_var, y_bar = bayesian_inference(model, test_img, 50, keep_prob=0.5)
+        # y_bar = model.inference(x_in=test_img, keep_prob=1.0)
         save_image_stack(y_bar, debug_dir,
             prefix='y_bar_{:04d}'.format(test_idx),
             scale=3, ext='png', stack_axis=0)
@@ -107,7 +108,7 @@ with tf.Session(config=config) as sess:
         model.snapshot(global_step)
 
         for test_idx, test_img in enumerate(test_x_list):
-            y_bar_mean, y_bar_var, y_bar = bayesian_inference(model, test_img, 25)
+            y_bar_mean, y_bar_var, y_bar = bayesian_inference(model, test_img, 50, keep_prob=0.5)
             save_image_stack(y_bar, debug_dir,
                 prefix='y_bar_{:04d}'.format(test_idx),
                 scale=3, ext='png', stack_axis=0)

@@ -66,7 +66,7 @@ class ConvDiscriminator(BaseModel):
             print '\t y_hat', y_hat.get_shape()
 
             h0 = conv(y_hat, self.kernels[0], var_scope='h0')
-            # h0 = batch_norm(h0, training=training, var_scope='h0_bn')
+            h0 = batch_norm(h0, training=training, var_scope='h0_bn')
             h0 = lrelu(h0)
 
             h0_pool = tf.nn.max_pool(h0, [1,3,3,1], [1,3,3,1], padding='VALID',
@@ -74,7 +74,7 @@ class ConvDiscriminator(BaseModel):
             print '\t h0_pool', h0_pool.get_shape()
 
             h1 = conv(h0_pool, self.kernels[1], var_scope='h1')
-            # h1 = batch_norm(h1, training=training, var_scope='h1_bn')
+            h1 = batch_norm(h1, training=training, var_scope='h1_bn')
             h1 = lrelu(h1)
 
             h1_pool = tf.nn.max_pool(h1, [1,2,2,1], [1,2,2,1], padding='VALID',
@@ -82,7 +82,9 @@ class ConvDiscriminator(BaseModel):
             print '\t h1_pool', h1_pool.get_shape()
 
             h1_flat = tf.contrib.layers.flatten(h1_pool)
-            # h1_flat = tf.nn.dropout(h1_flat, keep_prob=keep_prob, name='h1_flat_do')
+            h1_flat = tf.nn.dropout(h1_flat, keep_prob=keep_prob, name='h1_flat_do')
+            print '\t h1_flat', h1_flat.get_shape()
+
             h2 = lrelu(linear(h1_flat, self.kernels[2], var_scope='h2'))
             h2 = tf.nn.dropout(h2, keep_prob=keep_prob, name='h2_do')
             print '\t h2', h2.get_shape()
@@ -91,6 +93,11 @@ class ConvDiscriminator(BaseModel):
             print '\t p_real', p_real.get_shape()
 
             return p_real
+
+    def inference(self, x_in, keep_prob=1.0):
+        p_real_ = self.sess.run([p_real_fake], feed_dict={self.x_fake: x_in})
+        p_real_smax = tf.nn.softmax(p_real_)
+        return p_real_smax
 
 
     def print_info(self):

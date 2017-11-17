@@ -206,7 +206,8 @@ class ImageMaskDataSet(DataSet):
 
 
     def _preprocessing(self, image, mask):
-        image = tf.divide(image, 255)
+        # image = tf.divide(image, 255)
+        image = tf.cast(image, tf.float32)
         mask = tf.cast(mask, tf.float32)
         image_mask = tf.concat([image, mask], -1)
 
@@ -228,6 +229,9 @@ class ImageMaskDataSet(DataSet):
         target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
         image = tf.image.resize_images(image, [target_h, target_w])
         mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
+        image = tf.divide(image, 255.0)
+
+        # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
 
         return image, mask
 

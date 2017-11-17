@@ -10,19 +10,20 @@ def save_image_stack(stack, writeto,
     stack_axis=0):
     assert os.path.exists(writeto)
     n_imgs = stack.shape[stack_axis]
+    stack = stack.astype(np.float32)
 
     ## convert onehot to mask
     if onehot:
         stack=np.argmax(stack, -1).astype(np.float32)
 
     if scale=='max':
-        stack *= 255/stack.max()
+        scaled = stack * 255/stack.max()
     else:
-        stack *= 255/scale
+        scaled = stack * 255/scale
 
-    stack = cv2.convertScaleAbs(stack)
+    scaled = cv2.convertScaleAbs(scaled)
 
-    img_list = np.split(stack, n_imgs, stack_axis)
+    img_list = np.split(scaled, n_imgs, stack_axis)
     for nx, img in enumerate(img_list):
         img = np.squeeze(img)
         img_name = '{}/{}_{:04d}.{}'.format(
