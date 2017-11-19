@@ -14,8 +14,9 @@ class ConvDiscriminator(BaseModel):
     defaults={
         'x_real': None,
         'x_fake': None,
-        'learning_rate': 5e-5,
-        'kernels': [16, 32, 256],
+        'learning_rate': 5e-4,
+        'kernels': [8, 16, 512],
+        'real_softening': 0.1,
         'name': 'ConvDiscriminator'}
 
     def __init__(self, **kwargs):
@@ -24,6 +25,11 @@ class ConvDiscriminator(BaseModel):
 
         assert self.x_real is not None
         assert self.x_fake is not None
+
+        ## Label softening add noise ~ N(0,0.01)
+        epsilon = tf.random_normal(shape=tf.shape(self.x_real),
+            mean=0.0, stddev=self.real_softening)
+        self.x_real = self.x_real + epsilon
 
         self.p_real_fake = self.model(self.x_fake)
         self.p_real_real = self.model(self.x_real, reuse=True)
@@ -65,7 +71,7 @@ class ConvDiscriminator(BaseModel):
                 scope.reuse_variables()
             print '\t y_hat', y_hat.get_shape()
 
-            h0 = conv(y_hat, self.kernels[0], var_scope='h0')
+            h0 = conv(y_hat, self.kernels[0], k_size=5, stride=3, var_scope='h0')
             h0 = batch_norm(h0, training=training, var_scope='h0_bn')
             h0 = lrelu(h0)
 

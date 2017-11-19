@@ -12,7 +12,7 @@ from utilities.general import (
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-config.log_device_placement = True
+# config.log_device_placement = True
 
 #data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
@@ -45,8 +45,8 @@ with tf.Session(config=config) as sess:
     dataset = ImageMaskDataSet(batch_size=batch_size,
         image_dir=image_dir,
         mask_dir=mask_dir,
-        capacity=1250,
-        min_holding=500,
+        capacity=5000,
+        min_holding=750,
         threads=2,
         crop_size=512,
         ratio=0.5,
@@ -61,9 +61,10 @@ with tf.Session(config=config) as sess:
         conv_kernels=[32, 64, 64, 128],
         deconv_kernels=[64, 64],
         learning_rate=1e-3,
-        x_dims=[128, 128, 3],
-        adversarial=True,
-        adversary_lr=5e-5)
+        x_dims=[256, 256, 3],
+        adversarial=True, )
+        # adversary_lr=5e-7)
+
     model.print_info()
     if step_start > 0:
         model.restore(snapshot_restore)

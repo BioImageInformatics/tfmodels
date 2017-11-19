@@ -20,6 +20,7 @@ class VGGBase(BaseModel):
         'learning_rate': 1e-3,
         'adversarial': False,
         'adversary_lr': 1e-4,
+        'adversary_lambda': 1,
         'dataset': None,
         'x_dims': [256, 256, 3],
         'conv_kernels': [32, 64, 128, 256],
@@ -142,6 +143,7 @@ class VGGTraining(VGGBase):
         # self.y_in = self.dataset.mask_op
         if self.y_in.get_shape().as_list()[-1] != self.n_classes:
             self.y_in_mask = tf.cast(tf.identity(self.y_in), tf.float32)
+            # self.y_in_mask = tf.divide(self.y_in_mask, self.n_classes)
             self.y_in = tf.one_hot(self.y_in, depth=self.n_classes)
             self.y_in = tf.squeeze(self.y_in)
             self.y_in = tf.reshape(self.y_in,
@@ -157,6 +159,7 @@ class VGGTraining(VGGBase):
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
         self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
         self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
+        # self.y_hat_mask = tf.divide(self.y_hat_mask, self.n_classes)
         print 'Model output y_hat:', self.y_hat.get_shape()
 
         ## ------------------- Training ops ------------------- ##
@@ -164,9 +167,11 @@ class VGGTraining(VGGBase):
         self.seg_optimizer = tf.train.AdamOptimizer(self.learning_rate, name='VGG_seg_Adam')
 
         if self.adversarial:
-            self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
+            # self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
             self.discriminator = ConvDiscriminator(sess=self.sess,
                 x_real=self.y_in, x_fake=tf.nn.softmax(self.y_hat))
+            # self.discriminator = ConvDiscriminator(sess=self.sess,
+            #     x_real=self.y_in_mask, x_fake=self.y_hat_mask)
             self.discriminator.print_info()
             self.training_op_list += self.discriminator.training_op_list
             self.summary_op_list += self.discriminator.summary_op_list
@@ -202,12 +207,12 @@ class VGGTraining(VGGBase):
         self.summary_op_list.append(self.seg_loss_sum)
 
         ## For batch norm
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            self.segmentation_train_op = self.seg_optimizer.minimize(
-                self.seg_loss, var_list=self.var_list)
-
-        self.training_op_list.append(self.segmentation_train_op)
+        # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # with tf.control_dependencies(update_ops):
+        #     self.segmentation_train_op = self.seg_optimizer.minimize(
+        #         self.seg_loss, var_list=self.var_list)
+        #
+        # self.training_op_list.append(self.segmentation_train_op)
 
         if self.adversarial:
             # p_real_fake = tf.stop_gradient(self.discriminator.model(self.y_hat_mask, reuse=True))
@@ -219,12 +224,21 @@ class VGGTraining(VGGBase):
             self.adv_loss_sum = tf.summary.scalar('adv_loss', self.adv_loss)
             self.summary_op_list.append(self.adv_loss_sum)
 
-            self.adversarial_train_op = self.adv_optimizer.minimize(
-                self.adv_loss, var_list=self.var_list)
-            self.training_op_list.append(self.adversarial_train_op)
-            self.loss = self.seg_loss + self.adv_loss
+            # self.adversarial_train_op = self.adv_optimizer.minimize(
+            #     self.adv_loss, var_list=self.var_list)
+            # self.training_op_list.append(self.adversarial_train_op)
+            self.loss = self.seg_loss + self.adversary_lambda * self.adv_loss
         else:
             self.loss = self.seg_loss
+
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.training_op = self.seg_optimizer.minimize(
+                self.loss, var_list=self.var_list)
+
+        self.training_op_list.append(self.training_op)
+
+
 
 
     def get_update_list(self):
