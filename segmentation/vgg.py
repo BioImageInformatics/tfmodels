@@ -201,12 +201,12 @@ class VGGTraining(VGGBase):
         self.summary_op_list.append(self.seg_loss_sum)
 
         ## For batch norm
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            self.segmentation_train_op = self.seg_optimizer.minimize(
-                self.seg_loss, var_list=self.var_list)
+        # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # with tf.control_dependencies(update_ops):
+        #     self.segmentation_train_op = self.seg_optimizer.minimize(
+        #         self.seg_loss, var_list=self.var_list)
 
-        self.training_op_list.append(self.segmentation_train_op)
+        # self.training_op_list.append(self.segmentation_train_op)
 
         if self.adversarial:
             # p_real_fake = tf.stop_gradient(self.discriminator.model(self.y_hat_mask, reuse=True))
@@ -215,15 +215,21 @@ class VGGTraining(VGGBase):
             self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=real_target, logits=p_real_fake)
             self.adv_loss = tf.reduce_mean(self.adv_loss)
+            
             self.adv_loss_sum = tf.summary.scalar('adv_loss', self.adv_loss)
             self.summary_op_list.append(self.adv_loss_sum)
 
-            self.adversarial_train_op = self.adv_optimizer.minimize(
-                self.adv_loss, var_list=self.var_list)
-            self.training_op_list.append(self.adversarial_train_op)
+            # self.adversarial_train_op = self.adv_optimizer.minimize(
+            #     self.adv_loss, var_list=self.var_list)
+            # self.training_op_list.append(self.adversarial_train_op)
             self.loss = self.seg_loss + self.adv_loss
         else:
             self.loss = self.seg_loss
+
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
+        self.training_op_list.append(self.training_op)
 
 
     def get_update_list(self):
