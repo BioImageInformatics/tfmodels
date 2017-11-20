@@ -3,7 +3,6 @@ import numpy as np
 import sys
 sys.path.insert(0, '.')
 from basemodel import BaseModel
-sys.path.insert(0, '../utilities')
 from ops import (
     lrelu,
     linear,
@@ -15,7 +14,7 @@ class ConvDiscriminator(BaseModel):
         'x_real': None,
         'x_fake': None,
         'learning_rate': 5e-4,
-        'kernels': [8, 16, 512],
+        'kernels': [16, 64, 512],
         'real_softening': 0.1,
         'name': 'ConvDiscriminator'}
 
@@ -71,7 +70,7 @@ class ConvDiscriminator(BaseModel):
                 scope.reuse_variables()
             print '\t y_hat', y_hat.get_shape()
 
-            h0 = conv(y_hat, self.kernels[0], k_size=5, stride=3, var_scope='h0')
+            h0 = conv(y_hat, self.kernels[0], k_size=7, stride=4, var_scope='h0')
             h0 = batch_norm(h0, training=training, var_scope='h0_bn')
             h0 = lrelu(h0)
 

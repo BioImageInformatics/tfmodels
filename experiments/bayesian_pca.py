@@ -61,8 +61,8 @@ with tf.Session(config=config) as sess:
         conv_kernels=[32, 64, 64, 128],
         deconv_kernels=[64, 64],
         learning_rate=1e-3,
-        x_dims=[256, 256, 3],
-        adversarial=True, )
+        x_dims=[256, 256, 3],)
+        # adversarial=True, )
         # adversary_lr=5e-7)
 
     model.print_info()

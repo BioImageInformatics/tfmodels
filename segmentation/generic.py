@@ -2,12 +2,9 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-sys.path.insert(0, '.')
-sys.path.insert(0, '..')
 from basemodel import BaseModel
 from discriminator import ConvDiscriminator
-
-from utilities.ops import (
+from ops import (
     lrelu,
     linear,
     conv,

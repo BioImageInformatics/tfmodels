@@ -2,12 +2,10 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-sys.path.insert(0, '.')
-sys.path.insert(0, '..')
+# sys.path.insert(0, '.')
 from basemodel import BaseModel
 from discriminator import ConvDiscriminator
-
-from utilities.ops import (
+from ops import (
     lrelu,
     linear,
     conv,
@@ -198,6 +196,7 @@ class VGGTraining(VGGBase):
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
+
     def make_training_ops(self):
         self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
             labels=self.y_in, logits=self.y_hat)
@@ -237,8 +236,6 @@ class VGGTraining(VGGBase):
                 self.loss, var_list=self.var_list)
 
         self.training_op_list.append(self.training_op)
-
-
 
 
     def get_update_list(self):
@@ -318,6 +315,7 @@ class VGGInference(VGGBase):
         self.training = tf.placeholder_with_default(False, shape=[], name='training')
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
             training=self.training)
+        self.y_hat_smax = tf.nn.softmax(self.y_hat)
 
         # self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
         # self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
@@ -325,11 +323,11 @@ class VGGInference(VGGBase):
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
-    def inference(self, x_in, keep_prob):
+    def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob}
         y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
-        # y_hat_smax = tf.nn.softmax(y_hat_)
+        # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
 
         return y_hat_
 
