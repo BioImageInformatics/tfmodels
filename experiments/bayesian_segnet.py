@@ -3,7 +3,8 @@ import numpy as np
 import sys, datetime, os
 
 sys.path.insert(0, '..')
-from segmentation.vgg import VGGTraining
+from segmentation.generic import GenericSegmentation
+from segmentation.segnet import SegNetTraining
 from utilities.datasets import ImageMaskDataSet
 from utilities.general import (
     save_image_stack,
@@ -29,14 +30,14 @@ assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 1000
 iterations = 250
-batch_size = 32
+batch_size = 16
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'pca256/logs/{}'.format(expdate)
-save_dir = 'pca256/snapshots'
-debug_dir = 'pca256/debug'
-snapshot_restore = 'pca256/snapshots/vgg_segmentation.ckpt-{}'.format(step_start)
+log_dir = 'pca256segnet/logs/{}'.format(expdate)
+save_dir = 'pca256segnet/snapshots'
+debug_dir = 'pca256segnet/debug'
+snapshot_restore = 'pca256segnet/snapshots/segnet.ckpt-{}'.format(step_start)
 
 
 with tf.Session(config=config) as sess:
@@ -52,12 +53,12 @@ with tf.Session(config=config) as sess:
         augmentation='random')
     dataset.print_info()
 
-    model = VGGTraining(sess=sess,
+    model = SegNetTraining(sess=sess,
         dataset=dataset,
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
-        conv_kernels=[32, 64, 64, 128],
+        conv_kernels=[64, 64, 64, 64],
         deconv_kernels=[64, 64],
         learning_rate=1e-3,
         x_dims=[256, 256, 3],)

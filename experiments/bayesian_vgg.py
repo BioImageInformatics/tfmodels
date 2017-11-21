@@ -3,15 +3,16 @@ import numpy as np
 import sys, datetime, os
 
 sys.path.insert(0, '..')
+from segmentation.generic import GenericSegmentation
 from segmentation.vgg import VGGTraining
-from utilities.datasets import ImageMaskDataSet
+from utilities.datasets import ImageMaskDataSet, ImageComboDataSet
 from utilities.general import (
     save_image_stack,
     bayesian_inference )
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-# config.log_device_placement = True
+config.log_device_placement = True
 
 #data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
@@ -21,35 +22,46 @@ config.gpu_options.allow_growth = True
 # image_dir = '{}/he'.format(data_home)
 # mask_dir = '{}/hmm/4class'.format(data_home)
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
-image_dir = '{}/jpg_norm'.format(data_home)
+image_dir = '{}/combo'.format(data_home)
 mask_dir = '{}/mask'.format(data_home)
 
-assert os.path.exists(image_dir) and os.path.exists(mask_dir)
+# assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 1000
 iterations = 250
 batch_size = 32
-step_start = 0
+step_start = 1000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'pca256/logs/{}'.format(expdate)
-save_dir = 'pca256/snapshots'
-debug_dir = 'pca256/debug'
-snapshot_restore = 'pca256/snapshots/vgg_segmentation.ckpt-{}'.format(step_start)
-
+log_dir = 'pca256vgg/logs/{}'.format(expdate)
+save_dir = 'pca256vgg/snapshots'
+debug_dir = 'pca256vgg/debug'
+snapshot_restore = 'pca256vgg/snapshots/vgg.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
     # with tf.device('/cpu:0'):
-    dataset = ImageMaskDataSet(batch_size=batch_size,
-        image_dir=image_dir,
-        mask_dir=mask_dir,
-        capacity=5000,
-        min_holding=750,
-        threads=2,
-        crop_size=512,
-        ratio=0.5,
-        augmentation='random')
+    # dataset = ImageMaskDataSet(batch_size=batch_size,
+    #     image_dir=image_dir,
+    #     mask_dir=mask_dir,
+    #     capacity=5000,
+    #     min_holding=750,
+    #     threads=8,
+    #     crop_size=512,
+    #     ratio=0.5,
+    #     augmentation='random')
+    # dataset.print_info()
+
+    with tf.device('/cpu:0'):
+        dataset = ImageComboDataSet(batch_size=batch_size,
+            image_dir=image_dir,
+            image_ext='png',
+            capacity=7500,
+            min_holding=500,
+            threads=6,
+            crop_size=512,
+            ratio=0.5,
+            augmentation='random')
     dataset.print_info()
 
     model = VGGTraining(sess=sess,
@@ -77,10 +89,10 @@ with tf.Session(config=config) as sess:
     test_x, test_y = dataset.get_batch(sess)
     test_x_list = np.split(test_x, test_x.shape[0], axis=0)
     test_y_list = np.split(test_y, test_y.shape[0], axis=0)
-    print '\t test_x', test_x.shape
-    print '\t test_y', test_y.shape
+    print '\t test_x', test_x.shape, test_x.min(), test_x.max()
+    print '\t test_y', test_y.shape, np.unique(test_y)
 
-    save_image_stack(test_x[...,::-1]+1, debug_dir, prefix='x_in_', scale='max', stack_axis=0)
+    save_image_stack(test_x[...,::-1]+1.0, debug_dir, prefix='x_in_', scale='max', stack_axis=0)
     save_image_stack(test_y, debug_dir, prefix='y__in_', scale=3, stack_axis=0)
     print 'Running initial test'
     for test_idx, test_img in enumerate(test_x_list):

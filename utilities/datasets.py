@@ -126,16 +126,16 @@ class DataSet(object):
 
 
 '''
-Required:
-:image_dir: string
-:mask_dir: string
-:n_classes: int
+It does not work with asynchronous loading.
+The two file readers in different streams WILL become desynced,
+resulting in mismatches.
 
+We could have a buffer queue for reading-preprocessing,
+and an outward facing queue for feeding data to the network.
+Alternatively, the image-mask file names should be married together from the
+very beginning.
 
-augmentation:
-    random: random crop, flip LR, flip UD, coloration
-    fixed: no crop, no flip, color standardized to global target
-    none: nothing
+I don't know how to do simple string concat + split in TF ops, so....
 '''
 class ImageMaskDataSet(DataSet):
     defaults = {
@@ -150,6 +150,7 @@ class ImageMaskDataSet(DataSet):
         'capacity': 5000,
         'seed': 5555,
         'threads': 4,
+        'input_size': 1200,
         'min_holding': 1250,
         'dstype': 'ImageMask',
         'augmentation': None }
@@ -161,46 +162,50 @@ class ImageMaskDataSet(DataSet):
         assert self.mask_dir is not None
 
         ## ----------------- Load Image Lists ------------------- ##
-        self.image_names = tf.convert_to_tensor(sorted(glob.glob(
-            os.path.join(self.image_dir, '*.'+self.image_ext) )))
-        self.mask_names  = tf.convert_to_tensor(sorted(glob.glob(
-            os.path.join(self.mask_dir, '*.'+self.mask_ext) )))
+        image_list = sorted(glob.glob(os.path.join(self.image_dir, '*.'+self.image_ext) ))
+        mask_list = sorted(glob.glob(os.path.join(self.mask_dir, '*.'+self.mask_ext) ))
+
+        # for imgname, maskname in zip(image_list, mask_list):
+        #     print imgname, maskname
+
+        self.image_names = tf.convert_to_tensor(image_list)
+        self.mask_names  = tf.convert_to_tensor(mask_list)
 
         ## ----------------- Queue ops to feed ----------------- ##
         self.feature_queue = tf.train.string_input_producer(self.image_names,
-            shuffle=True,
+            shuffle=False,
             seed=self.seed)
         self.mask_queue    = tf.train.string_input_producer(self.mask_names,
-            shuffle=True,
+            shuffle=False,
             seed=self.seed)
 
         ## ----------------- TensorFlow ops ------------------- ##
         self.image_reader = tf.WholeFileReader()
-        self.mask_reader = tf.WholeFileReader()
+        # self.mask_reader = tf.WholeFileReader()
 
         image_key, image_file = self.image_reader.read(self.feature_queue)
-        image_op = tf.image.decode_image(image_file, channels=self.channels)
+        mask_key, mask_file = self.image_reader.read(self.mask_queue)
 
-        mask_key, mask_file = self.mask_reader.read(self.mask_queue)
-        # mask_file = tf.Print(mask_file, [image_key, mask_key])
-        mask_op = tf.image.decode_image(mask_file)
+        image_file = tf.Print(image_file, [image_key, mask_key])
 
-        image_op, mask_op = self._preprocessing(image_op, mask_op)
-        # image_op, mask_op = tf.train.shuffle_batch([image_op, mask_op],
-        #     batch_size = self.batch_size,
-        #     capacity   = self.capacity,
-        #     min_after_dequeue = self.min_holding,
-        #     num_threads = self.threads,
-        #     name = 'Dataset')
-        image_op, mask_op = tf.train.batch([image_op, mask_op],
+        image = tf.image.decode_image(image_file)
+        mask = tf.image.decode_image(mask_file)
+
+        image, mask = self._preprocessing(image, mask)
+
+        self.image_op, self.mask_op = tf.train.batch([image, mask],
             batch_size = self.batch_size,
             capacity   = self.capacity,
             num_threads = self.threads,
+            shapes = [
+                [self.input_size, self.input_size, self.channels],
+                [self.input_size, self.input_size, 1]],
             name = 'Dataset')
+        print 'self.image_op', self.image_op.get_shape()
+        print 'self.mask_op', self.mask_op.get_shape()
 
-        self.image_op = image_op
-        self.mask_op = tf.cast(mask_op, tf.uint8)
 
+        self.mask_op = tf.cast(self.mask_op, tf.uint8)
         self.image_shape = self.image_op.get_shape()
         self.mask_shape = self.mask_op.get_shape()
 
@@ -214,7 +219,7 @@ class ImageMaskDataSet(DataSet):
         ## Cropping
         if self.augmentation == 'random':
             image_mask = tf.random_crop(image_mask,
-                [self.crop_size, self.crop_size, 4])
+                [-1, self.crop_size, self.crop_size, 4])
             image_mask = tf.image.random_flip_left_right(image_mask)
             image_mask = tf.image.random_flip_up_down(image_mask)
             image, mask = tf.split(image_mask, [3,1], axis=-1)
@@ -229,7 +234,128 @@ class ImageMaskDataSet(DataSet):
         target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
         image = tf.image.resize_images(image, [target_h, target_w])
         mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
-        image = tf.divide(image, 255.0)
+
+        ## Move to [-0.5, 0.5] for SELU activations
+        image = tf.multiply(image, 2/255.0) - 1
+
+        # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
+
+        return image, mask
+
+    def _random_normalize(self, image):
+        # imgR, imgG, imgB = tf.split(image, 3, -1)
+        lab_image = self._rgb_to_lab(image)
+        print 'lab_image', lab_image.get_shape()
+        imgR, imgG, imgB = tf.split(lab_image, 3, -1)
+
+        meanR, stdR = tf.nn.moments(imgR, axes = [0,1])
+        meanG, stdG = tf.nn.moments(imgG, axes = [0,1])
+        meanB, stdB = tf.nn.moments(imgB, axes = [0,1])
+
+        frgb = tf.random_normal([3,2], mean=0, stddev=0.001)
+        # frgb = tf.Print(frgb, [frgb, meanR, stdR, meanG, stdG, meanB, stdB])
+        imgR = (imgR - meanR) / stdR * (stdR + frgb[0,0]) + (meanR + frgb[0,1])
+        imgG = (imgG - meanG) / stdG * (stdG + frgb[1,0]) + (meanG + frgb[1,1])
+        imgB = (imgB - meanB) / stdB * (stdB + frgb[2,0]) + (meanB + frgb[2,1])
+
+        return tf.concat([imgR, imgG, imgB], -1)
+
+    def get_batch(self, sess):
+        image, mask = sess.run([self.image_op, self.mask_op])
+        return image, mask
+
+    def print_info(self):
+        print '------------------------ ImageMaskDataSet ---------------------- '
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '------------------------ ImageMaskDataSet ---------------------- '
+
+
+
+
+'''
+Required:
+:image_dir: string
+:n_classes: int
+
+The same as ImageMaskDataSet except each image is assumed to exist as a (h,w,4)
+where a split --> [3,1] on the 2nd axis will give image, mask
+
+augmentation:
+    random: random crop, flip LR, flip UD, coloration
+    fixed: no crop, no flip, color standardized to global target
+    none: nothing
+'''
+class ImageComboDataSet(DataSet):
+    defaults = {
+        'batch_size': 16,
+        'crop_size': 256,
+        'channels': 3,
+        'image_dir': None,
+        'image_ext': 'png',
+        'ratio': 1.0,
+        'capacity': 5000,
+        'seed': 5555,
+        'threads': 4,
+        'input_size': 1200,
+        'min_holding': 1250,
+        'dstype': 'ImageMask',
+        'augmentation': None }
+    def __init__(self, **kwargs):
+        self.defaults.update(kwargs)
+        # print self.defaults
+        super(ImageComboDataSet, self).__init__(**self.defaults)
+        assert self.image_dir is not None
+
+        ## ----------------- Load Image Lists ------------------- ##
+        image_list = sorted(glob.glob(os.path.join(self.image_dir, '*.'+self.image_ext) ))
+        self.image_names = tf.convert_to_tensor(image_list)
+
+        ## ----------------- Queue ops to feed ----------------- ##
+        self.feature_queue = tf.train.string_input_producer(self.image_names,
+            shuffle=False,
+            seed=self.seed)
+
+        self.image_reader = tf.WholeFileReader()
+        image_key, image_file = self.image_reader.read(self.feature_queue)
+        image = tf.image.decode_image(image_file, channels=4)
+        print image.get_shape()
+        image, mask = self._preprocessing(image)
+
+        self.image_op, self.mask_op = tf.train.shuffle_batch([image, mask],
+            batch_size = self.batch_size,
+            capacity   = self.capacity,
+            num_threads = self.threads,
+            min_after_dequeue = self.min_holding,
+            name = 'Dataset')
+
+        self.mask_op = tf.cast(self.mask_op, tf.uint8)
+
+    def _preprocessing(self, image_mask):
+        image_mask = tf.cast(image_mask, tf.float32)
+
+        ## Cropping
+        if self.augmentation == 'random':
+            image_mask = tf.random_crop(image_mask,
+                [self.crop_size, self.crop_size, 4])
+            image_mask = tf.image.random_flip_left_right(image_mask)
+            image_mask = tf.image.random_flip_up_down(image_mask)
+            image, mask = tf.split(image_mask, [3,1], axis=-1)
+
+            # image = tf.multiply(image, 2/255.0) - 1
+            image = tf.image.random_brightness(image, max_delta=0.05)
+            image = tf.image.random_contrast(image, lower=0.75, upper=1.0)
+            image = tf.image.random_hue(image, max_delta=0.05)
+            image = tf.image.random_saturation(image, lower=0.75, upper=1.0)
+
+        ## Resize ratio
+        target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
+        target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
+        image = tf.image.resize_images(image, [target_h, target_w])
+        mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
+
+        ## Move to [-1, 1] for SELU activations
+        image = tf.multiply(image, 2/255.0) - 1
 
         # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
 
@@ -262,15 +388,14 @@ class ImageMaskDataSet(DataSet):
 
 
     def print_info(self):
-        print '------------------------ ImageMaskDataSet ---------------------- '
+        print '------------------------ ImageComboDataSet ---------------------- '
         for key, value in sorted(self.__dict__.items()):
             print '|\t', key, value
-        print '------------------------ ImageMaskDataSet ---------------------- '
+        print '------------------------ ImageComboDataSet ---------------------- '
 
 
 
-
-## What I want is to asynchronously fill a queue with tiles from an SVS
+        ``
 class SVSDataSet(DataSet):
     defaults = {
         'batch_size': 16,

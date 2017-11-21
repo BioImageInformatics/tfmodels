@@ -2,39 +2,157 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-sys.path.insert(0, '.')
-sys.path.insert(0, '..')
+# sys.path.insert(0, '.')
 from basemodel import BaseModel
 from discriminator import ConvDiscriminator
-
-from utilities.ops import (
+from ops import (
     lrelu,
     linear,
     conv,
     deconv,
-    unpool,
     batch_norm)
 
-class SegNet(BaseModel):
-    defaults={
+class SegNetBase(BaseModel):
+    base_defaults={
         'sess': None,
         'learning_rate': 1e-3,
         'adversarial': False,
+        'adversary_lr': 1e-4,
+        'adversary_lambda': 1,
         'dataset': None,
-        # 'x_size': [256, 256],
-        'conv_kernels': [32, 64, 128, 256],
-        'deconv_kernels': [32, 64],
+        'x_dims': [256, 256, 3],
+        'conv_kernels': [64, 64, 64, 64],
+        'deconv_kernels': [64, 64],
         'n_classes': None,
         'summary_iters': 50,
         'mode': 'TRAIN',
         'name': 'SegNet'}
 
     def __init__(self, **kwargs):
-        self.defaults.update(**kwargs)
-        super(SegNet, self).__init__(**self.defaults)
+        self.base_defaults.update(**kwargs)
+        super(VGGBase, self).__init__(**self.base_defaults)
 
         assert self.n_classes is not None
         if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
+
+    def get_update_list(self):
+        raise Exception(NotImplementedError)
+
+    def summaries(self):
+        raise Exception(NotImplementedError)
+
+    def train_step(self, global_step):
+        raise Exception(NotImplementedError)
+
+    def snapshot(self, step):
+        raise Exception(NotImplementedError)
+
+    def restore(self, snapshot_path):
+        raise Exception(NotImplementedError)
+
+    def test_step(self, keep_prob=1.0):
+        raise Exception(NotImplementedError)
+
+    def inference(self, x_in, keep_prob):
+        raise Exception(NotImplementedError)
+
+    def loss_op(self):
+        raise Exception(NotImplementedError)
+
+    def print_info(self):
+        print '------------------------ SegNet ---------------------- '
+        for key, value in sorted(self.__dict__.items()):
+            if '_op' in key:
+                continue
+            print '|\t', key, value
+        print '------------------------ SegNet ---------------------- '
+
+    def _print_settings(self, filename):
+        with open(filename, 'w+') as f:
+            f.write('---------------------- SegNet ----------------------\n')
+            for key, value in sorted(self.__dict__.items()):
+                if '_op' in key:
+                    continue
+
+                if key == 'var_list':
+                    f.write('|\t{}:\n'.format(key))
+                    for val in value:
+                        f.write('|\t\t{}\n'.format(val))
+                    continue
+
+                f.write('|\t{}: {}\n'.format(key, value))
+            f.write('---------------------- SegNet ----------------------\n')
+
+    def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
+        print 'SegNet Model'
+        nonlin = self.nonlin
+        print 'Non-linearity:', nonlin
+
+        with tf.variable_scope(self.name) as scope:
+            if reuse:
+                scope.reuse_variables()
+            print '\t x_in', x_in.get_shape()
+
+            c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
+            c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
+            c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
+            c0_pool, c0_max = tf.nn.max_pool_with_argmax(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+                name='c0_pool')
+            print '\t c0_pool', c0_pool.get_shape() ## 128
+
+            c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
+            c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
+            c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
+            c1_pool, c1_max = tf.nn.max_pool_with_argmax(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+                name='c1_pool')
+            print '\t c1_pool', c1_pool.get_shape() ## 64
+
+            c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
+            c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
+            c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
+            c2_pool, c2_max = tf.nn.max_pool_with_argmax(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+                name='c2_pool')
+            print '\t c2_pool', c2_pool.get_shape() ## 32
+
+            c3_0 = nonlin(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
+            c3_1 = nonlin(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
+            c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
+            c3_1 = tf.nn.dropout(c3_1, keep_prob=keep_prob)
+            c3_pool, c3_max = tf.nn.max_pool_with_argmax(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+                name='c3_pool')
+            print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
+
+            ## Unpool instead of convolution
+            d1 = unpool_with_argmax(c3_pool, c3_max, ksize=[1,4,4,1], var_scope='unpool1')
+            # d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
+            d1 = nonlin(conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1'))
+            d1 = batch_norm(d1, training=training, var_scope='d1_bn')
+            d1 = tf.nn.dropout(d1, keep_prob=keep_prob)
+            print '\t d1', d1.get_shape() ## 16*4 = 64
+
+            d0 = unpool_with_argmax(d1, c1_max, var_scope='unpool2')
+            # d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
+            d0 = nonlin(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
+            d0 = batch_norm(d0, training=training, var_scope='d0_bn')
+            print '\t d0', d0.get_shape() ## 64*2 = 128
+
+            # y_hat = unpool_with_argmax(d0, c0_max, var_scope='unpool3')
+            # y_hat = conv(y_hat, self.n_classes, var_scope='y_hat')
+            y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
+            print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
+
+            return y_hat
+
+
+
+
+class SegNetTraining(SegNetBase):
+    train_defaults = {
+    'mode': 'TRAIN' }
+
+    def __init__(self, **kwargs):
+        self.train_defaults.update(**kwargs)
+        super(SegNetTraining, self).__init__(**self.train_defaults)
 
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
@@ -45,31 +163,48 @@ class SegNet(BaseModel):
         # self.x_in = self.dataset.image_op
         # self.y_in = self.dataset.mask_op
         if self.y_in.get_shape().as_list()[-1] != self.n_classes:
+            self.y_in_mask = tf.cast(tf.identity(self.y_in), tf.float32)
+            # self.y_in_mask = tf.divide(self.y_in_mask, self.n_classes)
             self.y_in = tf.one_hot(self.y_in, depth=self.n_classes)
             self.y_in = tf.squeeze(self.y_in)
+            self.y_in = tf.reshape(self.y_in,
+                [-1, self.x_dims[0], self.x_dims[1], self.n_classes])
             print 'Converted y_in to one_hot: ', self.y_in.get_shape()
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
-        self.keep_prob = tf.placeholder_with_default(0.5, shape=[],
-            name='keep_prob')
+        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
+        self.training = tf.placeholder_with_default(True, shape=[], name='training')
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
-            training=True)
+            training=self.training)
+        self.y_hat_smax = tf.nn.softmax(self.y_hat)
+        self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
+        self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
+        # self.y_hat_mask = tf.divide(self.y_hat_mask, self.n_classes)
         print 'Model output y_hat:', self.y_hat.get_shape()
+
+        ## ------------------- Training ops ------------------- ##
+        self.var_list = self.get_update_list()
+        self.seg_optimizer = tf.train.AdamOptimizer(self.learning_rate, name='SegNet_Adam')
+
         if self.adversarial:
+            # self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
             self.discriminator = ConvDiscriminator(sess=self.sess,
-                x_real=self.y_in, x_fake=self.y_hat)
+                x_real=self.y_in, x_fake=tf.nn.softmax(self.y_hat))
+            # self.discriminator = ConvDiscriminator(sess=self.sess,
+            #     x_real=self.y_in_mask, x_fake=self.y_hat_mask)
             self.discriminator.print_info()
             self.training_op_list += self.discriminator.training_op_list
             self.summary_op_list += self.discriminator.summary_op_list
 
-        self.loss = self.loss_op()
+        self.make_training_ops()
+        # self.loss = self.loss_op()
 
-        ## ------------------- Training ops ------------------- ##
-        self.var_list = self.get_update_list()
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='SegNetAdam')
-        self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
-        self.training_op_list.append(self.training_op)
+        ## ------------------- Testing ops ------------------- ##
+        #self.x_test = tf.placeholder('float',
+        #    shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
+        #    name='x_test')
+        #self.y_hat_test = self.model(self.x_test, keep_prob=self.keep_prob, reuse=True, training=False)
 
         ## ------------------- Gather Summary ops ------------------- ##
         self.summary_op_list += self.summaries()
@@ -80,9 +215,51 @@ class SegNet(BaseModel):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
-        self.save_dir = os.path.join(self.save_dir, 'segnet_segmentation.ckpt')
+        self.snapshot_name = os.path.join(self.save_dir, 'segnet_segmentation.ckpt')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
+
+        self._print_settings(filename=os.path.join(self.save_dir, 'segnet_model_settings.txt'))
+
+    def make_training_ops(self):
+        self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
+            labels=self.y_in, logits=self.y_hat)
+        self.seg_loss = tf.reduce_mean(self.seg_loss)
+
+        self.seg_loss_sum = tf.summary.scalar('seg_loss', self.seg_loss)
+        self.summary_op_list.append(self.seg_loss_sum)
+
+        ## For batch norm
+        # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # with tf.control_dependencies(update_ops):
+        #     self.segmentation_train_op = self.seg_optimizer.minimize(
+        #         self.seg_loss, var_list=self.var_list)
+        #
+        # self.training_op_list.append(self.segmentation_train_op)
+
+        if self.adversarial:
+            # p_real_fake = tf.stop_gradient(self.discriminator.model(self.y_hat_mask, reuse=True))
+            p_real_fake = self.discriminator.p_real_fake
+            real_target = tf.ones_like(p_real_fake)
+            self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=real_target, logits=p_real_fake)
+            self.adv_loss = tf.reduce_mean(self.adv_loss)
+            self.adv_loss_sum = tf.summary.scalar('adv_loss', self.adv_loss)
+            self.summary_op_list.append(self.adv_loss_sum)
+
+            # self.adversarial_train_op = self.adv_optimizer.minimize(
+            #     self.adv_loss, var_list=self.var_list)
+            # self.training_op_list.append(self.adversarial_train_op)
+            self.loss = self.seg_loss + self.adversary_lambda * self.adv_loss
+        else:
+            self.loss = self.seg_loss
+
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.training_op = self.seg_optimizer.minimize(
+                self.loss, var_list=self.var_list)
+
+        self.training_op_list.append(self.training_op)
 
 
     def get_update_list(self):
@@ -92,39 +269,35 @@ class SegNet(BaseModel):
     def summaries(self):
         ## Input image
         x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
-
-        ## Input mask
-        y_in_mask = tf.expand_dims(tf.argmax(self.y_in, -1),-1)
-        y_in_mask = tf.cast(y_in_mask, tf.float32)
-        y_in_sum = tf.summary.image('y_in', y_in_mask, max_outputs=4)
-        print '\t y_in_mask', y_in_mask.get_shape(), y_in_mask.dtype
-
-        ## Predicted mask
-        y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
-        y_hat_mask = tf.cast(y_hat_mask, tf.float32)
-        y_hat_sum = tf.summary.image('y_hat', y_hat_mask, max_outputs=4)
-        print '\t y_hat_mask', y_hat_mask.get_shape(), y_hat_mask.dtype
-
+        y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
+        y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
         ## Loss scalar
         loss_sum = tf.summary.scalar('loss', self.loss)
-
         ## Filters
         # TODO
 
         return [x_in_sum, y_in_sum, y_hat_sum, loss_sum]
 
-
     def train_step(self, global_step):
         summary_str = self.sess.run(self.training_op_list)[-1]
-
         if global_step % self.summary_iters == 0:
             self.summary_writer.add_summary(summary_str, global_step)
 
+    def train_step_return_values(self, global_step):
+        train_return_ = self.sess.run(self.training_op_list+[self.x_in, self.y_in, self.y_hat_mask])
+        return_x = train_return_[-3]
+        return_y = train_return_[-2]
+        return_y_hat = train_return_[-1]
+        if global_step % self.summary_iters == 0:
+            summary_str = train_return_[-4]
+            self.summary_writer.add_summary(summary_str, global_step)
+
+        return return_x, return_y, return_y_hat
 
     def snapshot(self, step):
-        print 'Snapshotting to [{}] step [{}]'.format(self.save_dir, step)
-        self.saver.save(self.sess, self.save_dir, global_step=step)
-
+        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_name, step),
+        self.saver.save(self.sess, self.snapshot_name, global_step=step)
+        print 'Done'
 
     def restore(self, snapshot_path):
         print 'Restoring from {}'.format(snapshot_path)
@@ -134,99 +307,74 @@ class SegNet(BaseModel):
         except:
             print 'Failed! Continuing without loading snapshot.'
 
-
-    def test_step(self, keep_prob=1.0):
-        x_in_, y_in_, y_hat_ = self.sess.run([self.x_in, self.y_in, self.y_hat],
-            feed_dict={self.keep_prob: keep_prob})
-        return [x_in_, y_in_, y_hat_]
-
-
     def inference(self, x_in, keep_prob):
-        y_hat_ = self.sess.run([self.y_hat],
-            feed_dict={self.x_in: x_in, self.keep_prob: keep_prob})[0]
+        feed_dict = {self.x_in: x_in,
+                     self.keep_prob: keep_prob,
+                     self.training: False}
+        y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
+        # y_hat_smax = tf.nn.softmax(y_hat_)
 
         return y_hat_
 
 
-    def loss_op(self):
-        seg_loss = tf.nn.softmax_cross_entropy_with_logits(
-            labels=self.y_in, logits=self.y_hat)
-        seg_loss = tf.reduce_mean(seg_loss)
-        seg_loss_sum = tf.summary.scalar('seg_loss', seg_loss)
-        self.summary_op_list.append(seg_loss_sum)
+class SegNetInference(SegNetBase):
+    inference_defaults = {
+        'mode': 'TEST' }
 
-        if self.adversarial:
-            p_real_fake = self.discriminator.p_real_fake
-            real_target = tf.ones_like(p_real_fake)
-            adv_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=real_target, logits=p_real_fake))
-            adv_loss_sum = tf.summary.scalar('adv_loss', adv_loss)
-            self.summary_op_list.append(adv_loss_sum)
-            return seg_loss + adv_loss
+    def __init__(self, **kwargs):
+        self.inference_defaults.update(**kwargs)
+        super(SegNetInference, self).__init__(**self.inference_defaults)
 
-        return seg_loss
+        ## ------------------- Input ops ------------------- ##
+        self.x_in = tf.placeholder('float',
+            shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
+            name='x_in')
 
+        ## ------------------- Model ops ------------------- ##
+        # self.keep_prob = tf.placeholder('float', name='keep_prob')
+        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
+        self.training = tf.placeholder_with_default(False, shape=[], name='training')
+        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
+            training=self.training)
+        self.y_hat_smax = tf.nn.softmax(self.y_hat)
 
-    def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'SegNet Model'
-        with tf.variable_scope(self.name) as scope:
-            if reuse:
-                scope.reuse_variables()
-            print '\t x_in', x_in.get_shape()
+        # self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
+        # self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
 
-            c0_0 = lrelu(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
-            c0_1 = lrelu(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
-            c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
-            c0_pool, c0_max = tf.nn.max_pool_with_argmax(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c0_pool')
-            print '\t c0_pool', c0_pool.get_shape() ## 128
+        self.saver = tf.train.Saver(max_to_keep=5)
+        self.sess.run(tf.global_variables_initializer())
 
-            c1_0 = lrelu(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
-            c1_1 = lrelu(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
-            c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
-            c1_pool, c1_max = tf.nn.max_pool_with_argmax(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c1_pool')
-            print '\t c1_pool', c1_pool.get_shape() ## 64
+    def inference(self, x_in, keep_prob=1.0):
+        assert len(x_in.shape) == 4
+        feed_dict = {self.x_in: x_in,
+                     self.keep_prob: keep_prob}
+        y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
+        # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
 
-            c2_0 = lrelu(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
-            c2_1 = lrelu(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
-            c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
-            c2_pool, c2_max = tf.nn.max_pool_with_argmax(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c2_pool')
-            print '\t c2_pool', c2_pool.get_shape() ## 32
+        return y_hat_
 
-            c3_0 = lrelu(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
-            c3_1 = lrelu(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
-            c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
-            c3_1 = tf.nn.dropout(c3_1, keep_prob=keep_prob)
-            c3_pool, c3_max = tf.nn.max_pool_with_argmax(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c3_pool')
-            print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
+    def bayesian_inference(self, x_in, samples=25, keep_prob=0.5):
+        assert keep_prob < 1.0
+        assert samples > 1
+        assert x_in.shape[0] == 1 and len(x_in.shape) == 4
 
-            ## Unpool instead of convolution
-            d1 = unpool(c3_pool, c3_max, ksize=[1,4,4,1], var_scope='unpool1')
-            # d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
-            d1 = lrelu(conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1'))
-            d1 = batch_norm(d1, training=training, var_scope='d1_bn')
-            d1 = tf.nn.dropout(d1, keep_prob=keep_prob)
-            print '\t d1', d1.get_shape() ## 16*4 = 64
+        y_hat_ = self.inference(x_in=x_in, keep_prob=keep_prob)
+        y_hat_ = np.expand_dims(y_hat_, -1)
+        for tt in xrange(1, samples):
+            y_hat_p = self.inference(x_in=x_in, keep_prob=keep_prob)
+            y_hat_ = np.concatenate([y_hat_, np.expand_dims(y_hat_p, -1)], -1)
 
-            d0 = unpool(d1, c1_max, var_scope='unpool2')
-            # d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
-            d0 = lrelu(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
-            d0 = batch_norm(d0, training=training, var_scope='d0_bn')
-            print '\t d0', d0.get_shape() ## 64*2 = 128
+        y_bar_mean = np.mean(y_hat_, axis=-1) ## (1, h, w, n_classes)
+        y_bar_var = np.var(y_hat_, axis=-1)
+        y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
 
-            # y_hat = unpool(d0, c0_max, var_scope='unpool3')
-            # y_hat = conv(y_hat, self.n_classes, var_scope='y_hat')
-            y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
-            print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
-
-            return y_hat
+        return y_bar_mean, y_bar_var, y_bar
 
 
-    def print_info(self):
-        print '------------------------ SegNet ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ SegNet ---------------------- '
+    def restore(self, snapshot_path):
+        print 'Restoring from {}'.format(snapshot_path)
+        try:
+            self.saver.restore(self.sess, snapshot_path)
+            print 'Success!'
+        except:
+            print 'Failed! Continuing without loading snapshot.'

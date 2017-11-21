@@ -3,7 +3,6 @@ import numpy as np
 import sys
 sys.path.insert(0, '.')
 from basemodel import BaseModel
-sys.path.insert(0, '../utilities')
 from ops import (
     lrelu,
     linear,
@@ -15,7 +14,7 @@ class ConvDiscriminator(BaseModel):
         'x_real': None,
         'x_fake': None,
         'learning_rate': 5e-4,
-        'kernels': [8, 16, 512],
+        'kernels': [16, 64, 512],
         'real_softening': 0.1,
         'name': 'ConvDiscriminator'}
 
@@ -66,33 +65,34 @@ class ConvDiscriminator(BaseModel):
 
     def model(self, y_hat, keep_prob=0.5, reuse=False, training=True):
         print 'Convolutional Discriminator'
+        nonlin = self.nonlin
+        print 'Nonlinearity: ', nonlin
+
         with tf.variable_scope('ConvDiscriminator') as scope:
             if reuse:
                 scope.reuse_variables()
             print '\t y_hat', y_hat.get_shape()
 
-            h0 = conv(y_hat, self.kernels[0], k_size=5, stride=3, var_scope='h0')
-            h0 = batch_norm(h0, training=training, var_scope='h0_bn')
-            h0 = lrelu(h0)
+            h0 = nonlin(conv(y_hat, self.kernels[0], k_size=7, stride=4, var_scope='h0'))
 
             h0_pool = tf.nn.max_pool(h0, [1,3,3,1], [1,3,3,1], padding='VALID',
                 name='h0_pool')
             print '\t h0_pool', h0_pool.get_shape()
 
-            h1 = conv(h0_pool, self.kernels[1], var_scope='h1')
-            h1 = batch_norm(h1, training=training, var_scope='h1_bn')
-            h1 = lrelu(h1)
+            h1 = nonlin(conv(h0_pool, self.kernels[1], var_scope='h1'))
 
             h1_pool = tf.nn.max_pool(h1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='h1_pool')
             print '\t h1_pool', h1_pool.get_shape()
 
             h1_flat = tf.contrib.layers.flatten(h1_pool)
-            h1_flat = tf.nn.dropout(h1_flat, keep_prob=keep_prob, name='h1_flat_do')
+            # h1_flat = tf.nn.dropout(h1_flat, keep_prob=keep_prob, name='h1_flat_do')
+            h1_flat = tf.contrib.nn.alpha_dropout(h1_flat, keep_prob=keep_prob, name='h1_flat_do')
             print '\t h1_flat', h1_flat.get_shape()
 
-            h2 = lrelu(linear(h1_flat, self.kernels[2], var_scope='h2'))
-            h2 = tf.nn.dropout(h2, keep_prob=keep_prob, name='h2_do')
+            h2 = nonlin(linear(h1_flat, self.kernels[2], var_scope='h2'))
+            # h2 = tf.nn.dropout(h2, keep_prob=keep_prob, name='h2_do')
+            h2 = tf.contrib.nn.alpha_dropout(h2, keep_prob=keep_prob, name='h2_do')
             print '\t h2', h2.get_shape()
 
             p_real = linear(h2, 1, var_scope='p_real')

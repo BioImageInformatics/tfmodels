@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-
 class BaseModel(object):
     ## Defaults
     defaults={
@@ -25,6 +24,9 @@ class BaseModel(object):
             setattr(self, key, value)
 
         assert self.sess is not None
+
+        ## Set the nonlinearity for all models
+        self.nonlin = tf.nn.selu
 
     def print_info(self):
         print '------------------------ BaseModel ---------------------- '
