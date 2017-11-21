@@ -62,56 +62,75 @@ class VGGBase(BaseModel):
     def print_info(self):
         print '------------------------ VGG ---------------------- '
         for key, value in sorted(self.__dict__.items()):
+            if '_op' in key:
+                continue
             print '|\t', key, value
         print '------------------------ VGG ---------------------- '
 
+    def _print_settings(self, filename):
+        with open(filename, 'w+') as f:
+            f.write('---------------------- VGG ----------------------\n')
+            for key, value in sorted(self.__dict__.items()):
+                if '_op' in key:
+                    continue
+
+                if key == 'var_list':
+                    f.write('|\t{}:\n'.format(key))
+                    for val in value:
+                        f.write('|\t\t{}\n'.format(val))
+                    continue
+
+                f.write('|\t{}: {}\n'.format(key, value))
+            f.write('---------------------- VGG ----------------------\n')
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'VGG-FCN Model'
+        nonlin = self.nonlin
+        print 'Non-linearity:', nonlin
+
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
-            c0_0 = lrelu(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
-            c0_1 = lrelu(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
-            c0_1 = batch_norm(c0_1, reuse=reuse, training=training, var_scope='c0_1_bn')
+            c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
+            c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
+            # c0_1 = batch_norm(c0_1, reuse=reuse, training=training, var_scope='c0_1_bn')
             c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape() ## 128
 
-            c1_0 = lrelu(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
-            c1_1 = lrelu(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
-            c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
+            c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
+            c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
+            # c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
             c1_pool = tf.nn.max_pool(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
             print '\t c1_pool', c1_pool.get_shape() ## 64
 
-            c2_0 = lrelu(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
-            c2_1 = lrelu(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
-            c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
+            c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
+            c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
+            # c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
             c2_pool = tf.nn.max_pool(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c2_pool')
             print '\t c2_pool', c2_pool.get_shape() ## 32
 
-            c3_0 = lrelu(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
-            c3_0 = tf.nn.dropout(c3_0, keep_prob=keep_prob)
-            c3_1 = lrelu(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
-            c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
+            c3_0 = nonlin(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
+            # c3_0 = tf.nn.dropout(c3_0, keep_prob=keep_prob)
+            c3_0 = tf.contrib.nn.alpha_dropout(c3_0, keep_prob=keep_prob)
+            c3_1 = nonlin(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
+            # c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
             c3_pool = tf.nn.max_pool(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c3_pool')
             print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
 
-            d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
-            d1 = conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1')
-            d1 = batch_norm(d1, reuse=reuse, training=training, var_scope='d1_bn')
-            d1 = lrelu(d1)
+            d1 = nonlin(deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1'))
+            d1 = nonlin(conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1'))
+            # d1 = batch_norm(d1, reuse=reuse, training=training, var_scope='d1_bn')
             print '\t d1', d1.get_shape() ## 16*4 = 64
 
-            d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
-            d0 = conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0')
-            d0 = batch_norm(d0, training=training, var_scope='d0_bn')
-            d0 = lrelu(d0)
+            d0 = nonlin(deconv(d1, self.deconv_kernels[0], var_scope='d0'))
+            d0 = nonlin(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
+            # d0 = batch_norm(d0, training=training, var_scope='d0_bn')
             print '\t d0', d0.get_shape() ## 64*2 = 128
 
             y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
@@ -124,8 +143,7 @@ class VGGBase(BaseModel):
 
 class VGGTraining(VGGBase):
     train_defaults = {
-    'mode': 'TRAIN'
-    }
+    'mode': 'TRAIN' }
 
     def __init__(self, **kwargs):
         self.train_defaults.update(**kwargs)
@@ -192,10 +210,11 @@ class VGGTraining(VGGBase):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
-        self.save_dir = os.path.join(self.save_dir, 'vgg_segmentation.ckpt')
+        self.snapshot_name = os.path.join(self.save_dir, 'vgg.ckpt')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
+        self._print_settings(filename=os.path.join(self.save_dir, 'vgg_model_settings.txt'))
 
     def make_training_ops(self):
         self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
@@ -271,8 +290,8 @@ class VGGTraining(VGGBase):
         return return_x, return_y, return_y_hat
 
     def snapshot(self, step):
-        print 'Snapshotting to [{}] step [{}]'.format(self.save_dir, step),
-        self.saver.save(self.sess, self.save_dir, global_step=step)
+        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_name, step),
+        self.saver.save(self.sess, self.snapshot_name, global_step=step)
         print 'Done'
 
     def restore(self, snapshot_path):
@@ -293,12 +312,9 @@ class VGGTraining(VGGBase):
         return y_hat_
 
 
-
-
 class VGGInference(VGGBase):
     inference_defaults = {
-        'mode': 'TEST'
-    }
+        'mode': 'TEST' }
 
     def __init__(self, **kwargs):
         self.inference_defaults.update(**kwargs)
@@ -324,12 +340,30 @@ class VGGInference(VGGBase):
         self.sess.run(tf.global_variables_initializer())
 
     def inference(self, x_in, keep_prob=1.0):
+        assert len(x_in.shape) == 4
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob}
         y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
         # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
 
         return y_hat_
+
+    def bayesian_inference(self, x_in, samples=25, keep_prob=0.5):
+        assert keep_prob < 1.0
+        assert samples > 1
+        assert x_in.shape[0] == 1 and len(x_in.shape) == 4
+
+        y_hat_ = self.inference(x_in=x_in, keep_prob=keep_prob)
+        y_hat_ = np.expand_dims(y_hat_, -1)
+        for tt in xrange(1, samples):
+            y_hat_p = self.inference(x_in=x_in, keep_prob=keep_prob)
+            y_hat_ = np.concatenate([y_hat_, np.expand_dims(y_hat_p, -1)], -1)
+
+        y_bar_mean = np.mean(y_hat_, axis=-1) ## (1, h, w, n_classes)
+        y_bar_var = np.var(y_hat_, axis=-1)
+        y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
+
+        return y_bar_mean, y_bar_var, y_bar
 
 
     def restore(self, snapshot_path):

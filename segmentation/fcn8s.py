@@ -12,7 +12,7 @@ from ops import (
     deconv,
     batch_norm)
 
-class SegNetBase(BaseModel):
+class FCNBase(BaseModel):
     base_defaults={
         'sess': None,
         'learning_rate': 1e-3,
@@ -21,8 +21,8 @@ class SegNetBase(BaseModel):
         'adversary_lambda': 1,
         'dataset': None,
         'x_dims': [256, 256, 3],
-        'conv_kernels': [64, 64, 64, 64],
-        'deconv_kernels': [64, 64],
+        'conv_kernels': [32, 64, 64, 128],
+        'deconv_kernels': [32],
         'n_classes': None,
         'summary_iters': 50,
         'mode': 'TRAIN',
@@ -60,16 +60,16 @@ class SegNetBase(BaseModel):
         raise Exception(NotImplementedError)
 
     def print_info(self):
-        print '------------------------ SegNet ---------------------- '
+        print '------------------------ FCN ---------------------- '
         for key, value in sorted(self.__dict__.items()):
             if '_op' in key:
                 continue
             print '|\t', key, value
-        print '------------------------ SegNet ---------------------- '
+        print '------------------------ FCN ---------------------- '
 
     def _print_settings(self, filename):
         with open(filename, 'w+') as f:
-            f.write('---------------------- SegNet ----------------------\n')
+            f.write('---------------------- FCN ----------------------\n')
             for key, value in sorted(self.__dict__.items()):
                 if '_op' in key:
                     continue
@@ -81,10 +81,12 @@ class SegNetBase(BaseModel):
                     continue
 
                 f.write('|\t{}: {}\n'.format(key, value))
-            f.write('---------------------- SegNet ----------------------\n')
+            f.write('---------------------- FCN ----------------------\n')
 
+    ## Layer flow copied from:
+    ## https://github.com/MarvinTeichmann/tensorflow-fcn/blob/master/fcn8_vgg.py
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'SegNet Model'
+        print 'FCN Model'
         nonlin = self.nonlin
         print 'Non-linearity:', nonlin
 
@@ -95,49 +97,49 @@ class SegNetBase(BaseModel):
 
             c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
             c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
-            c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
-            c0_pool, c0_max = tf.nn.max_pool_with_argmax(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+            c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape() ## 128
 
             c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
             c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
-            c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
-            c1_pool, c1_max = tf.nn.max_pool_with_argmax(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+            c1_pool = tf.nn.max_pool(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
             print '\t c1_pool', c1_pool.get_shape() ## 64
 
             c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
             c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
-            c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
-            c2_pool, c2_max = tf.nn.max_pool_with_argmax(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+            c2_pool = tf.nn.max_pool(c2_1, [1,4,4,1], [1,4,4,1], padding='VALID',
                 name='c2_pool')
             print '\t c2_pool', c2_pool.get_shape() ## 32
 
             c3_0 = nonlin(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
+            c3_0 = tf.contrib.nn.alpha_dropout(c3_0, keep_prob=keep_prob)
             c3_1 = nonlin(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
-            c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
-            c3_1 = tf.nn.dropout(c3_1, keep_prob=keep_prob)
-            c3_pool, c3_max = tf.nn.max_pool_with_argmax(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+            c3_pool = tf.nn.max_pool(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c3_pool')
             print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
 
-            ## Unpool instead of convolution
-            d1 = unpool_with_argmax(c3_pool, c3_max, ksize=[1,4,4,1], var_scope='unpool1')
-            # d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
-            d1 = nonlin(conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1'))
-            d1 = batch_norm(d1, training=training, var_scope='d1_bn')
-            d1 = tf.nn.dropout(d1, keep_prob=keep_prob)
-            print '\t d1', d1.get_shape() ## 16*4 = 64
+            ## The actual ones has one more instead
+            # c4_0 = nonlin(conv(c3_pool, self.conv_kernels[4], k_size=3, stride=1, var_scope='c4_0'))
+            # c4_0 = tf.contrib.nn.alpha_dropout(c4_0, keep_prob=keep_prob)
+            # c4_1 = nonlin(conv(c4_0, self.conv_kernels[4], k_size=3, stride=1, var_scope='c4_1'))
+            # c4_pool = tf.nn.max_pool(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
+            #     name='c4_pool')
+            # print '\t c4_pool', c4_pool.get_shape()  ## inputs / 32 = 8
 
-            d0 = unpool_with_argmax(d1, c1_max, var_scope='unpool2')
-            # d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
-            d0 = nonlin(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
-            d0 = batch_norm(d0, training=training, var_scope='d0_bn')
-            print '\t d0', d0.get_shape() ## 64*2 = 128
+            upscore3 = nonlin(deconv(c3_pool, self.n_classes, upsample_rate=16, var_scope='ups3'))
+            upscore2 = nonlin(deconv(c2_pool, self.n_classes, upsample_rate=8, var_scope='ups2'))
+            upscore1 = nonlin(deconv(c1_pool, self.n_classes, upsample_rate=4, var_scope='ups1'))
+            print '\t upscore3', upscore3.get_shape()
+            print '\t upscore2', upscore2.get_shape()
+            print '\t upscore1', upscore1.get_shape()
 
-            # y_hat = unpool_with_argmax(d0, c0_max, var_scope='unpool3')
-            # y_hat = conv(y_hat, self.n_classes, var_scope='y_hat')
+            upscore_concat = tf.concat([upscore3, upscore2, upscore1], axis=-1)
+            print '\t upscore_concat', upscore_concat.get_shape()
+            d0 = nonlin(conv(upscore_concat, deconv_kernels[0], k_size=3, stride=1, var_scope='d0'))
+            print '\t d0', d0.get_shape()
+
             y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
 
@@ -146,7 +148,7 @@ class SegNetBase(BaseModel):
 
 
 
-class SegNetTraining(SegNetBase):
+class FCNTraining(FCNBase):
     train_defaults = {
     'mode': 'TRAIN' }
 
@@ -185,7 +187,7 @@ class SegNetTraining(SegNetBase):
 
         ## ------------------- Training ops ------------------- ##
         self.var_list = self.get_update_list()
-        self.seg_optimizer = tf.train.AdamOptimizer(self.learning_rate, name='SegNet_Adam')
+        self.seg_optimizer = tf.train.AdamOptimizer(self.learning_rate, name='FCN_Adam')
 
         if self.adversarial:
             # self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
@@ -215,11 +217,11 @@ class SegNetTraining(SegNetBase):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
-        self.snapshot_name = os.path.join(self.save_dir, 'segnet_segmentation.ckpt')
+        self.snapshot_name = os.path.join(self.save_dir, 'fcn_segmentation.ckpt')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
-        self._print_settings(filename=os.path.join(self.save_dir, 'segnet_model_settings.txt'))
+        self._print_settings(filename=os.path.join(self.save_dir, 'fcn_model_settings.txt'))
 
     def make_training_ops(self):
         self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
@@ -317,7 +319,7 @@ class SegNetTraining(SegNetBase):
         return y_hat_
 
 
-class SegNetInference(SegNetBase):
+class FCNInference(FCNBase):
     inference_defaults = {
         'mode': 'TEST' }
 

@@ -25,6 +25,9 @@ class BaseModel(object):
 
         assert self.sess is not None
 
+        ## Set the nonlinearity for all models
+        self.nonlin = tf.nn.selu
+
     def print_info(self):
         print '------------------------ BaseModel ---------------------- '
         for key, value in sorted(self.__dict__.items()):

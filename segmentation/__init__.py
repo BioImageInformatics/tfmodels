@@ -5,12 +5,16 @@
 import ops
 from discriminator import ConvDiscriminator
 from generic import GenericSegmentation
-from segnet import SegNet
+from segnet import SegNetTraining, SegNetInference
 from vgg import VGGTraining, VGGInference
+from fcn8s import FCNTraining, FCNInference
 
 __all__ = ['ConvDiscriminator',
            'GenericSegmentation',
-           'SegNet',
+           'SegNetTraining',
+           'SegNetInference',
            'VGGTraining',
            'VGGInference',
+           'FCNTraining',
+           'FCNInference',
            ]
