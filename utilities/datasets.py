@@ -320,6 +320,8 @@ class ImageComboDataSet(DataSet):
         image_key, image_file = self.image_reader.read(self.feature_queue)
         image = tf.image.decode_image(image_file, channels=4)
         print image.get_shape()
+
+        #with tf.device('/cpu:0'):
         image, mask = self._preprocessing(image)
 
         self.image_op, self.mask_op = tf.train.shuffle_batch([image, mask],

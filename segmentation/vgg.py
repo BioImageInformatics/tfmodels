@@ -35,53 +35,6 @@ class VGGBase(BaseModel):
         assert self.n_classes is not None
         if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
 
-    def get_update_list(self):
-        raise Exception(NotImplementedError)
-
-    def summaries(self):
-        raise Exception(NotImplementedError)
-
-    def train_step(self, global_step):
-        raise Exception(NotImplementedError)
-
-    def snapshot(self, step):
-        raise Exception(NotImplementedError)
-
-    def restore(self, snapshot_path):
-        raise Exception(NotImplementedError)
-
-    def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
-
-    def inference(self, x_in, keep_prob):
-        raise Exception(NotImplementedError)
-
-    def loss_op(self):
-        raise Exception(NotImplementedError)
-
-    def print_info(self):
-        print '------------------------ VGG ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            if '_op' in key:
-                continue
-            print '|\t', key, value
-        print '------------------------ VGG ---------------------- '
-
-    def _print_settings(self, filename):
-        with open(filename, 'w+') as f:
-            f.write('---------------------- VGG ----------------------\n')
-            for key, value in sorted(self.__dict__.items()):
-                if '_op' in key:
-                    continue
-
-                if key == 'var_list':
-                    f.write('|\t{}:\n'.format(key))
-                    for val in value:
-                        f.write('|\t\t{}\n'.format(val))
-                    continue
-
-                f.write('|\t{}: {}\n'.format(key, value))
-            f.write('---------------------- VGG ----------------------\n')
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'VGG-FCN Model'
@@ -203,7 +156,8 @@ class VGGTraining(VGGBase):
 
         ## ------------------- Gather Summary ops ------------------- ##
         self.summary_op_list += self.summaries()
-        self.summary_op = tf.summary.merge(self.summary_op_list)
+        # self.summary_op = tf.summary.merge(self.summary_op_list)
+        self.summary_op = tf.summary.merge_all()
         self.training_op_list.append(self.summary_op)
 
         ## ------------------- TensorFlow helpers ------------------- ##
@@ -214,7 +168,7 @@ class VGGTraining(VGGBase):
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
-        self._print_settings(filename=os.path.join(self.save_dir, 'vgg_model_settings.txt'))
+        self._print_info_to_file(filename=os.path.join(self.save_dir, 'vgg_model_settings.txt'))
 
     def make_training_ops(self):
         self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(

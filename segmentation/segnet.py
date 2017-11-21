@@ -30,58 +30,10 @@ class SegNetBase(BaseModel):
 
     def __init__(self, **kwargs):
         self.base_defaults.update(**kwargs)
-        super(VGGBase, self).__init__(**self.base_defaults)
+        super(SegNetBase, self).__init__(**self.base_defaults)
 
         assert self.n_classes is not None
         if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
-
-    def get_update_list(self):
-        raise Exception(NotImplementedError)
-
-    def summaries(self):
-        raise Exception(NotImplementedError)
-
-    def train_step(self, global_step):
-        raise Exception(NotImplementedError)
-
-    def snapshot(self, step):
-        raise Exception(NotImplementedError)
-
-    def restore(self, snapshot_path):
-        raise Exception(NotImplementedError)
-
-    def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
-
-    def inference(self, x_in, keep_prob):
-        raise Exception(NotImplementedError)
-
-    def loss_op(self):
-        raise Exception(NotImplementedError)
-
-    def print_info(self):
-        print '------------------------ SegNet ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            if '_op' in key:
-                continue
-            print '|\t', key, value
-        print '------------------------ SegNet ---------------------- '
-
-    def _print_settings(self, filename):
-        with open(filename, 'w+') as f:
-            f.write('---------------------- SegNet ----------------------\n')
-            for key, value in sorted(self.__dict__.items()):
-                if '_op' in key:
-                    continue
-
-                if key == 'var_list':
-                    f.write('|\t{}:\n'.format(key))
-                    for val in value:
-                        f.write('|\t\t{}\n'.format(val))
-                    continue
-
-                f.write('|\t{}: {}\n'.format(key, value))
-            f.write('---------------------- SegNet ----------------------\n')
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'SegNet Model'
