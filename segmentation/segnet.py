@@ -10,7 +10,8 @@ from ops import (
     linear,
     conv,
     deconv,
-    batch_norm)
+    batch_norm,
+    unpool_with_argmax )
 
 class SegNetBase(BaseModel):
     base_defaults={
