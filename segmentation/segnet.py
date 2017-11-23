@@ -83,10 +83,10 @@ class SegNetBase(BaseModel):
             d0 = nonlin(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
             print '\t d0', d0.get_shape() ## 64*2 = 128
 
-            y_hat = unpool(d0, c0_max, k_size=[1,2,2,1], var_scope='unpool0')
-            y_hat = conv(y_hat, self.n_classes, stride=1, pad='SAME', var_scope='y_hat')
-            # y_hat = nonlin(deconv(y_hat, self.n_classes, var_scope='y_hat'))
+            # y_hat = unpool(d0, c0_max, k_size=[1,2,2,1], var_scope='unpool0')
             # y_hat = conv(y_hat, self.n_classes, stride=1, pad='SAME', var_scope='y_hat')
+            y_hat = nonlin(deconv(d0, self.n_classes, var_scope='y_hat_0'))
+            y_hat = conv(y_hat, self.n_classes, stride=1, pad='SAME', var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
 
             return y_hat

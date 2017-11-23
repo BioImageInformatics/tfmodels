@@ -28,14 +28,14 @@ image_dir = '{}/combo'.format(data_home)
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 500
 iterations = 2500
-batch_size = 16
+batch_size = 32
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'pca256segnet/logs/{}'.format(expdate)
-save_dir = 'pca256segnet/snapshots'
-debug_dir = 'pca256segnet/debug'
-snapshot_restore = 'pca256segnet/snapshots/segnet_large.ckpt-{}'.format(step_start)
+log_dir = 'pca128segnet/logs/{}'.format(expdate)
+save_dir = 'pca128segnet/snapshots'
+debug_dir = 'pca128segnet/debug'
+snapshot_restore = 'pca128segnet/snapshots/segnet.ckpt-{}'.format(step_start)
 
 
 with tf.Session(config=config) as sess:
@@ -47,7 +47,7 @@ with tf.Session(config=config) as sess:
         min_holding=1000,
         threads=8,
         crop_size=512,
-        ratio=0.5,
+        ratio=0.25,
         augmentation='random')
     dataset.print_info()
 
@@ -59,10 +59,10 @@ with tf.Session(config=config) as sess:
         conv_kernels=[64, 64, 128, 256],
         deconv_kernels=[64, 64, 128],
         learning_rate=1e-3,
-        x_dims=[256, 256, 3],
+        x_dims=[128, 128, 3],
         # adversarial=True,
         # adversary_lambda=0,
-        snapshot_name='segnet_large')
+        snapshot_name='segnet')
 
     model.print_info()
     if step_start > 0:
