@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-import os
+import os, glob
 
 
 ''' Save a 4D stack of images
@@ -47,3 +47,23 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5):
     y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
 
     return y_bar_mean, y_bar_var, y_bar
+
+
+def write_image_mask_combos(src_dir, save_dir, src_ext='png', save_ext='jpg', resize=0.25):
+
+    img_list = sorted(glob.glob(os.path.join(
+        src_dir, '*.'+src_ext )))
+
+    for img in img_list:
+        outname = img.replace(src_dir, save_dir).replace(src_ext, save_ext)
+        img_ = cv2.imread(img, -1)
+        mask_ = img_[:,:,-1]
+        img_ = img_[:,:,:-1]
+
+
+        mask_ = np.dstack([mask_]*3) * (255/3)
+
+        img_mask = np.hstack([img_, mask_])
+        img_mask = cv2.resize(img_mask, dsize=(0,0), fx=resize, fy=resize)
+        success = cv2.imwrite(outname, img_mask)
+        print img, img_.shape, mask_.shape, img_mask.shape, outname

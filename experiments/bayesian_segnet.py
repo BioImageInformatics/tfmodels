@@ -1,11 +1,11 @@
 import tensorflow as tf
 import numpy as np
-import sys, datetime, os
+import sys, datetime, os, time
 
 sys.path.insert(0, '..')
 from segmentation.generic import GenericSegmentation
 from segmentation.segnet import SegNetTraining
-from utilities.datasets import ImageMaskDataSet
+from utilities.datasets import ImageComboDataSet
 from utilities.general import (
     save_image_stack,
     bayesian_inference )
@@ -22,34 +22,32 @@ config.gpu_options.allow_growth = True
 # image_dir = '{}/he'.format(data_home)
 # mask_dir = '{}/hmm/4class'.format(data_home)
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
-image_dir = '{}/jpg_norm'.format(data_home)
-mask_dir = '{}/mask'.format(data_home)
+image_dir = '{}/combo'.format(data_home)
 
-assert os.path.exists(image_dir) and os.path.exists(mask_dir)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 1000
-iterations = 250
-batch_size = 16
+epochs = 500
+iterations = 2500
+batch_size = 32
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'pca256segnet/logs/{}'.format(expdate)
-save_dir = 'pca256segnet/snapshots'
-debug_dir = 'pca256segnet/debug'
-snapshot_restore = 'pca256segnet/snapshots/segnet.ckpt-{}'.format(step_start)
+log_dir = 'pca128segnet/logs/{}'.format(expdate)
+save_dir = 'pca128segnet/snapshots'
+debug_dir = 'pca128segnet/debug'
+snapshot_restore = 'pca128segnet/snapshots/segnet.ckpt-{}'.format(step_start)
 
 
 with tf.Session(config=config) as sess:
     # with tf.device('/cpu:0'):
-    dataset = ImageMaskDataSet(batch_size=batch_size,
+    dataset = ImageComboDataSet(batch_size=batch_size,
         image_dir=image_dir,
-        mask_dir=mask_dir,
-        capacity=5000,
-        min_holding=750,
-        threads=2,
+        image_ext='png',
+        capacity=2500,
+        min_holding=1000,
+        threads=8,
         crop_size=512,
-        ratio=0.5,
+        ratio=0.25,
         augmentation='random')
     dataset.print_info()
 
@@ -58,12 +56,13 @@ with tf.Session(config=config) as sess:
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
-        conv_kernels=[64, 64, 64, 64],
-        deconv_kernels=[64, 64],
+        conv_kernels=[64, 64, 128, 256],
+        deconv_kernels=[64, 64, 128],
         learning_rate=1e-3,
-        x_dims=[256, 256, 3],)
-        # adversarial=True, )
-        # adversary_lr=5e-7)
+        x_dims=[128, 128, 3],
+        # adversarial=True,
+        # adversary_lambda=0,
+        snapshot_name='segnet')
 
     model.print_info()
     if step_start > 0:
@@ -101,11 +100,13 @@ with tf.Session(config=config) as sess:
     print 'Start'
     global_step = step_start
     for epx in xrange(1, epochs):
+        epoch_start = time.time()
         for itx in xrange(iterations):
             global_step += 1
             model.train_step(global_step)
 
-        print 'Epoch [{}] step [{}]'.format(epx, global_step)
+        print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
+            epx, global_step, time.time()-epoch_start)
         model.snapshot(global_step)
 
         for test_idx, test_img in enumerate(test_x_list):

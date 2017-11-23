@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import sys, datetime, os
+import sys, datetime, os, time
 
 sys.path.insert(0, '..')
 from segmentation.generic import GenericSegmentation
@@ -30,8 +30,8 @@ mask_dir = '{}/mask'.format(data_home)
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 1000
 iterations = 250
-batch_size = 32
-step_start = 1000
+batch_size = 16
+step_start = 39750
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir = 'pca256vgg/logs/{}'.format(expdate)
@@ -52,16 +52,16 @@ with tf.Session(config=config) as sess:
     #     augmentation='random')
     # dataset.print_info()
 
-    with tf.device('/cpu:0'):
-        dataset = ImageComboDataSet(batch_size=batch_size,
-            image_dir=image_dir,
-            image_ext='png',
-            capacity=7500,
-            min_holding=500,
-            threads=6,
-            crop_size=512,
-            ratio=0.5,
-            augmentation='random')
+    #with tf.device('/cpu:0'):
+    dataset = ImageComboDataSet(batch_size=batch_size,
+        image_dir=image_dir,
+        image_ext='png',
+        capacity=2500,
+        min_holding=1000,
+        threads=8,
+        crop_size=512,
+        ratio=0.5,
+        augmentation='random')
     dataset.print_info()
 
     model = VGGTraining(sess=sess,
@@ -112,11 +112,13 @@ with tf.Session(config=config) as sess:
     print 'Start'
     global_step = step_start
     for epx in xrange(1, epochs):
+        epoch_start = time.time()
         for itx in xrange(iterations):
             global_step += 1
             model.train_step(global_step)
 
-        print 'Epoch [{}] step [{}]'.format(epx, global_step)
+        print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
+            epx, global_step, time.time()-epoch_start)
         model.snapshot(global_step)
 
         for test_idx, test_img in enumerate(test_x_list):

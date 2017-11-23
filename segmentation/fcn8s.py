@@ -35,53 +35,6 @@ class FCNBase(BaseModel):
         assert self.n_classes is not None
         if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
 
-    def get_update_list(self):
-        raise Exception(NotImplementedError)
-
-    def summaries(self):
-        raise Exception(NotImplementedError)
-
-    def train_step(self, global_step):
-        raise Exception(NotImplementedError)
-
-    def snapshot(self, step):
-        raise Exception(NotImplementedError)
-
-    def restore(self, snapshot_path):
-        raise Exception(NotImplementedError)
-
-    def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
-
-    def inference(self, x_in, keep_prob):
-        raise Exception(NotImplementedError)
-
-    def loss_op(self):
-        raise Exception(NotImplementedError)
-
-    def print_info(self):
-        print '------------------------ FCN ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            if '_op' in key:
-                continue
-            print '|\t', key, value
-        print '------------------------ FCN ---------------------- '
-
-    def _print_settings(self, filename):
-        with open(filename, 'w+') as f:
-            f.write('---------------------- FCN ----------------------\n')
-            for key, value in sorted(self.__dict__.items()):
-                if '_op' in key:
-                    continue
-
-                if key == 'var_list':
-                    f.write('|\t{}:\n'.format(key))
-                    for val in value:
-                        f.write('|\t\t{}\n'.format(val))
-                    continue
-
-                f.write('|\t{}: {}\n'.format(key, value))
-            f.write('---------------------- FCN ----------------------\n')
 
     ## Layer flow copied from:
     ## https://github.com/MarvinTeichmann/tensorflow-fcn/blob/master/fcn8_vgg.py
@@ -192,7 +145,7 @@ class FCNTraining(FCNBase):
         if self.adversarial:
             # self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
             self.discriminator = ConvDiscriminator(sess=self.sess,
-                x_real=self.y_in, x_fake=tf.nn.softmax(self.y_hat))
+                x_in=self.x_in, y_real=self.y_in, y_fake=tf.nn.softmax(self.y_hat))
             # self.discriminator = ConvDiscriminator(sess=self.sess,
             #     x_real=self.y_in_mask, x_fake=self.y_hat_mask)
             self.discriminator.print_info()
@@ -200,17 +153,11 @@ class FCNTraining(FCNBase):
             self.summary_op_list += self.discriminator.summary_op_list
 
         self.make_training_ops()
-        # self.loss = self.loss_op()
-
-        ## ------------------- Testing ops ------------------- ##
-        #self.x_test = tf.placeholder('float',
-        #    shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
-        #    name='x_test')
-        #self.y_hat_test = self.model(self.x_test, keep_prob=self.keep_prob, reuse=True, training=False)
 
         ## ------------------- Gather Summary ops ------------------- ##
         self.summary_op_list += self.summaries()
-        self.summary_op = tf.summary.merge(self.summary_op_list)
+        # self.summary_op = tf.summary.merge(self.summary_op_list)
+        self.summary_op = tf.summary.merge_all()
         self.training_op_list.append(self.summary_op)
 
         ## ------------------- TensorFlow helpers ------------------- ##
@@ -243,6 +190,9 @@ class FCNTraining(FCNBase):
             # p_real_fake = tf.stop_gradient(self.discriminator.model(self.y_hat_mask, reuse=True))
             p_real_fake = self.discriminator.p_real_fake
             real_target = tf.ones_like(p_real_fake)
+            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
+                mean=0.0, stddev=0.01)
+            real_target = real_target + real_epsilon
             self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=real_target, logits=p_real_fake)
             self.adv_loss = tf.reduce_mean(self.adv_loss)
