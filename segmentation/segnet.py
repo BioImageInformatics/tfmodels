@@ -11,7 +11,7 @@ from ops import (
     conv,
     deconv,
     batch_norm,
-    unpool_with_argmax )
+    unpool,)
 
 class SegNetBase(BaseModel):
     base_defaults={
@@ -19,11 +19,11 @@ class SegNetBase(BaseModel):
         'learning_rate': 1e-3,
         'adversarial': False,
         'adversary_lr': 1e-4,
-        'adversary_lambda': 1,
+        'adversary_lambda': 0.1,
         'dataset': None,
         'x_dims': [256, 256, 3],
         'conv_kernels': [64, 64, 64, 64],
-        'deconv_kernels': [64, 64],
+        'deconv_kernels': [64, 64, 64],
         'n_classes': None,
         'summary_iters': 50,
         'mode': 'TRAIN',
@@ -48,50 +48,45 @@ class SegNetBase(BaseModel):
 
             c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
             c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
-            c0_1 = batch_norm(c0_1, training=training, var_scope='c0_1_bn')
-            c0_pool, c0_max = tf.nn.max_pool_with_argmax(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c0_pool')
+            c0_pool, c0_max = tf.nn.max_pool_with_argmax(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape() ## 128
 
             c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
             c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
-            c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
             c1_pool, c1_max = tf.nn.max_pool_with_argmax(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
             print '\t c1_pool', c1_pool.get_shape() ## 64
 
             c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
             c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
-            c2_1 = batch_norm(c2_1, training=training, var_scope='c2_1_bn')
-            c2_pool, c2_max = tf.nn.max_pool_with_argmax(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c2_pool')
+            c2_pool, c2_max = tf.nn.max_pool_with_argmax(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='c2_pool')
             print '\t c2_pool', c2_pool.get_shape() ## 32
 
             c3_0 = nonlin(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
             c3_1 = nonlin(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
-            c3_1 = batch_norm(c3_1, training=training, var_scope='c3_1_bn')
-            c3_1 = tf.nn.dropout(c3_1, keep_prob=keep_prob)
-            c3_pool, c3_max = tf.nn.max_pool_with_argmax(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
-                name='c3_pool')
+            c3_1 = tf.contrib.nn.alpha_dropout(c3_1, keep_prob=keep_prob)
+            c3_pool, c3_max = tf.nn.max_pool_with_argmax(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='c3_pool')
             print '\t c3_pool', c3_pool.get_shape()  ## inputs / 16 = 16
 
-            ## Unpool instead of convolution
-            d1 = unpool_with_argmax(c3_pool, c3_max, ksize=[1,4,4,1], var_scope='unpool1')
-            # d1 = deconv(c3_pool, self.deconv_kernels[1], upsample_rate=4, var_scope='d1')
-            d1 = nonlin(conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1'))
-            d1 = batch_norm(d1, training=training, var_scope='d1_bn')
-            d1 = tf.nn.dropout(d1, keep_prob=keep_prob)
-            print '\t d1', d1.get_shape() ## 16*4 = 64
+            ## Unpool instead of deconvolution
+            d2 = unpool(c3_pool, c3_max, k_size=[1,2,2,1], var_scope='unpool3')
+            d2 = nonlin(conv(d2, self.deconv_kernels[2], stride=1, var_scope='dc2'))
+            d2 = tf.contrib.nn.alpha_dropout(d2, keep_prob=keep_prob)
+            print '\t d2', d2.get_shape() ## 16*2 = 32
 
-            d0 = unpool_with_argmax(d1, c1_max, var_scope='unpool2')
-            # d0 = deconv(d1, self.deconv_kernels[0], var_scope='d0')
+            d1 = unpool(d2, c2_max, k_size=[1,2,2,1], var_scope='unpool2')
+            d1 = nonlin(conv(d1, self.deconv_kernels[1], stride=1, var_scope='dc1'))
+            d1 = tf.contrib.nn.alpha_dropout(d1, keep_prob=keep_prob)
+            print '\t d1', d1.get_shape() ## 32*2 = 64
+
+            d0 = unpool(d1, c1_max, k_size=[1,2,2,1], var_scope='unpool1')
             d0 = nonlin(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
-            d0 = batch_norm(d0, training=training, var_scope='d0_bn')
             print '\t d0', d0.get_shape() ## 64*2 = 128
 
-            # y_hat = unpool_with_argmax(d0, c0_max, var_scope='unpool3')
-            # y_hat = conv(y_hat, self.n_classes, var_scope='y_hat')
-            y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
+            y_hat = unpool(d0, c0_max, k_size=[1,2,2,1], var_scope='unpool0')
+            y_hat = conv(y_hat, self.n_classes, stride=1, pad='SAME', var_scope='y_hat')
+            # y_hat = nonlin(deconv(y_hat, self.n_classes, var_scope='y_hat'))
+            # y_hat = conv(y_hat, self.n_classes, stride=1, pad='SAME', var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
 
             return y_hat
@@ -143,7 +138,7 @@ class SegNetTraining(SegNetBase):
         if self.adversarial:
             # self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
             self.discriminator = ConvDiscriminator(sess=self.sess,
-                x_real=self.y_in, x_fake=tf.nn.softmax(self.y_hat))
+                x_in=self.x_in, y_real=self.y_in, y_fake=tf.nn.softmax(self.y_hat))
             # self.discriminator = ConvDiscriminator(sess=self.sess,
             #     x_real=self.y_in_mask, x_fake=self.y_hat_mask)
             self.discriminator.print_info()
@@ -161,18 +156,19 @@ class SegNetTraining(SegNetBase):
 
         ## ------------------- Gather Summary ops ------------------- ##
         self.summary_op_list += self.summaries()
-        self.summary_op = tf.summary.merge(self.summary_op_list)
+        self.summary_op = tf.summary.merge_all()
+        # self.summary_op = tf.summary.merge(self.summary_op_list)
         self.training_op_list.append(self.summary_op)
 
         ## ------------------- TensorFlow helpers ------------------- ##
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
-        self.snapshot_name = os.path.join(self.save_dir, 'segnet_segmentation.ckpt')
+        self.snapshot_path = os.path.join(self.save_dir, '{}.ckpt'.format(self.snapshot_name))
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
-        self._print_settings(filename=os.path.join(self.save_dir, 'segnet_model_settings.txt'))
+        self._print_info_to_file(filename=os.path.join(self.save_dir, 'segnet_model_settings.txt'))
 
     def make_training_ops(self):
         self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
@@ -194,16 +190,30 @@ class SegNetTraining(SegNetBase):
             # p_real_fake = tf.stop_gradient(self.discriminator.model(self.y_hat_mask, reuse=True))
             p_real_fake = self.discriminator.p_real_fake
             real_target = tf.ones_like(p_real_fake)
+            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
+                mean=0.0, stddev=0.01)
+            real_target = real_target + real_epsilon
             self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=real_target, logits=p_real_fake)
             self.adv_loss = tf.reduce_mean(self.adv_loss)
             self.adv_loss_sum = tf.summary.scalar('adv_loss', self.adv_loss)
             self.summary_op_list.append(self.adv_loss_sum)
 
+            ## Standalone adversarial training op
             # self.adversarial_train_op = self.adv_optimizer.minimize(
             #     self.adv_loss, var_list=self.var_list)
             # self.training_op_list.append(self.adversarial_train_op)
-            self.loss = self.seg_loss + self.adversary_lambda * self.adv_loss
+
+            ## Discriminator feature matching
+            real_features = self.discriminator.real_features
+            fake_features = self.discriminator.fake_features
+            self.feature_loss = tf.losses.mean_squared_error(
+                predictions=fake_features, labels=real_features )
+            self.feature_loss_sum = tf.summary.scalar('feature_loss', self.feature_loss)
+            self.summary_op_list.append(self.feature_loss_sum)
+
+            self.loss = self.seg_loss + self.adversary_lambda * self.adv_loss + \
+                self.adversary_lambda * self.feature_loss
         else:
             self.loss = self.seg_loss
 
@@ -248,8 +258,8 @@ class SegNetTraining(SegNetBase):
         return return_x, return_y, return_y_hat
 
     def snapshot(self, step):
-        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_name, step),
-        self.saver.save(self.sess, self.snapshot_name, global_step=step)
+        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_path, step),
+        self.saver.save(self.sess, self.snapshot_path, global_step=step)
         print 'Done'
 
     def restore(self, snapshot_path):

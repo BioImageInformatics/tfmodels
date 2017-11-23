@@ -9,7 +9,8 @@ class BaseModel(object):
         'save_dir': None,
         'name': 'BaseModel',
         'training_op_list': [],
-        'summary_op_list': [] }
+        'summary_op_list': [],
+        'snapshot_name': 'snapshot' }
 
     def __init__(self, **kwargs):
         self.sess = None
@@ -28,13 +29,6 @@ class BaseModel(object):
 
         ## Set the nonlinearity for all models
         self.nonlin = tf.nn.selu
-
-    def print_info(self):
-        print '------------------------ BaseModel ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ BaseModel ---------------------- '
-
 
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)

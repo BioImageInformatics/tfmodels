@@ -138,7 +138,7 @@ class VGGTraining(VGGBase):
         if self.adversarial:
             # self.adv_optimizer = tf.train.AdamOptimizer(self.adversary_lr, name='VGG_adv_Adam')
             self.discriminator = ConvDiscriminator(sess=self.sess,
-                x_real=self.y_in, x_fake=tf.nn.softmax(self.y_hat))
+                x_in=self.x_in, y_real=self.y_in, y_fake=tf.nn.softmax(self.y_hat))
             # self.discriminator = ConvDiscriminator(sess=self.sess,
             #     x_real=self.y_in_mask, x_fake=self.y_hat_mask)
             self.discriminator.print_info()

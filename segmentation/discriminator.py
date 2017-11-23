@@ -11,27 +11,30 @@ from ops import (
 
 class ConvDiscriminator(BaseModel):
     defaults={
-        'x_real': None,
-        'x_fake': None,
-        'learning_rate': 5e-4,
+        'x_in': None,
+        'y_real': None,
+        'y_fake': None,
+        'learning_rate': 5e-5,
         'kernels': [64, 64, 64, 512],
-        'real_softening': 0.1,
+        'soften_labels': True,
+        'real_softening': 0.01,
         'name': 'ConvDiscriminator'}
 
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
         super(ConvDiscriminator, self).__init__(**self.defaults)
 
-        assert self.x_real is not None
-        assert self.x_fake is not None
+        assert self.y_real is not None
+        assert self.y_fake is not None
 
         ## Label softening add noise ~ N(0,0.01)
-        epsilon = tf.random_normal(shape=tf.shape(self.x_real),
-            mean=0.0, stddev=self.real_softening)
-        self.x_real = self.x_real + epsilon
+        if self.soften_labels:
+            epsilon = tf.random_normal(shape=tf.shape(self.y_real),
+                mean=0.0, stddev=self.real_softening)
+            self.y_real = self.y_real + epsilon
 
-        self.p_real_fake = self.model(self.x_fake)
-        self.p_real_real = self.model(self.x_real, reuse=True)
+        self.p_real_fake, self.real_features = self.model(self.y_fake, self.x_in)
+        self.p_real_real, self.fake_features = self.model(self.y_real, self.x_in, reuse=True)
         self.loss = self.loss_op()
 
         self.var_list = self.get_update_list()
@@ -53,17 +56,26 @@ class ConvDiscriminator(BaseModel):
 
     ## TODO switch to Wasserstein loss. Remember to clip the outputs
     def loss_op(self):
-        real_target = tf.ones_like(self.p_real_fake)
-        fake_target = tf.zeros_like(self.p_real_real)
+        real_target = tf.ones_like(self.p_real_real)
+        fake_target = tf.zeros_like(self.p_real_fake)
+
+        if self.soften_labels:
+            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
+                mean=0.0, stddev=self.real_softening)
+            fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
+                mean=0.0, stddev=self.real_softening)
+            real_target = real_target + real_epsilon
+            fake_target = fake_target + fake_epsilon
 
         loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
             labels=real_target, logits=self.p_real_real))
         loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
             labels=fake_target, logits=self.p_real_fake))
-        return (loss_real + loss_fake) / 2.0
+        # return (loss_real + loss_fake) / 2.0
+        return loss_real + loss_fake
 
 
-    def model(self, y_hat, keep_prob=0.5, reuse=False, training=True):
+    def model(self, y_hat, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'Convolutional Discriminator'
         nonlin = self.nonlin
         print 'Nonlinearity: ', nonlin
@@ -73,7 +85,10 @@ class ConvDiscriminator(BaseModel):
                 scope.reuse_variables()
             print '\t y_hat', y_hat.get_shape()
 
-            h0_0 = nonlin(conv(y_hat, self.kernels[0], k_size=3, stride=1, var_scope='h0_0'))
+            y_hat_x_in = tf.concat([y_hat, x_in], axis=-1)
+            print '\t y_hat_x_in', y_hat_x_in.get_shape()
+
+            h0_0 = nonlin(conv(y_hat_x_in, self.kernels[0], k_size=3, stride=1, var_scope='h0_0'))
             h0_1 = nonlin(conv(h0_0, self.kernels[0], k_size=3, stride=1, var_scope='h0_1'))
             h0_pool = tf.nn.max_pool(h0_1, [1,4,4,1], [1,4,4,1], padding='VALID', name='h0_pool')
             print '\t h0_pool', h0_pool.get_shape()
@@ -99,16 +114,9 @@ class ConvDiscriminator(BaseModel):
             p_real = linear(h3, 1, var_scope='p_real')
             print '\t p_real', p_real.get_shape()
 
-            return p_real
+            return p_real, h3
 
     def inference(self, x_in, keep_prob=1.0):
         p_real_ = self.sess.run([p_real_fake], feed_dict={self.x_fake: x_in})
         p_real_smax = tf.nn.softmax(p_real_)
         return p_real_smax
-
-
-    def print_info(self):
-        print '------------------------ ConvDiscriminator ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ ConvDiscriminator ---------------------- '
