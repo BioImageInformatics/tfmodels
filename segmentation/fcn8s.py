@@ -21,8 +21,8 @@ class FCNBase(BaseModel):
         'adversary_lambda': 1,
         'dataset': None,
         'x_dims': [256, 256, 3],
-        'conv_kernels': [32, 64, 64, 128],
-        'deconv_kernels': [32],
+        'conv_kernels': [32, 64, 128, 256],
+        'deconv_kernels': [64],
         'n_classes': None,
         'summary_iters': 50,
         'mode': 'TRAIN',
@@ -30,7 +30,7 @@ class FCNBase(BaseModel):
 
     def __init__(self, **kwargs):
         self.base_defaults.update(**kwargs)
-        super(VGGBase, self).__init__(**self.base_defaults)
+        super(FCNBase, self).__init__(**self.base_defaults)
 
         assert self.n_classes is not None
         if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
@@ -154,7 +154,7 @@ class FCNTraining(FCNBase):
 
     def __init__(self, **kwargs):
         self.train_defaults.update(**kwargs)
-        super(SegNetTraining, self).__init__(**self.train_defaults)
+        super(FCNTraining, self).__init__(**self.train_defaults)
 
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
@@ -325,7 +325,7 @@ class FCNInference(FCNBase):
 
     def __init__(self, **kwargs):
         self.inference_defaults.update(**kwargs)
-        super(SegNetInference, self).__init__(**self.inference_defaults)
+        super(FCNInference, self).__init__(**self.inference_defaults)
 
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder('float',
