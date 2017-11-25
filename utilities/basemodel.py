@@ -7,28 +7,15 @@ class BaseModel(object):
         'sess': None,
         'log_dir': None,
         'save_dir': None,
-        'name': 'BaseModel',
+        'name': 'base',
         'training_op_list': [],
         'summary_op_list': [],
         'snapshot_name': 'snapshot' }
 
     def __init__(self, **kwargs):
-        self.sess = None
-        self.log_dir = None
-        self.save_dir = None
-        self.training_op_list = []
-        self.summary_op_list = []
-        # self.defaults.update(**kwargs)
-        # print self.defaults
-        # for key, value in self.defaults.items():
-        #     setattr(self, key, value)
-        for key, value in kwargs.items():
+        self.defaults.update(**kwargs)
+        for key, value in self.defaults.items():
             setattr(self, key, value)
-
-        assert self.sess is not None
-
-        ## Set the nonlinearity for all models
-        self.nonlin = tf.nn.selu
 
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)

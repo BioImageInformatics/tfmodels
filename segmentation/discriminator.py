@@ -1,15 +1,7 @@
 import tensorflow as tf
-import numpy as np
-import sys
-sys.path.insert(0, '.')
-from basemodel import BaseModel
-from ops import (
-    lrelu,
-    linear,
-    conv,
-    batch_norm)
+from ..utilities.basemodel import BaseModel
 
-class ConvDiscriminator(BaseModel):
+class SegmentationDiscriminator(BaseModel):
     defaults={
         'x_in': None,
         'y_real': None,
@@ -18,11 +10,12 @@ class ConvDiscriminator(BaseModel):
         'kernels': [64, 64, 64, 512],
         'soften_labels': True,
         'real_softening': 0.01,
-        'name': 'ConvDiscriminator'}
+        'name': 'SegDiscriminator',
+    }
 
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
-        super(ConvDiscriminator, self).__init__(**self.defaults)
+        super(SegmentationDiscriminator, self).__init__(**self.defaults)
 
         assert self.y_real is not None
         assert self.y_fake is not None
@@ -47,11 +40,6 @@ class ConvDiscriminator(BaseModel):
 
         discrim_loss_sum = tf.summary.scalar('discrim_loss', self.loss)
         self.summary_op_list.append(discrim_loss_sum)
-
-
-    def get_update_list(self):
-        t_vars = tf.trainable_variables()
-        return [var for var in t_vars if 'ConvDiscriminator' in var.name]
 
 
     ## TODO switch to Wasserstein loss. Remember to clip the outputs
@@ -80,7 +68,7 @@ class ConvDiscriminator(BaseModel):
         nonlin = self.nonlin
         print 'Nonlinearity: ', nonlin
 
-        with tf.variable_scope('ConvDiscriminator') as scope:
+        with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
             print '\t y_hat', y_hat.get_shape()
@@ -115,6 +103,7 @@ class ConvDiscriminator(BaseModel):
             print '\t p_real', p_real.get_shape()
 
             return p_real, h3
+
 
     def inference(self, x_in, keep_prob=1.0):
         p_real_ = self.sess.run([p_real_fake], feed_dict={self.x_fake: x_in})

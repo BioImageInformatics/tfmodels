@@ -92,9 +92,6 @@ Assume the images and masks are named similarly and are in different folders
 
 class DataSet(object):
     defaults = {
-        'batch_size': 64,
-        'crop_size': 256,
-        'ratio': 1.0,
         'capacity': 5000,
         'seed': 5555,
         'threads': 4,
@@ -294,11 +291,6 @@ class ImageComboDataSet(DataSet):
         'image_dir': None,
         'image_ext': 'png',
         'ratio': 1.0,
-        'capacity': 5000,
-        'seed': 5555,
-        'threads': 4,
-        'input_size': 1200,
-        'min_holding': 1250,
         'dstype': 'ImageMask',
         'augmentation': None }
     def __init__(self, **kwargs):
@@ -396,10 +388,6 @@ class ImageComboDataSet(DataSet):
         print '------------------------ ImageComboDataSet ---------------------- '
 
 
-
-<<<<<<< HEAD
-        ``
-=======
 '''
 '''
 class ImageDataSet(DataSet):
@@ -485,12 +473,11 @@ class ImageDataSet(DataSet):
         print '------------------------ ImageDataSet ---------------------- '
         for key, value in sorted(self.__dict__.items()):
             print '|\t', key, value
-        print '------------------------ ImageDataSet ---------------------- '
+        print '------------------------ ImageDataSet ----------------------'
 
 
 
 ## TODO
->>>>>>> 124b1bd928135229a5558411158e8ddc72b5ab0a
 class SVSDataSet(DataSet):
     defaults = {
         'batch_size': 16,

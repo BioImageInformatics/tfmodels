@@ -14,5 +14,7 @@ inference_model = tfmodels.VGGInference(snapshot_path)
 output = inference_model.inference(images)
 '''
 
+import sys
+sys.path.insert(0, '.')
 from utilities import *
 from segmentation import *
