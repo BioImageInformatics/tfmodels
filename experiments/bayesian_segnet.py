@@ -3,7 +3,6 @@ import numpy as np
 import sys, datetime, os, time
 
 sys.path.insert(0, '..')
-from segmentation.generic import GenericSegmentation
 from segmentation.segnet import SegNetTraining
 from utilities.datasets import ImageComboDataSet
 from utilities.general import (

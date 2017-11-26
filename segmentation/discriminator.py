@@ -1,7 +1,7 @@
 import tensorflow as tf
-from ..utilities.basemodel import BaseModel
+from ..generative.discriminator_basemodel import BaseDiscriminator
 
-class SegmentationDiscriminator(BaseModel):
+class SegmentationDiscriminator(BaseDiscriminator):
     defaults={
         'x_in': None,
         'y_real': None,
@@ -9,7 +9,7 @@ class SegmentationDiscriminator(BaseModel):
         'learning_rate': 5e-5,
         'kernels': [64, 64, 64, 512],
         'soften_labels': True,
-        'real_softening': 0.01,
+        'soften_sddev': 0.01,
         'name': 'SegDiscriminator',
     }
 
@@ -23,44 +23,15 @@ class SegmentationDiscriminator(BaseModel):
         ## Label softening add noise ~ N(0,0.01)
         if self.soften_labels:
             epsilon = tf.random_normal(shape=tf.shape(self.y_real),
-                mean=0.0, stddev=self.real_softening)
+                mean=0.0, stddev=self.soften_sddev)
             self.y_real = self.y_real + epsilon
 
+        ## Set up the real prob, fake prob
         self.p_real_fake, self.real_features = self.model(self.y_fake, self.x_in)
         self.p_real_real, self.fake_features = self.model(self.y_real, self.x_in, reuse=True)
-        self.loss = self.loss_op()
 
-        self.var_list = self.get_update_list()
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='DiscAdam')
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
-
-        self.training_op_list.append(self.training_op)
-
-        discrim_loss_sum = tf.summary.scalar('discrim_loss', self.loss)
-        self.summary_op_list.append(discrim_loss_sum)
-
-
-    ## TODO switch to Wasserstein loss. Remember to clip the outputs
-    def loss_op(self):
-        real_target = tf.ones_like(self.p_real_real)
-        fake_target = tf.zeros_like(self.p_real_fake)
-
-        if self.soften_labels:
-            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
-                mean=0.0, stddev=self.real_softening)
-            fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
-                mean=0.0, stddev=self.real_softening)
-            real_target = real_target + real_epsilon
-            fake_target = fake_target + fake_epsilon
-
-        loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=real_target, logits=self.p_real_real))
-        loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=fake_target, logits=self.p_real_fake))
-        # return (loss_real + loss_fake) / 2.0
-        return loss_real + loss_fake
+        ## Then call _make_training_op
+        self._make_training_op()
 
 
     def model(self, y_hat, x_in, keep_prob=0.5, reuse=False, training=True):
@@ -106,6 +77,5 @@ class SegmentationDiscriminator(BaseModel):
 
 
     def inference(self, x_in, keep_prob=1.0):
-        p_real_ = self.sess.run([p_real_fake], feed_dict={self.x_fake: x_in})
-        p_real_smax = tf.nn.softmax(p_real_)
-        return p_real_smax
+        p_real_ = self.sess.run([self.p_real_fake], feed_dict={self.x_fake: x_in})[0]
+        return p_real_
