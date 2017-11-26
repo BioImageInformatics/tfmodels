@@ -7,9 +7,7 @@ from generator_basemodel import BaseGenerator
 ''' Generative Adversarial Network
 
 1. Define the disciminator and generator according to the template models
-
 2. implement the loss functions and regularizers
-
 3. ???
 
 '''
@@ -22,9 +20,6 @@ class Discriminator(BaseDiscriminator):
         self.gan_discriminator_defaults.update(**kwargs)
         super(Discriminator, self).__init__(**self.gan_discriminator_defaults)
 
-        self.p_real_fake = self.model(x_in=self.fake)
-        self.p_real_real = self.model(x_in=self.real, reuse=True)
-        self._make_training_op()
 
     def model(self, x_in, keep_prob=0.5, reuse=False):
         with tf.variable_scope(self.name) as scope:
@@ -58,7 +53,6 @@ class Generator(BaseGenerator):
         self.gan_generator_defaults.update(**kwargs)
         super(Generator, self).__init__(**self.gan_generator_defaults)
 
-        # self.x_hat = self.model(z_in=self.z_in)
 
     def model(self, z_in, keep_prob=0.5, reuse=False):
         with tf.variable_scope(self.name) as scope:
