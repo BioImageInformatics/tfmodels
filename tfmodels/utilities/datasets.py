@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import os, glob, cv2
+import threading
 from openslide import OpenSlide
 
 from tensorflow.examples.tutorials.mnist import input_data
@@ -42,45 +43,57 @@ def load_images(paths, batchsize, crop_size):
     #     tensor.min(), tensor.max(), tensor.dtype)
     return tensor
 
+""" Using TF's built in MNIST dataset with the queue
 
+https://stackoverflow.com/questions/43231958/filling-queue-from-python-iterator
+"""
 class MNISTDataSet(object):
-    def __init__(self,
-                 source_dir,
-                 batch_size,
-                 n_classes = 10,
-                 mode='TRAIN'):
+    mnist_dataset_defaults = {
+        'batch_size': 64,
+        'capacity': 256,
+        'coord': None,
+        'mode': 'TRAIN',
+        'n_classes': 10,
+        'threads': 1,
+        'sess': None,
+        'source_dir': None,
+    }
 
+    def __init__(self, **kwargs):
+        self.mnist_dataset_defaults.update(**kwargs)
+        for key, value in self.mnist_dataset_defaults.items():
+            setattr(self, key, value)
+
+        assert self.source_dir is not None
         self.mnist = input_data.read_data_sets(source_dir)
-        self.has_masks = False
-        self.batch_size = batch_size
-        self.mode = mode
-        self.use_feed = True
+        self.iterator = self.mnist_iterator()
 
-        ## Don't need that fancy stuff down there
+        self.queue = tf.FIFOQueue(
+            capacity=self.capacity,
+            dtypes=[tf.float32] )
 
-        # if self.mode=='TRAIN':
-        # self.image_op = tf.placeholder(tf.float32, [self.batch_size, 28, 28, 1], name='MNIST_x')
-        # self.image_op = tf.cast(self.image_op_vec, tf.float32)
-            # self.image_op, self.labels_op = self.mnist.train.next_batch(self.batch_size)
-        # elif self.mode=='TEST':
-        # self.image_op, self.labels_op = self.mnist.test.next_batch(self.batch_size)
+        ## A bit different from below. The equeue_op pulls data from the iterator
+        ## It doesn't need shape??
+        self.batch_x = tf.placeholder(tf.float32, [None, 28, 28, 1])
+        self.enqueue_op = self.queue.enqueue(batch_x)
+        self.image_op = self.dequeue()
 
-        # self.image_op = self._reshape_batch(self.image_op_vec)
+        ## Some magic here
+        def enqueue_thread(self):
+            with self.coord.stop_on_exception():
+                while not self.coord.should_stop():
+                    self.sess.run(self.enqueue_op,
+                        feed_dict={self.batch_x: list(next(self.iterator))})
 
-    ## Dummy method -
-    def set_tf_sess(self, sess):
-        return
+        for i in range(self.threads):
+            threading.Thread(target=enqueue_thread).start()
 
+    def mnist_iterator(self):
+        while True:
+            batch_x, batch_y = self.mnist.train.next_batch(self.batch_sizej)
+            batch_x = np.reshape([self.batch_size, 28, 28, 1])
+            yield batch_x
 
-    def _reshape_batch(self, vect_x):
-        dims = [self.batch_size, 28, 28, 1]
-        batch = np.reshape(vect_x, dims)
-        return batch
-
-
-    ## Get a mean image to subtract
-    def _compute_mean(self):
-        pass
 
 
 '''
@@ -98,8 +111,7 @@ class DataSet(object):
         'min_holding': 1250,}
 
     def __init__(self, **kwargs):
-        for key, value in self.defaults.items():
-            setattr(self, key, value)
+        self.defaults.update(**kwargs)
         for key, value in kwargs.items():
             setattr(self, key, value)
 

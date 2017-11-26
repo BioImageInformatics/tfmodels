@@ -5,9 +5,8 @@ class BaseDiscriminator(BaseModel):
     ## Overload the base class.. do I even need the base class?
     ## TODO expose number of kernels and number of upsample steps to the world
     discriminator_defaults = {
-        'dis_kernels': [32, 64, 128]
-        'learning_rate': 1e-4,
-        'name': 'discriminator'
+        'dis_kernels': [32, 64, 128],
+        'name': 'discriminator',
         'soften_labels': False,
         'soften_sddev': 0.01,
     }

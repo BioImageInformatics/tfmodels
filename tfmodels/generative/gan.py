@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
+from ..utilities.basemodel import BaseModel
 from discriminator_basemodel import BaseDiscriminator
 from generator_basemodel import BaseGenerator
 
@@ -30,10 +31,10 @@ class Discriminator(BaseDiscriminator):
             print 'Nonlinearity: ', self.nonlin
             nonlin = self.nonlin
 
-            c0 = nonlin(conv(x_in, k_size=7, stride=3, var_scope='c0'))
-            c1 = nonlin(conv(c0, self.dis_kernels[0], k_size=7, stride=3, var_scope='c1'))
-            c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=7, stride=3, var_scope='c2'))
-            flat = tf.contrib.layers.flatten(c2)
+            c0 = nonlin(conv(x_in, self.dix_kenrels[0], k_size=5, stride=3, var_scope='c0'))
+            c1 = nonlin(conv(c0, self.dis_kernels[1], k_size=5, stride=3, var_scope='c1'))
+            # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
+            flat = tf.contrib.layers.flatten(c1)
             h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0'))
             p_real = linear(h0, 1, var_scope='p_real')
 
@@ -75,12 +76,12 @@ class Generator(BaseGenerator):
 
 
 ## defaults for all variables needed in Generator and Discriminator
-class GAN(BaseGenerativeModel):
+class GAN(BaseModel):
     gan_defaults = {
         'batch_size': 64,
-        'dataset': None
+        'dataset': None,
         'discriminator': None,
-        'dis_learning_rate': 1e-4
+        'dis_learning_rate': 1e-4,
         'dis_kernels': [32, 64, 128, 256],
         'generator': None,
         'gen_learning_rate': 2e-4,
@@ -101,6 +102,16 @@ class GAN(BaseGenerativeModel):
         assert len(self.x_dims) == 3
         if self.mode=='TRAIN': assert self.dataset is not None
 
+        self.generator = Generator(
+            gen_kernels=self.gen_kernels,
+            n_upsamples=self.n_upsamples,
+            x_dims=self.x_dims )
+        self.discriminator = Discriminator(
+            dis_kernels=self.dis_kernels,
+            soften_labels=self.soften_labels,
+            soften_sddev=self.soften_sddev )
+
+
         ## ---------------------- Input ops ----------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_imds[2]])
@@ -109,9 +120,6 @@ class GAN(BaseGenerativeModel):
         self.z_in = tf.placeholder_with_default(self.z_in_default,
             shape=[None, self.z_dim])
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-
-        self.generator = Generator(**self.gan_defaults)
-        self.discriminator = Discriminator(**self.gan_defaults)
 
         ## ---------------------- Model ops ----------------------- ##
         self.x_hat = self.generator.model(self.z_in, keep_prob=self.keep_prob)
