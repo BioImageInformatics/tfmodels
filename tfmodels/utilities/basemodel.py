@@ -1,27 +1,31 @@
 import tensorflow as tf
 import numpy as np
 
-class BaseGenerativeModel(object):
+class BaseModel(object):
+    ## Defaults
     defaults={
+        'sess': None,
         'log_dir': None,
         'save_dir': None,
-        'name': 'GenerativeModel',
-        'snapshot_name': 'snapshot'
-    }
+        'name': 'base',
+        'training_op_list': [],
+        'summary_op_list': [],
+        'snapshot_name': 'snapshot' }
 
     def __init__(self, **kwargs):
-
         self.defaults.update(**kwargs)
-        for key, value in defaults.items():
+        for key, value in self.defaults.items():
             setattr(self, key, value)
 
-        assert self.sess is not None
-
-        ## Default nonlinearity
+        ## Set nonlinearity for all downstream models
         self.nonlin = tf.nn.selu
 
-    def get_update_list(self):
+    def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
+
+    def get_update_list(self):
+        t_vars = tf.trainable_variables()
+        return [var for var in t_vars if self.name in var.name]
 
     def summaries(self):
         raise Exception(NotImplementedError)
@@ -50,7 +54,7 @@ class BaseGenerativeModel(object):
             if '_op' in key:
                 continue
 
-            if key == 'var_list':
+            if key == 'var_list' or 'vars' in key:
                 print '|\t{}:'.format(key)
                 for val in value:
                     print '|\t\t{}'.format(val)
@@ -66,7 +70,7 @@ class BaseGenerativeModel(object):
                 if '_op' in key:
                     continue
 
-                if key == 'var_list':
+                if key == 'var_list' or 'vars' in key:
                     f.write('|\t{}:\n'.format(key))
                     for val in value:
                         f.write('|\t\t{}\n'.format(val))

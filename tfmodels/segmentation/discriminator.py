@@ -1,15 +1,7 @@
 import tensorflow as tf
-import numpy as np
-import sys
-sys.path.insert(0, '.')
-from basemodel import BaseModel
-from ops import (
-    lrelu,
-    linear,
-    conv,
-    batch_norm)
+from ..generative.discriminator_basemodel import BaseDiscriminator
 
-class ConvDiscriminator(BaseModel):
+class SegmentationDiscriminator(BaseDiscriminator):
     defaults={
         'x_in': None,
         'y_real': None,
@@ -17,12 +9,13 @@ class ConvDiscriminator(BaseModel):
         'learning_rate': 5e-5,
         'kernels': [64, 64, 64, 512],
         'soften_labels': True,
-        'real_softening': 0.01,
-        'name': 'ConvDiscriminator'}
+        'soften_sddev': 0.01,
+        'name': 'SegDiscriminator',
+    }
 
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
-        super(ConvDiscriminator, self).__init__(**self.defaults)
+        super(SegmentationDiscriminator, self).__init__(**self.defaults)
 
         assert self.y_real is not None
         assert self.y_fake is not None
@@ -30,49 +23,15 @@ class ConvDiscriminator(BaseModel):
         ## Label softening add noise ~ N(0,0.01)
         if self.soften_labels:
             epsilon = tf.random_normal(shape=tf.shape(self.y_real),
-                mean=0.0, stddev=self.real_softening)
+                mean=0.0, stddev=self.soften_sddev)
             self.y_real = self.y_real + epsilon
 
+        ## Set up the real prob, fake prob
         self.p_real_fake, self.real_features = self.model(self.y_fake, self.x_in)
         self.p_real_real, self.fake_features = self.model(self.y_real, self.x_in, reuse=True)
-        self.loss = self.loss_op()
 
-        self.var_list = self.get_update_list()
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate, name='DiscAdam')
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            self.training_op = self.optimizer.minimize(self.loss, var_list=self.var_list)
-
-        self.training_op_list.append(self.training_op)
-
-        discrim_loss_sum = tf.summary.scalar('discrim_loss', self.loss)
-        self.summary_op_list.append(discrim_loss_sum)
-
-
-    def get_update_list(self):
-        t_vars = tf.trainable_variables()
-        return [var for var in t_vars if 'ConvDiscriminator' in var.name]
-
-
-    ## TODO switch to Wasserstein loss. Remember to clip the outputs
-    def loss_op(self):
-        real_target = tf.ones_like(self.p_real_real)
-        fake_target = tf.zeros_like(self.p_real_fake)
-
-        if self.soften_labels:
-            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
-                mean=0.0, stddev=self.real_softening)
-            fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
-                mean=0.0, stddev=self.real_softening)
-            real_target = real_target + real_epsilon
-            fake_target = fake_target + fake_epsilon
-
-        loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=real_target, logits=self.p_real_real))
-        loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=fake_target, logits=self.p_real_fake))
-        # return (loss_real + loss_fake) / 2.0
-        return loss_real + loss_fake
+        ## Then call _make_training_op
+        self._make_training_op()
 
 
     def model(self, y_hat, x_in, keep_prob=0.5, reuse=False, training=True):
@@ -80,7 +39,7 @@ class ConvDiscriminator(BaseModel):
         nonlin = self.nonlin
         print 'Nonlinearity: ', nonlin
 
-        with tf.variable_scope('ConvDiscriminator') as scope:
+        with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
             print '\t y_hat', y_hat.get_shape()
@@ -116,7 +75,7 @@ class ConvDiscriminator(BaseModel):
 
             return p_real, h3
 
+
     def inference(self, x_in, keep_prob=1.0):
-        p_real_ = self.sess.run([p_real_fake], feed_dict={self.x_fake: x_in})
-        p_real_smax = tf.nn.softmax(p_real_)
-        return p_real_smax
+        p_real_ = self.sess.run([self.p_real_fake], feed_dict={self.x_fake: x_in})[0]
+        return p_real_
