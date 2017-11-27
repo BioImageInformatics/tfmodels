@@ -1,5 +1,6 @@
 import tensorflow as tf
 from segmentation_basemodel import SegmentationBaseModel
+from ..utilities.ops import *
 
 class VGG(SegmentationBaseModel):
     vgg_defaults={

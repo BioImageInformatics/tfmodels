@@ -1,8 +1,9 @@
 import tensorflow as tf
 import numpy as np
-import sys
+import sys, os
 
 from ..utilities.basemodel import BaseModel
+from discriminator import SegmentationDiscriminator
 
 class SegmentationBaseModel(BaseModel):
     ## Defaults
@@ -13,6 +14,7 @@ class SegmentationBaseModel(BaseModel):
         'conv_kernels': [32, 64, 128, 256],
         'dataset': None,
         'deconv_kernels': [32, 64],
+        'feature_matching': False,
         'learning_rate': 1e-3,
         'log_dir': None,
         'mode': 'TRAIN',
@@ -73,11 +75,14 @@ class SegmentationBaseModel(BaseModel):
         ## ------------------- Training ops ------------------- ##
         self.var_list = self.get_update_list()
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
-            name='{}_Adam'.format(name))
+            name='{}_Adam'.format(self.name))
 
         if self.adversarial:
             self.discriminator = SegmentationDiscriminator(sess=self.sess,
-                x_in=self.x_in, y_real=self.y_in, y_fake=tf.nn.softmax(self.y_hat))
+                x_in=self.x_in,
+                y_real=self.y_in,
+                y_fake=tf.nn.softmax(self.y_hat),
+                feature_matching=self.feature_matching)
             self.discriminator.print_info()
             self.training_op_list += self.discriminator.training_op_list
             self.summary_op_list += self.discriminator.summary_op_list
@@ -135,6 +140,8 @@ class SegmentationBaseModel(BaseModel):
         self.summary_op_list.append(self.seg_loss_sum)
 
         if self.adversarial:
+            ## Train the generator w.r.t. the current discriminator
+            ## The discriminator itself is updated elsewhere
             p_real_fake = self.discriminator.p_real_fake
             real_target = tf.ones_like(p_real_fake)
             self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
@@ -148,10 +155,8 @@ class SegmentationBaseModel(BaseModel):
         else:
             self.loss = self.seg_loss
 
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            self.training_op = self.optimizer.minimize(
-                self.loss, var_list=self.var_list)
+        self.training_op = self.optimizer.minimize(
+            self.loss, var_list=self.var_list)
 
         self.training_op_list.append(self.training_op)
 
@@ -180,8 +185,8 @@ class SegmentationBaseModel(BaseModel):
 
 
     def snapshot(self, step):
-        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_name, step),
-        self.saver.save(self.sess, self.snapshot_name, global_step=step)
+        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_dir, step),
+        self.saver.save(self.sess, self.snapshot_dir, global_step=step)
         print 'Done'
 
 
@@ -198,58 +203,28 @@ class SegmentationBaseModel(BaseModel):
         raise Exception(NotImplementedError)
 
 
-    def inference(self, x_in, keep_prob):
+    def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob,
                      self.training: False}
         y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
+        return y_hat_
 
 
-    def bayesian_inference(self, x_in, samples=25, keep_prob=0.5):
+    def bayesian_inference(self, x_in, samples=25, keep_prob=0.5, ret_all=False):
         assert keep_prob < 1.0
         assert samples > 1
         assert x_in.shape[0] == 1 and len(x_in.shape) == 4
 
-        y_hat_ = self.inference(x_in=x_in, keep_prob=keep_prob)
-        y_hat_ = np.expand_dims(y_hat_, -1)
-        for tt in xrange(1, samples):
-            y_hat_p = self.inference(x_in=x_in, keep_prob=keep_prob)
-            y_hat_ = np.concatenate([y_hat_, np.expand_dims(y_hat_p, -1)], -1)
+        x_in_stack = np.concatenate([x_in]*samples, axis=0)
 
-        y_bar_mean = np.mean(y_hat_, axis=-1) ## (1, h, w, n_classes)
-        y_bar_var = np.var(y_hat_, axis=-1)
-        y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
+        y_hat = self.inference(x_in=x_in_stack, keep_prob=keep_prob)
+        y_bar_mean = np.mean(y_hat, axis=0) ## (1, h, w, n_classes)
 
-        return y_bar_mean, y_bar_var, y_bar
-
-
-    def print_info(self):
-        print '------------------------ {} ---------------------- '.format(self.name)
-        for key, value in sorted(self.__dict__.items()):
-            if '_op' in key:
-                continue
-
-            if key == 'var_list':
-                print '|\t{}:'.format(key)
-                for val in value:
-                    print '|\t\t{}'.format(val)
-                continue
-
-            print '|\t', key, value
-        print '------------------------ {} ---------------------- '.format(self.name)
-
-    def _print_info_to_file(self, filename):
-        with open(filename, 'w+') as f:
-            f.write('---------------------- {} ----------------------\n'.format(self.name))
-            for key, value in sorted(self.__dict__.items()):
-                if '_op' in key:
-                    continue
-
-                if key == 'var_list':
-                    f.write('|\t{}:\n'.format(key))
-                    for val in value:
-                        f.write('|\t\t{}\n'.format(val))
-                    continue
-
-                f.write('|\t{}: {}\n'.format(key, value))
-            f.write('---------------------- {} ----------------------\n'.format(self.name))
+        if ret_all:
+            y_bar_var = np.var(y_hat, axis=0)
+            y_bar_argmax = np.argmax(y_bar_mean, axis=-1)
+            y_bar_argmax = np.expand_dims(y_bar_argmax, 0)
+            return y_bar_mean, y_bar_var, y_bar_argmax
+        else:
+            return y_bar_mean

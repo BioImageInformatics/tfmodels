@@ -1,24 +1,26 @@
 import tensorflow as tf
 from ..generative.discriminator_basemodel import BaseDiscriminator
+from ..utilities.ops import *
 
 class SegmentationDiscriminator(BaseDiscriminator):
     defaults={
+        'feature_matching': False,
+        'kernels': [64, 64, 64, 512],
+        'learning_rate': 5e-5,
+        'name': 'SegDiscriminator',
+        'soften_labels': True,
+        'soften_sddev': 0.01,
         'x_in': None,
         'y_real': None,
         'y_fake': None,
-        'learning_rate': 5e-5,
-        'kernels': [64, 64, 64, 512],
-        'soften_labels': True,
-        'soften_sddev': 0.01,
-        'name': 'SegDiscriminator',
     }
 
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
         super(SegmentationDiscriminator, self).__init__(**self.defaults)
 
-        assert self.y_real is not None
         assert self.y_fake is not None
+        assert self.y_real is not None
 
         ## Label softening add noise ~ N(0,0.01)
         if self.soften_labels:
@@ -79,3 +81,39 @@ class SegmentationDiscriminator(BaseDiscriminator):
     def inference(self, x_in, keep_prob=1.0):
         p_real_ = self.sess.run([self.p_real_fake], feed_dict={self.x_fake: x_in})[0]
         return p_real_
+
+
+    def _make_loss(self):
+        real_target = tf.ones_like(self.p_real_real)
+        fake_target = tf.zeros_like(self.p_real_fake)
+
+        if self.soften_labels:
+            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
+                mean=0.0, stddev=self.soften_sddev)
+            fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
+                mean=0.0, stddev=self.soften_sddev)
+            real_target = real_target + real_epsilon
+            fake_target = fake_target + fake_epsilon
+
+        loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=real_target, logits=self.p_real_real))
+        loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=fake_target, logits=self.p_real_fake))
+        # return (loss_real + loss_fake) / 2.0
+        return loss_real + loss_fake
+
+
+    def _make_training_op(self):
+        self.var_list = self.get_update_list()
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
+            name='{}_Adam'.format(self.name))
+
+        self.loss = self._make_loss()
+        self.train_op = self.optimizer.minimize(self.loss,
+            var_list=self.var_list)
+        self.training_op_list.append(self.train_op)
+
+        # Summary
+        self.disciminator_loss_sum = tf.summary.scalar('{}_loss'.format(self.name),
+            self.loss)
+        self.summary_op_list.append(self.disciminator_loss_sum)

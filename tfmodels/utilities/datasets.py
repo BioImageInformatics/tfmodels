@@ -256,30 +256,13 @@ class ImageMaskDataSet(DataSet):
         image = tf.image.resize_images(image, [target_h, target_w])
         mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
-        ## Move to [-0.5, 0.5] for SELU activations
+        ## Recenter to [-0.5, 0.5] for SELU activations
         image = tf.multiply(image, 2/255.0) - 1
 
         # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
 
         return image, mask
 
-    def _random_normalize(self, image):
-        # imgR, imgG, imgB = tf.split(image, 3, -1)
-        lab_image = self._rgb_to_lab(image)
-        print 'lab_image', lab_image.get_shape()
-        imgR, imgG, imgB = tf.split(lab_image, 3, -1)
-
-        meanR, stdR = tf.nn.moments(imgR, axes = [0,1])
-        meanG, stdG = tf.nn.moments(imgG, axes = [0,1])
-        meanB, stdB = tf.nn.moments(imgB, axes = [0,1])
-
-        frgb = tf.random_normal([3,2], mean=0, stddev=0.001)
-        # frgb = tf.Print(frgb, [frgb, meanR, stdR, meanG, stdG, meanB, stdB])
-        imgR = (imgR - meanR) / stdR * (stdR + frgb[0,0]) + (meanR + frgb[0,1])
-        imgG = (imgG - meanG) / stdG * (stdG + frgb[1,0]) + (meanG + frgb[1,1])
-        imgB = (imgB - meanB) / stdB * (stdB + frgb[2,0]) + (meanB + frgb[2,1])
-
-        return tf.concat([imgR, imgG, imgB], -1)
 
     def get_batch(self, sess):
         image, mask = sess.run([self.image_op, self.mask_op])
@@ -309,14 +292,17 @@ augmentation:
 '''
 class ImageComboDataSet(DataSet):
     defaults = {
+        'augmentation': 'random',
         'batch_size': 16,
         'crop_size': 256,
         'channels': 3,
+        'dstype': 'ImageMask',
         'image_dir': None,
         'image_ext': 'png',
         'ratio': 1.0,
-        'dstype': 'ImageMask',
-        'augmentation': None }
+        'seed': 5555
+    }
+
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
         # print self.defaults
@@ -372,32 +358,11 @@ class ImageComboDataSet(DataSet):
         image = tf.image.resize_images(image, [target_h, target_w])
         mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
-        ## Move to [-1, 1] for SELU activations
+        ## Recenter to [-1, 1] for SELU activations
         image = tf.multiply(image, 2/255.0) - 1
 
         # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
-
         return image, mask
-
-
-
-    def _random_normalize(self, image):
-        # imgR, imgG, imgB = tf.split(image, 3, -1)
-        lab_image = self._rgb_to_lab(image)
-        print 'lab_image', lab_image.get_shape()
-        imgR, imgG, imgB = tf.split(lab_image, 3, -1)
-
-        meanR, stdR = tf.nn.moments(imgR, axes = [0,1])
-        meanG, stdG = tf.nn.moments(imgG, axes = [0,1])
-        meanB, stdB = tf.nn.moments(imgB, axes = [0,1])
-
-        frgb = tf.random_normal([3,2], mean=0, stddev=0.001)
-        # frgb = tf.Print(frgb, [frgb, meanR, stdR, meanG, stdG, meanB, stdB])
-        imgR = (imgR - meanR) / stdR * (stdR + frgb[0,0]) + (meanR + frgb[0,1])
-        imgG = (imgG - meanG) / stdG * (stdG + frgb[1,0]) + (meanG + frgb[1,1])
-        imgB = (imgB - meanB) / stdB * (stdB + frgb[2,0]) + (meanB + frgb[2,1])
-
-        return tf.concat([imgR, imgG, imgB], -1)
 
 
     def get_batch(self, sess):
@@ -414,7 +379,7 @@ class ImageComboDataSet(DataSet):
 
 '''
 '''
-class ImageDataSet(DataSet):
+class ImageFeeder(DataSet):
     defaults = {
         'augmentation': None,
         'batch_size': 16,
@@ -424,7 +389,6 @@ class ImageDataSet(DataSet):
         'dstype': 'Image',
         'image_dir': None,
         'image_ext': 'jpg',
-        'input_size': 1200,
         'min_holding': 1250,
         'ratio': 1.0,
         'seed': 5555,
@@ -434,7 +398,7 @@ class ImageDataSet(DataSet):
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
         # print self.defaults
-        super(ImageComboDataSet, self).__init__(**self.defaults)
+        super(ImageFeeder, self).__init__(**self.defaults)
         assert self.image_dir is not None
 
         ## ----------------- Load Image Lists ------------------- ##
@@ -448,13 +412,13 @@ class ImageDataSet(DataSet):
 
         self.image_reader = tf.WholeFileReader()
         image_key, image_file = self.image_reader.read(self.feature_queue)
-        image = tf.image.decode_image(image_file, channels=4)
+        image = tf.image.decode_image(image_file, channels=self.channels)
         print image.get_shape()
 
         #with tf.device('/cpu:0'):
         image = self._preprocessing(image)
 
-        self.image_op = tf.train.shuffle_batch(image,
+        self.image_op = tf.train.shuffle_batch([image],
             batch_size = self.batch_size,
             capacity   = self.capacity,
             num_threads = self.threads,
@@ -465,12 +429,14 @@ class ImageDataSet(DataSet):
     def _preprocessing(self, image):
         image = tf.cast(image, tf.float32)
 
+        ## ????
+        image = tf.random_crop(image,
+            [self.crop_size, self.crop_size, self.channels])
+
         ## Cropping
         if self.augmentation == 'random':
-            image = tf.random_crop(image_mask,
-                [self.crop_size, self.crop_size, 4])
-            image = tf.image.random_flip_left_right(image_mask)
-            image = tf.image.random_flip_up_down(image_mask)
+            image = tf.image.random_flip_left_right(image)
+            image = tf.image.random_flip_up_down(image)
 
             image = tf.image.random_brightness(image, max_delta=0.05)
             image = tf.image.random_contrast(image, lower=0.75, upper=1.0)
@@ -489,8 +455,8 @@ class ImageDataSet(DataSet):
 
 
     def get_batch(self, sess):
-        image, mask = sess.run([self.image_op, self.mask_op])
-        return image, mask
+        image = sess.run([self.image_op])[0]
+        return image
 
 
     def print_info(self):
