@@ -59,6 +59,7 @@ class SegNetBase(BaseModel):
 
             c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_0'))
             c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=3, stride=1, var_scope='c2_1'))
+            c2_1 = tf.contrib.nn.alpha_dropout(c2_1, keep_prob=keep_prob)
             c2_pool, c2_max = tf.nn.max_pool_with_argmax(c2_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='c2_pool')
             print '\t c2_pool', c2_pool.get_shape() ## 32
 

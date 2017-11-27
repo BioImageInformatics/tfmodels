@@ -24,9 +24,8 @@ config.gpu_options.allow_growth = True
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo'.format(data_home)
 
-
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 500
+epochs = 25
 iterations = 2500
 batch_size = 32
 step_start = 0
@@ -58,7 +57,7 @@ with tf.Session(config=config) as sess:
         save_dir=save_dir,
         conv_kernels=[64, 64, 128, 256],
         deconv_kernels=[64, 64, 128],
-        learning_rate=1e-3,
+        learning_rate=2e-4,
         x_dims=[128, 128, 3],
         # adversarial=True,
         # adversary_lambda=0,
