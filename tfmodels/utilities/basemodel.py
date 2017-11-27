@@ -17,11 +17,15 @@ class BaseModel(object):
         for key, value in self.defaults.items():
             setattr(self, key, value)
 
+        ## Set nonlinearity for all downstream models
+        self.nonlin = tf.nn.selu
+
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
 
     def get_update_list(self):
-        raise Exception(NotImplementedError)
+        t_vars = tf.trainable_variables()
+        return [var for var in t_vars if self.name in var.name]
 
     def summaries(self):
         raise Exception(NotImplementedError)
@@ -50,7 +54,7 @@ class BaseModel(object):
             if '_op' in key:
                 continue
 
-            if key == 'var_list':
+            if key == 'var_list' or 'vars' in key:
                 print '|\t{}:'.format(key)
                 for val in value:
                     print '|\t\t{}'.format(val)
@@ -66,7 +70,7 @@ class BaseModel(object):
                 if '_op' in key:
                     continue
 
-                if key == 'var_list':
+                if key == 'var_list' or 'vars' in key:
                     f.write('|\t{}:\n'.format(key))
                     for val in value:
                         f.write('|\t\t{}\n'.format(val))

@@ -19,6 +19,3 @@ sys.path.insert(0, '.')
 from utilities import *
 from segmentation import *
 from generative import *
-
-print 'TFModels imported'
-print dir()

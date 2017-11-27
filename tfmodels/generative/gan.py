@@ -1,9 +1,16 @@
 import tensorflow as tf
 import numpy as np
+import os
 
 from ..utilities.basemodel import BaseModel
 from discriminator_basemodel import BaseDiscriminator
 from generator_basemodel import BaseGenerator
+from ..utilities.ops import (
+    conv,
+    deconv,
+    linear,
+    conv_cond_concat
+)
 
 ''' Generative Adversarial Network
 
@@ -31,12 +38,18 @@ class Discriminator(BaseDiscriminator):
             print 'Nonlinearity: ', self.nonlin
             nonlin = self.nonlin
 
-            c0 = nonlin(conv(x_in, self.dix_kenrels[0], k_size=5, stride=3, var_scope='c0'))
+            print '\t x_in', x_in.get_shape()
+            c0 = nonlin(conv(x_in, self.dis_kernels[0], k_size=5, stride=3, var_scope='c0'))
+            print '\t c0', c0.get_shape()
             c1 = nonlin(conv(c0, self.dis_kernels[1], k_size=5, stride=3, var_scope='c1'))
+            print '\t c1', c1.get_shape()
             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
             flat = tf.contrib.layers.flatten(c1)
+            print '\t flat', flat.get_shape()
             h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0'))
+            print '\t h0', h0.get_shape()
             p_real = linear(h0, 1, var_scope='p_real')
+            print '\t p_real', p_real.get_shape()
 
             return p_real
 
@@ -65,13 +78,20 @@ class Generator(BaseGenerator):
             nonlin = self.nonlin
 
             ## Project
-            projection = nonlin(linear(self.z_in, self.project_shape, var_scope='projection')) ## [16*16]
+            print '\t z_in', z_in.get_shape()
+            projection = nonlin(linear(z_in, self.project_shape, var_scope='projection')) ## [16*16]
+            print '\t projection', projection.get_shape()
             project_conv = tf.reshape(projection, self.resize_shape) ## [16, 16, 1]
+            print '\t project_conv', project_conv.get_shape()
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0')) ## [32, 32, 128]
+            print '\t h0', h0.get_shape()
             h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1')) ## [64, 64, 64]
-            h2 = nonlin(deconv(h1, self.gen_kernels[2], var_scope='h2')) ## [128, 128, 32]
+            print '\t h1', h1.get_shape()
 
-            x_hat = conv(h2, self.x_dims[-1], stride=1, var_scope='x_hat') ## [128, 128, 3]
+            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat'))
+            print '\t x_hat', x_hat.get_shape()
+
+            return x_hat
 
 
 
@@ -86,11 +106,17 @@ class GAN(BaseModel):
         'generator': None,
         'gen_learning_rate': 2e-4,
         'gen_kernels': [32, 64, 128, 256],
+        'iterator_dataset': False,
+        'log_dir': None,
+        'mode': 'TRAIN',
+        'name': 'GAN',
         'n_upsamples': 3,
         'pretraining': 500,
+        'save_dir': None,
         'sess': None,
         'soften_labels': False,
         'soften_sddev': 0.01,
+        'summary_iters': 50,
         'x_dims': [256, 256, 3],
         'z_dim': 64, }
 
@@ -113,8 +139,15 @@ class GAN(BaseModel):
 
 
         ## ---------------------- Input ops ----------------------- ##
-        self.x_in = tf.placeholder_with_default(self.dataset.image_op,
-            shape=[None, self.x_dims[0], self.x_dims[1], self.x_imds[2]])
+        if self.iterator_dataset:
+            self.x_in = tf.placeholder(tf.float32,
+                shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
+                name='x_in')
+        else:
+            self.x_in = tf.placeholder_with_default(self.dataset.image_op,
+                shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
+                name='x_in')
+
         self.z_in_default = tf.random_normal([self.batch_size, self.z_dim],
             mean=0.0, stddev=1.0)
         self.z_in = tf.placeholder_with_default(self.z_in_default,
@@ -124,7 +157,7 @@ class GAN(BaseModel):
         ## ---------------------- Model ops ----------------------- ##
         self.x_hat = self.generator.model(self.z_in, keep_prob=self.keep_prob)
         self.p_real_real = self.discriminator.model(self.x_in, keep_prob=self.keep_prob)
-        self.p_real_fake = self.discriminator.model(self.x_fake, keep_prob=self.keep_prob, reuse=True)
+        self.p_real_fake = self.discriminator.model(self.x_hat, keep_prob=self.keep_prob, reuse=True)
 
         ## ---------------------- Loss ops ------------------------ ##
         self._loss_op()
@@ -138,8 +171,13 @@ class GAN(BaseModel):
         ## ------------------- Done with setup -------------------- ##
         self._print_info_to_file(filename=os.path.join(self.save_dir, 'gan_settings.txt'))
 
+        ## ---------------------- Initialize ---------------------- ##
+        self.sess.run(tf.global_variables_initializer())
+
         ## ---------------------- Pretraining --------------------- ##
         self._pretraining()
+
+        print self.training_op_list
 
 
     def _loss_op(self):
@@ -201,17 +239,32 @@ class GAN(BaseModel):
     def _pretraining(self):
         print 'Pretraining discriminator'
         for _ in xrange(self.pretraining):
-            _ = self.sess.run([self.dis_train_op])
+            if self.iterator_dataset:
+                feed_dict = {self.x_in: next(self.dataset.iterator)}
+                _ = self.sess.run([self.dis_train_op], feed_dict=feed_dict)
+            else:
+                _ = self.sess.run([self.dis_train_op])
 
         print 'Pretraining generator'
         for _ in xrange(self.pretraining):
-            _ = self.sess.run([self.gen_train_op])
+            if self.iterator_dataset:
+                feed_dict = {self.x_in: next(self.dataset.iterator)}
+                _ = self.sess.run([self.gen_train_op], feed_dict=feed_dict)
+            else:
+                _ = self.sess.run([self.gen_train_op])
 
-        summary_str = self.sess.run(self.training_op_list)[-1]
+
+        summary_str = self.sess.run(self.training_op_list, feed_dict=feed_dict)[-1]
         self.summary_writer.add_summary(summary_str, 0)
 
 
     def train_step(self, global_step):
-        summary_str = self.sess.run([self.training_op_list])[-1]
+        if self.iterator_dataset:
+            feed_dict = {self.x_in: next(self.dataset.iterator)}
+            summary_str = self.sess.run(self.training_op_list, feed_dict=feed_dict)
+        else:
+            summary_str = self.sess.run(self.training_op_list)
+
         if global_step % self.summary_iters == 0:
+            summary_str = summary_str[-1]
             self.summary_writer.add_summary(summary_str, global_step)

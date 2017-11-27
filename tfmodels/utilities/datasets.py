@@ -47,15 +47,13 @@ def load_images(paths, batchsize, crop_size):
 
 https://stackoverflow.com/questions/43231958/filling-queue-from-python-iterator
 """
-class MNISTDataSet(object):
+class IteratorDataSet(object):
     mnist_dataset_defaults = {
         'batch_size': 64,
         'capacity': 256,
-        'coord': None,
         'mode': 'TRAIN',
+        'name': 'IteratorDataSet',
         'n_classes': 10,
-        'threads': 1,
-        'sess': None,
         'source_dir': None,
     }
 
@@ -65,34 +63,48 @@ class MNISTDataSet(object):
             setattr(self, key, value)
 
         assert self.source_dir is not None
-        self.mnist = input_data.read_data_sets(source_dir)
-        self.iterator = self.mnist_iterator()
+        self.data = input_data.read_data_sets(self.source_dir)
+        self.iterator = self.iterator_fn()
 
-        self.queue = tf.FIFOQueue(
-            capacity=self.capacity,
-            dtypes=[tf.float32] )
+        # self.queue = tf.FIFOQueue(
+        #     capacity=self.capacity,
+        #     dtypes=[tf.float32] )
+        #
+        # ## A bit different from below. The equeue_op pulls data from the iterator
+        # ## It doesn't need shape??
+        # self.batch_x = tf.placeholder(tf.float32, [None, 28, 28, 1])
+        # self.enqueue_op = self.queue.enqueue(self.batch_x)
+        # # self.enqueue_op = tf.Print(self.enqueue_op, ['enqueue'])
+        # self.image_op = self.queue.dequeue()
+        # # self.image_op = tf.Print(self.image_op, ['dequeue'])
 
-        ## A bit different from below. The equeue_op pulls data from the iterator
-        ## It doesn't need shape??
-        self.batch_x = tf.placeholder(tf.float32, [None, 28, 28, 1])
-        self.enqueue_op = self.queue.enqueue(batch_x)
-        self.image_op = self.dequeue()
 
-        ## Some magic here
-        def enqueue_thread(self):
-            with self.coord.stop_on_exception():
-                while not self.coord.should_stop():
-                    self.sess.run(self.enqueue_op,
-                        feed_dict={self.batch_x: list(next(self.iterator))})
-
-        for i in range(self.threads):
-            threading.Thread(target=enqueue_thread).start()
-
-    def mnist_iterator(self):
+    def iterator_fn(self):
         while True:
-            batch_x, batch_y = self.mnist.train.next_batch(self.batch_sizej)
-            batch_x = np.reshape([self.batch_size, 28, 28, 1])
+            batch_x, batch_y = self.data.train.next_batch(self.batch_size)
+            batch_x = np.reshape(batch_x, [self.batch_size, 28, 28, 1])
             yield batch_x
+
+
+    # def enqueue_thread(self):
+    #     with self.coord.stop_on_exception():
+    #         while not self.coord.should_stop():
+    #             self.sess.run(self.enqueue_op,
+    #                 feed_dict={self.batch_x: list(next(self.iterator))})
+    #
+    #
+    # def start_enqueue(self):
+    #     print 'Setting up threads'
+    #     for i in range(self.threads):
+    #         threading.Thread(target=self.enqueue_thread).start()
+
+
+
+    def print_info(self):
+        print '---------------------- {} ---------------------- '.format(self.name)
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '---------------------- {} ---------------------- '.format(self.name)
 
 
 

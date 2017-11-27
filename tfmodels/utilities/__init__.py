@@ -1,5 +1,5 @@
 from datasets import (
-    MNISTDataSet,
+    IteratorDataSet,
     ImageMaskDataSet,
     ImageComboDataSet
 )
@@ -16,7 +16,7 @@ from ops import (
 )
 
 __all__ = [
-    'MNISTDataSet',
+    'IteratorDataSet',
     'ImageMaskDataSet',
     'ImageComboDataSet',
 ]
