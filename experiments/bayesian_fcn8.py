@@ -16,8 +16,8 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo_norm'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 1000
-iterations = 250
+epochs = 250
+iterations = 1250
 batch_size = 32
 step_start = 0
 
@@ -42,6 +42,7 @@ with tf.Session(config=config) as sess:
 
     model = tfmodels.FCNTraining(sess=sess,
         dataset=dataset,
+        k_size=[7,5,5,3],
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,

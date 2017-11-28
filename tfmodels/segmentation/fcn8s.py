@@ -4,7 +4,7 @@ from ..utilities.ops import *
 
 class FCN(SegmentationBaseModel):
     base_defaults={
-        'k_size': 5,
+        'k_size': [7,5,3],
         'name': 'fcn',
         'snapshot_name': 'fcn'}
 
@@ -28,27 +28,27 @@ class FCN(SegmentationBaseModel):
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
-            c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=k_size, stride=1, var_scope='c0_0'))
-            c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=k_size, stride=1, var_scope='c0_1'))
+            c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=k_size[0], stride=1, var_scope='c0_0'))
+            c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=k_size[0], stride=1, var_scope='c0_1'))
             c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape() ## 128
 
-            c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=k_size, stride=1, var_scope='c1_0'))
-            c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=k_size, stride=1, var_scope='c1_1'))
+            c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=k_size[1], stride=1, var_scope='c1_0'))
+            c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=k_size[1], stride=1, var_scope='c1_1'))
             c1_pool = tf.nn.max_pool(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
             print '\t c1_pool', c1_pool.get_shape() ## 64
 
-            c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=k_size, stride=1, var_scope='c2_0'))
-            c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=k_size, stride=1, var_scope='c2_1'))
+            c2_0 = nonlin(conv(c1_pool, self.conv_kernels[2], k_size=k_size[2], stride=1, var_scope='c2_0'))
+            c2_1 = nonlin(conv(c2_0, self.conv_kernels[2], k_size=k_size[2], stride=1, var_scope='c2_1'))
             c2_1 = tf.contrib.nn.alpha_dropout(c2_1, keep_prob=keep_prob)
             c2_pool = tf.nn.max_pool(c2_1, [1,4,4,1], [1,4,4,1], padding='VALID',
                 name='c2_pool')
             print '\t c2_pool', c2_pool.get_shape() ## 32
 
-            c3_0 = nonlin(conv(c2_pool, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_0'))
-            c3_1 = nonlin(conv(c3_0, self.conv_kernels[3], k_size=3, stride=1, var_scope='c3_1'))
+            c3_0 = nonlin(conv(c2_pool, self.conv_kernels[3], k_size=k_size[3], stride=1, var_scope='c3_0'))
+            c3_1 = nonlin(conv(c3_0, self.conv_kernels[3], k_size=k_size[3], stride=1, var_scope='c3_1'))
             c3_1 = tf.contrib.nn.alpha_dropout(c3_1, keep_prob=keep_prob)
             c3_pool = tf.nn.max_pool(c3_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c3_pool')
@@ -62,10 +62,10 @@ class FCN(SegmentationBaseModel):
             #     name='c4_pool')
             # print '\t c4_pool', c4_pool.get_shape()  ## inputs / 32 = 8
 
-            ## Type 1
-            # upscore3 = nonlin(deconv(c3_pool, self.n_classes, upsample_rate=32, var_scope='ups3'))
-            # upscore2 = nonlin(deconv(c2_pool, self.n_classes, upsample_rate=16, var_scope='ups2'))
-            # upscore1 = nonlin(deconv(c1_pool, self.n_classes, upsample_rate=4, var_scope='ups1'))
+            ## Type 1 - much simpler
+            # upscore3 = nonlin(deconv(c3_pool, self.n_classes, k_size=36, upsample_rate=32, var_scope='ups3'))
+            # upscore2 = nonlin(deconv(c2_pool, self.n_classes, k_size=18, upsample_rate=16, var_scope='ups2'))
+            # upscore1 = nonlin(deconv(c1_pool, self.n_classes, k_size=7, upsample_rate=4, var_scope='ups1'))
             # print '\t upscore3', upscore3.get_shape()
             # print '\t upscore2', upscore2.get_shape()
             # print '\t upscore1', upscore1.get_shape()
@@ -83,20 +83,20 @@ class FCN(SegmentationBaseModel):
             print '\t prediction_2', prediction_2.get_shape()
             print '\t prediction_1', prediction_1.get_shape()
 
-            upscore3 = nonlin(deconv(prediction_3, self.n_classes, upsample_rate=2, var_scope='ups3'))
+            upscore3 = nonlin(deconv(prediction_3, self.n_classes, k_size=k_size[3], upsample_rate=2, var_scope='ups3'))
             print '\t upscore3', upscore3.get_shape()
             upscore3 = upscore3 + prediction_2
-            upscore3_ups = nonlin(deconv(upscore3, self.n_classes, upsample_rate=2, var_scope='ups3_ups'))
+            upscore3_ups = nonlin(deconv(upscore3, self.n_classes, k_size=k_size[2], upsample_rate=2, var_scope='ups3_ups'))
             print '\t upscore3_ups', upscore3_ups.get_shape()
 
-            upscore2 = nonlin(deconv(prediction_2, self.n_classes, upsample_rate=2, var_scope='ups2'))
+            upscore2 = nonlin(deconv(prediction_2, self.n_classes, k_size=k_size[1], upsample_rate=2, var_scope='ups2'))
             print '\t upscore2', upscore2.get_shape()
             upscore2 = upscore2 + upscore3_ups
-            upscore2_ups = nonlin(deconv(upscore2, self.n_classes, upsample_rate=2, var_scope='ups2_ups'))
+            upscore2_ups = nonlin(deconv(upscore2, self.n_classes, k_size=k_size[0], upsample_rate=2, var_scope='ups2_ups'))
             print '\t upscore2_ups', upscore2_ups.get_shape()
             upscore2 = prediction_1 + upscore2_ups
 
-            preout = nonlin(deconv(upscore2, self.n_classes, upsample_rate=4, var_scope='preout'))
+            preout = nonlin(deconv(upscore2, self.n_classes, k_size=7, upsample_rate=4, var_scope='preout'))
             print '\t preout', preout.get_shape()
 
             y_hat = conv(preout, self.n_classes, k_size=3, stride=1, var_scope='y_hat')
