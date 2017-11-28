@@ -18,6 +18,8 @@ The libaray also contains base methods for training generative models including 
 
 **Note** the default activation (set in `tfmodels/utilities/basemodel.py`) is SeLU. Accordingly, the input is scaled to `[-1.0, 1.0]` in the dataset loading functions, and we should use `tf.contrib.nn.alpha_dropout`.
 
+**This repo supplants my previous segmentation repo**
+
 
 ## Versioning
 ```

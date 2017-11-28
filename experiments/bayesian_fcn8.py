@@ -7,7 +7,6 @@ import tfmodels
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-config.log_device_placement = True
 
 #data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
@@ -16,18 +15,17 @@ config.log_device_placement = True
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo_norm'.format(data_home)
 
-
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 1000
 iterations = 250
-batch_size = 16
-step_start = 39750
+batch_size = 32
+step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir = 'pca256vgg/logs/{}'.format(expdate)
-save_dir = 'pca256vgg/snapshots'
-debug_dir = 'pca256vgg/debug'
-snapshot_restore = 'pca256vgg/snapshots/vgg.ckpt-{}'.format(step_start)
+log_dir          = 'pca128fcn/logs/{}'.format(expdate)
+save_dir         = 'pca128fcn/snapshots'
+debug_dir        = 'pca128fcn/debug'
+snapshot_restore = 'pca128fcn/snapshots/vgg.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -38,19 +36,18 @@ with tf.Session(config=config) as sess:
         min_holding=1000,
         threads=8,
         crop_size=512,
-        ratio=0.5,
+        ratio=0.25,
         augmentation='random')
     dataset.print_info()
 
-    model = tfmodels.VGGTraining(sess=sess,
+    model = tfmodels.FCNTraining(sess=sess,
         dataset=dataset,
         n_classes=4,
         log_dir=log_dir,
         save_dir=save_dir,
-        conv_kernels=[32, 64, 64, 128],
-        deconv_kernels=[64, 64],
-        learning_rate=1e-3,
-        x_dims=[256, 256, 3],)
+        conv_kernels=[64, 128, 256, 384],
+        learning_rate=3e-4,
+        x_dims=[128, 128, 3],)
 
     model.print_info()
     if step_start > 0:

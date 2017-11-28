@@ -232,36 +232,37 @@ class ImageMaskDataSet(DataSet):
 
 
     def _preprocessing(self, image, mask):
-        # image = tf.divide(image, 255)
-        image = tf.cast(image, tf.float32)
-        mask = tf.cast(mask, tf.float32)
-        image_mask = tf.concat([image, mask], -1)
+        with tf.name_scope('preprocessing'):
+            # image = tf.divide(image, 255
+            image = tf.cast(image, tf.float32)
+            mask = tf.cast(mask, tf.float32)
+            image_mask = tf.concat([image, mask], -1)
 
 
 
-        ## Cropping
-        if self.augmentation == 'random':
-            image_mask = tf.random_crop(image_mask,
-                [-1, self.crop_size, self.crop_size, 4])
-            image_mask = tf.image.random_flip_left_right(image_mask)
-            image_mask = tf.image.random_flip_up_down(image_mask)
-            image, mask = tf.split(image_mask, [3,1], axis=-1)
+            ## Cropping
+            if self.augmentation == 'random':
+                image_mask = tf.random_crop(image_mask,
+                    [-1, self.crop_size, self.crop_size, 4])
+                image_mask = tf.image.random_flip_left_right(image_mask)
+                image_mask = tf.image.random_flip_up_down(image_mask)
+                image, mask = tf.split(image_mask, [3,1], axis=-1)
 
-            image = tf.image.random_brightness(image, max_delta=0.01)
-            # image = tf.image.random_contrast(image, lower=0.7, upper=0.9)
-            image = tf.image.random_hue(image, max_delta=0.01)
-            image = tf.image.random_saturation(image, lower=0.85, upper=1.0)
-        else:
-            image, mask = tf.split(image_mask, [3,1], axis=-1)
+                image = tf.image.random_brightness(image, max_delta=0.01)
+                # image = tf.image.random_contrast(image, lower=0.7, upper=0.9)
+                image = tf.image.random_hue(image, max_delta=0.01)
+                image = tf.image.random_saturation(image, lower=0.85, upper=1.0)
+            else:
+                image, mask = tf.split(image_mask, [3,1], axis=-1)
 
-        ## Resize ratio
-        target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
-        target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
-        image = tf.image.resize_images(image, [target_h, target_w])
-        mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
+            ## Resize ratio
+            target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
+            target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
+            image = tf.image.resize_images(image, [target_h, target_w])
+            mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
-        ## Recenter to [-0.5, 0.5] for SELU activations
-        image = tf.multiply(image, 2/255.0) - 1
+            ## Recenter to [-0.5, 0.5] for SELU activations
+            image = tf.multiply(image, 2/255.0) - 1
 
         # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
 
@@ -327,32 +328,33 @@ class ImageComboDataSet(DataSet):
         self.mask_op = tf.cast(self.mask_op, tf.uint8)
 
     def _preprocessing(self, image_mask):
-        image_mask = tf.cast(image_mask, tf.float32)
+        with tf.name_scope('preprocessing'):
+            image_mask = tf.cast(image_mask, tf.float32)
 
-        ## Cropping
-        if self.augmentation == 'random':
-            image_mask = tf.random_crop(image_mask,
-                [self.crop_size, self.crop_size, 4])
-            image_mask = tf.image.random_flip_left_right(image_mask)
-            image_mask = tf.image.random_flip_up_down(image_mask)
-            image, mask = tf.split(image_mask, [3,1], axis=-1)
+            ## Cropping
+            if self.augmentation == 'random':
+                image_mask = tf.random_crop(image_mask,
+                    [self.crop_size, self.crop_size, 4])
+                image_mask = tf.image.random_flip_left_right(image_mask)
+                image_mask = tf.image.random_flip_up_down(image_mask)
+                image, mask = tf.split(image_mask, [3,1], axis=-1)
 
-            # image = tf.multiply(image, 2/255.0) - 1
-            image = tf.image.random_brightness(image, max_delta=0.05)
-            image = tf.image.random_contrast(image, lower=0.65, upper=1.0)
-            image = tf.image.random_hue(image, max_delta=0.05)
-            image = tf.image.random_saturation(image, lower=0.65, upper=1.0)
-        else:
-            image, mask = tf.split(image_mask, [3,1], axis=-1)
+                # image = tf.multiply(image, 2/255.0)-1
+                image = tf.image.random_brightness(image, max_delta=0.05)
+                image = tf.image.random_contrast(image, lower=0.7, upper=1.0)
+                image = tf.image.random_hue(image, max_delta=0.05)
+                image = tf.image.random_saturation(image, lower=0.7, upper=1.0)
+            else:
+                image, mask = tf.split(image_mask, [3,1], axis=-1)
 
-        ## Resize ratio
-        target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
-        target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
-        image = tf.image.resize_images(image, [target_h, target_w])
-        mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
+            ## Resize ratio
+            target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
+            target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
+            image = tf.image.resize_images(image, [target_h, target_w])
+            mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
-        ## Recenter to [-1, 1] for SELU activations
-        image = tf.multiply(image, 2/255.0) - 1
+            ## Recenter to [-1, 1] for SELU activations
+            image = tf.multiply(image, 2/255.0) - 1
 
         # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
         return image, mask
