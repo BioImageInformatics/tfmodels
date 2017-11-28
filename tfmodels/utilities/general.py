@@ -49,21 +49,30 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5):
     return y_bar_mean, y_bar_var, y_bar
 
 
-def write_image_mask_combos(src_dir, save_dir, src_ext='png', save_ext='jpg', resize=0.25):
+"""
+In case images and masks exist as separate files, this script will fuse them
+into a 4-channel (RGBA-like) image.
+
+"""
+def write_image_mask_combos(img_src_dir=None,
+    img_src_ext='jpg',
+    mask_src_dir=None,
+    mask_src_ext='png',
+    save_dir=None,
+    save_ext='png'):
 
     img_list = sorted(glob.glob(os.path.join(
-        src_dir, '*.'+src_ext )))
+        img_src_dir, '*.'+img_src_ext )))
+    mask_list = sorted(glob.glob(os.path.join(
+        mask_src_dir, '*.'+mask_src_ext )))
 
-    for img in img_list:
-        outname = img.replace(src_dir, save_dir).replace(src_ext, save_ext)
+    for img, mask in zip(img_list, mask_list):
+        outname = img.replace(img_src_dir, save_dir).replace(img_src_ext, save_ext)
         img_ = cv2.imread(img, -1)
-        mask_ = img_[:,:,-1]
-        img_ = img_[:,:,:-1]
+        mask_ = cv2.imread(mask, -1)
+        mask_ = np.expand_dims(mask_, -1)
 
+        img_mask = np.concatenate([img_, mask_], axis=-1)
 
-        mask_ = np.dstack([mask_]*3) * (255/3)
-
-        img_mask = np.hstack([img_, mask_])
-        img_mask = cv2.resize(img_mask, dsize=(0,0), fx=resize, fy=resize)
         success = cv2.imwrite(outname, img_mask)
-        print img, img_.shape, mask_.shape, img_mask.shape, outname
+        print img_mask.shape, img_mask.dtype, outname

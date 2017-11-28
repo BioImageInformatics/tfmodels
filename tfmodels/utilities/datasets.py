@@ -43,7 +43,7 @@ def load_images(paths, batchsize, crop_size):
     #     tensor.min(), tensor.max(), tensor.dtype)
     return tensor
 
-""" Using TF's built in MNIST dataset with the queue
+""" Using TF's built in MNIST dataset
 
 https://stackoverflow.com/questions/43231958/filling-queue-from-python-iterator
 """
@@ -237,6 +237,8 @@ class ImageMaskDataSet(DataSet):
         mask = tf.cast(mask, tf.float32)
         image_mask = tf.concat([image, mask], -1)
 
+
+
         ## Cropping
         if self.augmentation == 'random':
             image_mask = tf.random_crop(image_mask,
@@ -249,6 +251,8 @@ class ImageMaskDataSet(DataSet):
             # image = tf.image.random_contrast(image, lower=0.7, upper=0.9)
             image = tf.image.random_hue(image, max_delta=0.01)
             image = tf.image.random_saturation(image, lower=0.85, upper=1.0)
+        else:
+            image, mask = tf.split(image_mask, [3,1], axis=-1)
 
         ## Resize ratio
         target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
@@ -277,19 +281,6 @@ class ImageMaskDataSet(DataSet):
 
 
 
-'''
-Required:
-:image_dir: string
-:n_classes: int
-
-The same as ImageMaskDataSet except each image is assumed to exist as a (h,w,4)
-where a split --> [3,1] on the 2nd axis will give image, mask
-
-augmentation:
-    random: random crop, flip LR, flip UD, coloration
-    fixed: no crop, no flip, color standardized to global target
-    none: nothing
-'''
 class ImageComboDataSet(DataSet):
     defaults = {
         'augmentation': 'random',
@@ -348,9 +339,11 @@ class ImageComboDataSet(DataSet):
 
             # image = tf.multiply(image, 2/255.0) - 1
             image = tf.image.random_brightness(image, max_delta=0.05)
-            image = tf.image.random_contrast(image, lower=0.75, upper=1.0)
+            image = tf.image.random_contrast(image, lower=0.65, upper=1.0)
             image = tf.image.random_hue(image, max_delta=0.05)
-            image = tf.image.random_saturation(image, lower=0.75, upper=1.0)
+            image = tf.image.random_saturation(image, lower=0.65, upper=1.0)
+        else:
+            image, mask = tf.split(image_mask, [3,1], axis=-1)
 
         ## Resize ratio
         target_h = tf.cast(self.crop_size*self.ratio, tf.int32)

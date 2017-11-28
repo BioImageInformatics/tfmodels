@@ -17,13 +17,14 @@ config.gpu_options.allow_growth = True
 # image_dir = '{}/he'.format(data_home)
 # mask_dir = '{}/hmm/4class'.format(data_home)
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
-image_dir = '{}/combo'.format(data_home)
+# image_dir = '{}/combo'.format(data_home)
+image_dir = '{}/combo_norm'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 50
 iterations = 1000
 batch_size = 24
-step_start = 4000
+step_start = 21000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir = 'pca128segnet/logs/{}'.format(expdate)
