@@ -4,6 +4,9 @@ from ..utilities.ops import *
 
 class VGG(SegmentationBaseModel):
     vgg_defaults={
+        'conv_kernels': [64, 128, 256, 256],
+        'deconv_kernels': [128, 64],
+        'k_size': 5,
         'name': 'vgg',
         'snapshot_name': 'vgg'}
 
@@ -12,7 +15,6 @@ class VGG(SegmentationBaseModel):
         super(VGG, self).__init__(**self.vgg_defaults)
 
         assert self.n_classes is not None
-        if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
 
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
@@ -25,15 +27,15 @@ class VGG(SegmentationBaseModel):
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
-            c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_0'))
-            c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=3, stride=1, var_scope='c0_1'))
+            c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=5, stride=1, var_scope='c0_0'))
+            c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=5, stride=1, var_scope='c0_1'))
             # c0_1 = batch_norm(c0_1, reuse=reuse, training=training, var_scope='c0_1_bn')
             c0_pool = tf.nn.max_pool(c0_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c0_pool')
             print '\t c0_pool', c0_pool.get_shape() ## 128
 
-            c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_0'))
-            c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=3, stride=1, var_scope='c1_1'))
+            c1_0 = nonlin(conv(c0_pool, self.conv_kernels[1], k_size=5, stride=1, var_scope='c1_0'))
+            c1_1 = nonlin(conv(c1_0, self.conv_kernels[1], k_size=5, stride=1, var_scope='c1_1'))
             # c1_1 = batch_norm(c1_1, training=training, var_scope='c1_1_bn')
             c1_pool = tf.nn.max_pool(c1_1, [1,2,2,1], [1,2,2,1], padding='VALID',
                 name='c1_pool')
@@ -61,11 +63,11 @@ class VGG(SegmentationBaseModel):
             print '\t d1', d1.get_shape() ## 16*4 = 64
 
             d0 = nonlin(deconv(d1, self.deconv_kernels[0], var_scope='d0'))
-            d0 = nonlin(conv(d0, self.deconv_kernels[0], stride=1, var_scope='dc0'))
+            d0 = nonlin(conv(d0, self.deconv_kernels[0], k_size=3, stride=1, var_scope='dc0'))
             # d0 = batch_norm(d0, training=training, var_scope='d0_bn')
             print '\t d0', d0.get_shape() ## 64*2 = 128
 
-            y_hat = deconv(d0, self.n_classes, var_scope='y_hat')
+            y_hat = deconv(d0, self.n_classes, k_size=3, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape() ## 128*2 = 256
 
             return y_hat

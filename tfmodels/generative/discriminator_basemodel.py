@@ -6,6 +6,7 @@ class BaseDiscriminator(BaseModel):
     ## TODO expose number of kernels and number of upsample steps to the world
     discriminator_defaults = {
         'dis_kernels': [32, 64, 128],
+        'adversary_feature_matching': False,
         'name': 'discriminator',
         'soften_labels': False,
         'soften_sddev': 0.01,

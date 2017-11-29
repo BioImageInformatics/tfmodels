@@ -13,19 +13,20 @@ config.gpu_options.allow_growth = True
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
-image_dir = '{}/combo_norm'.format(data_home)
+# image_dir = '{}/combo_norm'.format(data_home)
+image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 250
 iterations = 1250
-batch_size = 32
+batch_size = 24
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128fcn/logs/{}'.format(expdate)
-save_dir         = 'pca128fcn/snapshots'
-debug_dir        = 'pca128fcn/debug'
-snapshot_restore = 'pca128fcn/snapshots/vgg.ckpt-{}'.format(step_start)
+log_dir          = 'pca128fcn_a/logs/{}'.format(expdate)
+save_dir         = 'pca128fcn_a/snapshots'
+debug_dir        = 'pca128fcn_a/debug'
+snapshot_restore = 'pca128fcn_a/snapshots/fcn.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -41,21 +42,27 @@ with tf.Session(config=config) as sess:
     dataset.print_info()
 
     model = tfmodels.FCNTraining(sess=sess,
-        dataset=dataset,
-        k_size=[7,5,5,3],
-        n_classes=4,
-        log_dir=log_dir,
-        save_dir=save_dir,
+        adversarial=True,
+        adversary_lambda=2,
+        adversary_lr=2e-5,
         conv_kernels=[64, 128, 256, 384],
-        learning_rate=3e-4,
+        dataset=dataset,
+        global_step=step_start,
+        k_size=[7,5,5,3],
+        learning_rate=4e-4,
+        log_dir=log_dir,
+        n_classes=4,
+        pretraining_iters=500,
+        save_dir=save_dir,
+        summary_iters=50,
         x_dims=[128, 128, 3],)
-
     model.print_info()
+
     if step_start > 0:
         model.restore(snapshot_restore)
 
     ## ------------------- Input Coordinators ------------------- ##
-    print 'Thread coordinators'
+    print 'Starting thread coordinators'
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord=coord)
 
@@ -84,16 +91,21 @@ with tf.Session(config=config) as sess:
 
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
+
+    print 'Pretraining'
+    model.pretrain()
+
+    print 'Starting at step {}'.format(model.global_step)
     global_step = step_start
     for epx in xrange(1, epochs):
         epoch_start = time.time()
         for itx in xrange(iterations):
-            global_step += 1
-            model.train_step(global_step)
+            # global_step += 1
+            model.train_step()
 
         print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
-            epx, global_step, time.time()-epoch_start)
-        model.snapshot(global_step)
+            epx, model.global_step, time.time()-epoch_start)
+        model.snapshot()
 
         for test_idx, test_img in enumerate(test_x_list):
             y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img, 50, keep_prob=0.5, ret_all=True)

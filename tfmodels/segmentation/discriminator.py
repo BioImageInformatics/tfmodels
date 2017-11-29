@@ -3,11 +3,11 @@ from ..generative.discriminator_basemodel import BaseDiscriminator
 from ..utilities.ops import *
 
 class SegmentationDiscriminator(BaseDiscriminator):
-    defaults={
-        'feature_matching': False,
-        'kernels': [64, 64, 64, 512],
+    seg_discrim_defaults={
+        'discriminator_train_op_list': [],
+        'kernels': [32, 32, 32, 128],
         'learning_rate': 5e-5,
-        'name': 'SegDiscriminator',
+        'name': 'adversary',
         'soften_labels': True,
         'soften_sddev': 0.01,
         'x_in': None,
@@ -16,8 +16,8 @@ class SegmentationDiscriminator(BaseDiscriminator):
     }
 
     def __init__(self, **kwargs):
-        self.defaults.update(kwargs)
-        super(SegmentationDiscriminator, self).__init__(**self.defaults)
+        self.seg_discrim_defaults.update(kwargs)
+        super(SegmentationDiscriminator, self).__init__(**self.seg_discrim_defaults)
 
         assert self.y_fake is not None
         assert self.y_real is not None
@@ -49,19 +49,19 @@ class SegmentationDiscriminator(BaseDiscriminator):
             y_hat_x_in = tf.concat([y_hat, x_in], axis=-1)
             print '\t y_hat_x_in', y_hat_x_in.get_shape()
 
-            h0_0 = nonlin(conv(y_hat_x_in, self.kernels[0], k_size=3, stride=1, var_scope='h0_0'))
-            h0_1 = nonlin(conv(h0_0, self.kernels[0], k_size=3, stride=1, var_scope='h0_1'))
+            h0_0 = nonlin(conv(y_hat_x_in, self.kernels[0], k_size=5, stride=1, var_scope='h0_0'))
+            h0_1 = nonlin(conv(h0_0, self.kernels[0], k_size=5, stride=1, var_scope='h0_1'))
             h0_pool = tf.nn.max_pool(h0_1, [1,4,4,1], [1,4,4,1], padding='VALID', name='h0_pool')
             print '\t h0_pool', h0_pool.get_shape()
 
-            h1_0 = nonlin(conv(h0_pool, self.kernels[1], var_scope='h1_0'))
-            h1_1 = nonlin(conv(h1_0, self.kernels[1], var_scope='h1_1'))
+            h1_0 = nonlin(conv(h0_pool, self.kernels[1], stride=1, var_scope='h1_0'))
+            h1_1 = nonlin(conv(h1_0, self.kernels[1], stride=1, var_scope='h1_1'))
             h1_pool = tf.nn.max_pool(h1_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h1_pool')
             print '\t h1_pool', h1_pool.get_shape()
 
-            h2_0 = nonlin(conv(h1_pool, self.kernels[2], var_scope='h2_0'))
-            h2_1 = nonlin(conv(h2_0, self.kernels[2], var_scope='h2_1'))
-            h2_pool = tf.nn.max_pool(h1_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h2_pool')
+            h2_0 = nonlin(conv(h1_pool, self.kernels[2], stride=1, var_scope='h2_0'))
+            h2_1 = nonlin(conv(h2_0, self.kernels[2], stride=1, var_scope='h2_1'))
+            h2_pool = tf.nn.max_pool(h2_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h2_pool')
             print '\t h2_pool', h2_pool.get_shape()
 
             h_flat = tf.contrib.layers.flatten(h2_pool)
@@ -69,7 +69,7 @@ class SegmentationDiscriminator(BaseDiscriminator):
             print '\t h_flat', h_flat.get_shape()
 
             h3 = nonlin(linear(h_flat, self.kernels[3], var_scope='h3'))
-            h3 = tf.contrib.nn.alpha_dropout(h3, keep_prob=keep_prob, name='h3_do')
+            # h3 = tf.contrib.nn.alpha_dropout(h3, keep_prob=keep_prob, name='h3_do')
             print '\t h3', h3.get_shape()
 
             p_real = linear(h3, 1, var_scope='p_real')
@@ -104,16 +104,17 @@ class SegmentationDiscriminator(BaseDiscriminator):
 
 
     def _make_training_op(self):
-        self.var_list = self.get_update_list()
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
-            name='{}_Adam'.format(self.name))
+        with tf.name_scope('discriminator_losses'):
+            self.var_list = self.get_update_list()
+            self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
+                name='{}_Adam'.format(self.name))
 
-        self.loss = self._make_loss()
-        self.train_op = self.optimizer.minimize(self.loss,
-            var_list=self.var_list)
-        self.training_op_list.append(self.train_op)
+            self.loss = self._make_loss()
+            self.train_op = self.optimizer.minimize(self.loss,
+                var_list=self.var_list, name='{}_train'.format(self.name))
+            self.discriminator_train_op_list.append(self.train_op)
 
-        # Summary
-        self.disciminator_loss_sum = tf.summary.scalar('{}_loss'.format(self.name),
-            self.loss)
-        self.summary_op_list.append(self.disciminator_loss_sum)
+            # Summary
+            self.disciminator_loss_sum = tf.summary.scalar('{}_loss'.format(self.name),
+                self.loss)
+            self.summary_op_list.append(self.disciminator_loss_sum)

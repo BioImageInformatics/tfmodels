@@ -14,7 +14,6 @@ class SegNet(SegmentationBaseModel):
         super(SegNet, self).__init__(**self.base_defaults)
 
         assert self.n_classes is not None
-        if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'SegNet Model'

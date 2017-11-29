@@ -4,7 +4,7 @@ import datetime
 
 class BaseModel(object):
     ## Defaults
-    defaults={
+    base_defaults={
         'sess': None,
         'log_dir': None,
         'save_dir': None,
@@ -14,8 +14,8 @@ class BaseModel(object):
         'snapshot_name': 'snapshot' }
 
     def __init__(self, **kwargs):
-        self.defaults.update(**kwargs)
-        for key, value in self.defaults.items():
+        self.base_defaults.update(**kwargs)
+        for key, value in self.base_defaults.items():
             setattr(self, key, value)
 
         ## Set nonlinearity for all downstream models
@@ -23,6 +23,12 @@ class BaseModel(object):
 
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
+
+    ## In progress for saving each model in its own snapshot (SAVE1)
+    # def make_saver(self):
+    #     t_vars = tf.trainable_variables()
+    #     self.saver = tf.train.Saver([var for var in t_vars if self.name in var.name],
+    #         max_to_keep=5,)
 
     def get_update_list(self):
         t_vars = tf.trainable_variables()
@@ -53,10 +59,10 @@ class BaseModel(object):
         print '------------------------ {} ---------------------- '.format(self.name)
         print '|\t\t TIMESTAMP: {}'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
         for key, value in sorted(self.__dict__.items()):
-            if '_op' in key:
-                continue
+            # if '_op' in key:
+            #     continue
 
-            if key == 'var_list' or 'vars' in key:
+            if 'list' in key:
                 print '|\t{}:'.format(key)
                 for val in value:
                     print '|\t\t{}:'.format(val)
@@ -70,10 +76,10 @@ class BaseModel(object):
             f.write('---------------------- {} ----------------------\n'.format(self.name))
             f.write('|\t\t TIMESTAMP: {}\n'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")))
             for key, value in sorted(self.__dict__.items()):
-                if '_op' in key:
-                    continue
+                # if '_op' in key:
+                #     continue
 
-                if key == 'var_list' or 'vars' in key:
+                if 'list' in key:
                     f.write('|\t{}:\n'.format(key))
                     for val in value:
                         f.write('|\t\t{}:\n'.format(val))
