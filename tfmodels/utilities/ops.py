@@ -88,11 +88,11 @@ def unpool(pool, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
     """
        Unpooling layer after max_pool_with_argmax.
        Args:
-           pool:   max pooled output tensor
+           pool:     max pooled output tensor
            ind:      argmax indices
-           k_size:     k_size is the same as for the pool
+           k_size:   k_size is the same as for the pool
        Return:
-           unpool:    unpooling tensor
+           unpool:   unpooling tensor
     """
     with tf.variable_scope(var_scope) as scope:
         input_shape = tf.shape(pool)
@@ -116,6 +116,14 @@ def unpool(pool, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
         set_output_shape = [set_input_shape[0], set_input_shape[1] * k_size[1], set_input_shape[2] * k_size[2], set_input_shape[3]]
         ret.set_shape(set_output_shape)
         return ret
+
+## https://stackoverflow.com/questions/44454158/tensorflow-implementing-a-class-wise-weighted-cross-entropy-loss
+## @Jeff Allen
+def class_weighted_pixelwise_crossentropy(target, logit, weight=1):
+    logit = tf.clip_by_value(logit, 10e-8, 1.-10e-8)
+    return -tf.reduce_sum(target * weight * tf.log(logit))
+
+
 
 ## https://github.com/mshunshin/SegNetCMR/blob/master/tfmodel/layers.py
 # def unpool_with_argmax(pool, ind, var_scope=None, k_size=[1, 2, 2, 1]):

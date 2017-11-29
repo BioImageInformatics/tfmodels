@@ -3,6 +3,7 @@ import numpy as np
 import sys, os
 
 from ..utilities.basemodel import BaseModel
+from ..utilities.ops import class_weighted_pixelwise_crossentropy
 from discriminator import SegmentationDiscriminator
 
 class SegmentationBaseModel(BaseModel):
@@ -181,9 +182,17 @@ class SegmentationBaseModel(BaseModel):
 
     def make_training_ops(self):
         with tf.name_scope('segmentation_losses'):
-            self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
-                labels=self.y_in, logits=self.y_hat)
-            self.seg_loss = tf.reduce_mean(self.seg_loss)
+            if self.class_weights:
+                # sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), 1)
+                # self.seg_loss = tf.losses.softmax_cross_entropy(
+                #     labels=self.sample_weights, logits=self.y_hat)
+                self.seg_loss = class_weighted_pixelwise_crossentropy(
+                    labels=self.y_in, logits=self.y_hat, weights=self.class_weights)
+                self.seg_loss = tf.reduce_mean(self.seg_loss)
+            else:
+                self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
+                    labels=self.y_in, logits=self.y_hat)
+                self.seg_loss = tf.reduce_mean(self.seg_loss)
 
             ## Unused except in pretraining or specificially requested
             self.seg_training_op = self.optimizer.minimize(
