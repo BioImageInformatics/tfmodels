@@ -157,12 +157,12 @@ class Generator(BaseGenerator):
             print '\t projection', projection.get_shape()
             project_conv = tf.reshape(projection, self.resize_shape) ## [16, 16, 1]
             print '\t project_conv', project_conv.get_shape()
-            h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0')) ## [32, 32, 128]
+            h0 = nonlin(deconv(project_conv, self.gen_kernels[0], k_size=4, var_scope='h0')) ## [32, 32, 128]
             print '\t h0', h0.get_shape()
-            h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1')) ## [64, 64, 64]
+            h1 = nonlin(deconv(h0, self.gen_kernels[1], k_size=4, var_scope='h1')) ## [64, 64, 64]
             print '\t h1', h1.get_shape()
 
-            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat'))
+            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat'))
             print '\t x_hat', x_hat.get_shape()
 
             return x_hat
