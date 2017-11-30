@@ -116,12 +116,15 @@ def unpool(pool, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
         set_output_shape = [set_input_shape[0], set_input_shape[1] * k_size[1], set_input_shape[2] * k_size[2], set_input_shape[3]]
         ret.set_shape(set_output_shape)
         return ret
-
-## https://stackoverflow.com/questions/44454158/tensorflow-implementing-a-class-wise-weighted-cross-entropy-loss
-## @Jeff Allen
-def class_weighted_pixelwise_crossentropy(target, logit, weight=1):
-    logit = tf.clip_by_value(logit, 10e-8, 1.-10e-8)
-    return -tf.reduce_sum(target * weight * tf.log(logit))
+#
+# def class_weighted_pixelwise_crossentropy(labels, logits, weights=1):
+#     sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.classweights), -1)
+#     print '\t segmentation losses sample_weights:', sample_weights
+#     xent = tf.losses.softmax_cross_entropy(
+#         labels=self.y_in, logits=self.y_hat, weights=sample_weights)
+#     print '\t segmentation losses seg_loss:', self.seg_loss
+#
+#     return xent
 
 
 

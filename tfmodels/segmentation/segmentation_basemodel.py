@@ -3,7 +3,7 @@ import numpy as np
 import sys, os
 
 from ..utilities.basemodel import BaseModel
-from ..utilities.ops import class_weighted_pixelwise_crossentropy
+# from ..utilities.ops import class_weighted_pixelwise_crossentropy
 from discriminator import SegmentationDiscriminator
 
 class SegmentationBaseModel(BaseModel):
@@ -13,6 +13,7 @@ class SegmentationBaseModel(BaseModel):
         'adversary_lr': 1e-4,
         'adversary_lambda': 1,
         'adversary_feature_matching': False,
+        'class_weights': None,
         'conv_kernels': [32, 64, 128, 256],
         'dataset': None,
         'deconv_kernels': [32, 64],
@@ -183,12 +184,17 @@ class SegmentationBaseModel(BaseModel):
     def make_training_ops(self):
         with tf.name_scope('segmentation_losses'):
             if self.class_weights:
-                # sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), 1)
-                # self.seg_loss = tf.losses.softmax_cross_entropy(
-                #     labels=self.sample_weights, logits=self.y_hat)
-                self.seg_loss = class_weighted_pixelwise_crossentropy(
-                    labels=self.y_in, logits=self.y_hat, weights=self.class_weights)
-                self.seg_loss = tf.reduce_mean(self.seg_loss)
+                ## https://github.com/tensorflow/tensorflow/issues/10021
+                sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), -1)
+                print '\t segmentation losses sample_weights:', sample_weights
+                self.seg_loss = tf.losses.softmax_cross_entropy(onehot_labels=self.y_in,
+                    logits=self.y_hat, weights=sample_weights)
+                print '\t segmentation losses seg_loss:', self.seg_loss
+
+                # self.seg_loss = class_weighted_pixelwise_crossentropy(
+                #     labels=self.y_in, logits=self.y_hat, weights=self.class_weights)
+                # self.seg_loss = tf.reduce_mean(self.seg_loss)
+                # print '\t segmentation losses seg_loss:', self.seg_loss
             else:
                 self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
                     labels=self.y_in, logits=self.y_hat)
