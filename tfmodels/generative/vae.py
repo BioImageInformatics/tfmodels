@@ -126,7 +126,7 @@ class Encoder(BaseEncoder):
             log_var = linear(h0, self.z_dim, var_scope='log_var')
             print '\t var', log_var.get_shape()
 
-            epsilon = tf.random_normal(shape=[batch_size, self.z_dim], mean=0.0, stddev=1.0)
+            epsilon = tf.random_normal(shape=tf.shape(mu), mean=0.0, stddev=1.0)
             zed = mu + epsilon * tf.exp(0.5 * log_var)
             # zed = mu + epsilon * sigma
             print '\t zed', zed.get_shape()
@@ -156,6 +156,7 @@ class Generator(BaseGenerator):
             print 'Nonlinearity: ', self.nonlin
             nonlin = self.nonlin
 
+            ## These first two layers will be pretty much the same in all generators
             ## Project
             print '\t z_in', z_in.get_shape()
             projection = nonlin(linear(z_in, self.project_shape, var_scope='projection')) ## [16*16]
@@ -167,10 +168,11 @@ class Generator(BaseGenerator):
             h1 = nonlin(deconv(h0, self.gen_kernels[1], k_size=4, var_scope='h1')) ## [64, 64, 64]
             print '\t h1', h1.get_shape()
 
-            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat'))
+            x_hat_logit = conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat')
+            x_hat = tf.nn.sigmoid(x_hat_logit)
             print '\t x_hat', x_hat.get_shape()
 
-            return x_hat
+            return x_hat, x_hat_logit
 
 
 
@@ -232,7 +234,7 @@ class VAE(BaseModel):
 
         ## ---------------------- Model ops ----------------------- ##
         self.zed, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
-        self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
+        self.x_hat, self.x_hat_logit = self.generator.model(self.zed, keep_prob=self.keep_prob)
 
         ## ---------------------- Loss ops ------------------------ ##
         self._loss_op()
@@ -252,46 +254,30 @@ class VAE(BaseModel):
         self.sess.run(tf.global_variables_initializer())
 
 
-
     def _loss_op(self):
-        # self.loss = tf.Variable(0.0, name='loss')
         self._reconstruction_loss()
-        self._marginal_likelihood()
         self._kl_divergence()
 
         self.loss = self.recon_loss + self.kld
-        # self.ELBO = self.marginal_likelihood + self.kld
         self.loss = tf.reduce_mean(self.loss)
 
-    ## wtf?
-    def _marginal_likelihood(self):
-        self.marginal_likelihood = tf.reduce_sum(self.x_in * tf.log(self.x_hat) + \
-            (1 - self.x_in) * tf.log(1 - self.x_hat), 1)
-        self.marginal_likelihood = tf.reduce_mean(self.marginal_likelihood)
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
             self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.x_hat,
+                logits=self.x_hat_logit,
                 labels=self.x_in), axis=[1,2,3])
             print 'recon_loss', self.recon_loss.get_shape()
 
-            # self.recon_loss = tf.losses.mean_squared_error(
-            #     labels=self.x_in, predictions=self.x_hat,
-            #     reduction=tf.losses.Reduction.NONE)
-            # self.recon_loss = tf.reduce_mean(self.recon_loss, axis=[1,2,3])
 
     def _kl_divergence(self):
         with tf.name_scope('kld'):
-            # self.kld = -0.5 * tf.reduce_sum(1 + tf.square(self.sigma) - \
-            #     tf.square(self.mu) - \
-            #     tf.log(1e-8 + \
-            #     tf.square(self.sigma)), 1)
             self.kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
                 tf.square(self.mu) - \
                 tf.exp(self.log_var), 1)
             print 'kld', self.kld.get_shape()
             # self.kld = tf.reduce_mean(self.kld)
+
 
     def _training_ops(self):
         self.generator_vars = self.generator.get_update_list()
@@ -299,6 +285,7 @@ class VAE(BaseModel):
 
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
         self.train_op = self.optimizer.minimize(self.loss)
+
 
     def _summary_ops(self):
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
@@ -314,6 +301,7 @@ class VAE(BaseModel):
         self.m_lik_sum = tf.summary.scalar('m_lik', self.marginal_likelihood)
 
         self.summary_op = tf.summary.merge_all()
+
 
     def train_step(self):
         self.global_step += 1

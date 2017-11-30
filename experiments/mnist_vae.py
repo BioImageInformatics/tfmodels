@@ -14,7 +14,7 @@ data_home = ''
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 500
 iterations = 1000
-batch_size = 256
+batch_size = 64
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
@@ -31,8 +31,8 @@ with tf.Session(config=config) as sess:
     dataset = tfmodels.IteratorDataSet(sess=sess,
         batch_size=batch_size,
         capacity=1024,
-        # source_dir='/Users/nathaning/Envs/tensorflow/MNIST_data')
-        source_dir='/home/nathan/envs/tensorflow/MNIST_data')
+        source_dir='/Users/nathaning/Envs/tensorflow/MNIST_data')
+        # source_dir='/home/nathan/envs/tensorflow/MNIST_data')
     dataset.print_info()
 
     print 'test batch:'

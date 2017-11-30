@@ -19,8 +19,8 @@ class BaseGenerator(BaseModel):
 
         ## calculate the reshape size
         lo_res_size = self.x_dims[0]//(2**self.n_upsamples)
-        self.project_shape = (lo_res_size**2)
-        self.resize_shape = [-1, lo_res_size, lo_res_size, 1]
+        self.project_shape = (lo_res_size**2) * self.gen_kernels[0]
+        self.resize_shape = [-1, lo_res_size, lo_res_size, self.gen_kernels[0]]
 
 
     def model(self, z_in, keep_prob=0.5, reuse=False):
