@@ -107,9 +107,9 @@ class Encoder(BaseEncoder):
 
             batch_size = tf.shape(x_in)[0]
             print '\t x_in', x_in.get_shape()
-            c0 = nonlin(conv(x_in, self.enc_kernels[0], k_size=5, stride=3, var_scope='c0'))
+            c0 = nonlin(conv(x_in, self.enc_kernels[0], k_size=4, stride=2, var_scope='c0'))
             print '\t c0', c0.get_shape()
-            c1 = nonlin(conv(c0, self.enc_kernels[1], k_size=5, stride=3, var_scope='c1'))
+            c1 = nonlin(conv(c0, self.enc_kernels[1], k_size=4, stride=2, var_scope='c1'))
             print '\t c1', c1.get_shape()
             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
             flat = tf.contrib.layers.flatten(c1)
@@ -199,7 +199,7 @@ class VAE(BaseModel):
 
         self.encoder = Encoder(
             enc_kernels=self.enc_kernels,
-            z_dims=self.z_dims )
+            z_dim=self.z_dim )
         self.generator = Generator(
             gen_kernels=self.gen_kernels,
             n_upsamples=self.n_upsamples,
@@ -249,20 +249,25 @@ class VAE(BaseModel):
 
 
     def _loss_op(self):
-        self.loss = tf.constant(0.0)
+        # self.loss = tf.Variable(0.0, name='loss')
         self._reconstruction_loss()
         self._kl_divergence()
 
+        self.loss = self.recon_loss + self.kld
+        self.loss = tf.reduce_mean(self.loss)
+
     def _reconstruction_loss(self):
-        self.recon_loss = tf.losses.mean_squared_error(
-            labels=self.x_in, predictions=self.x_hat)
-        tf.assign_add(self.loss, self.recon_loss)
+        with tf.name_scope('MSE'):
+            self.recon_loss = tf.losses.mean_squared_error(
+                labels=self.x_in, predictions=self.x_hat,
+                reduction=tf.losses.Reduction.NONE)
+            self.recon_loss = tf.reduce_mean(self.recon_loss, axis=[1,2,3])
 
     def _kl_divergence(self):
-        self.kld = -0.5 * tf.reduce_sum(1 + self.log_var
-            - tf.square(self.mu)
-            - tf.exp(self.log_var), 1)
-        tf.assign_add(self.loss, self.kld)
+        with tf.name_scope('kld'):
+            self.kld = -0.5 * tf.reduce_sum(1 + self.log_var
+                - tf.square(self.mu)
+                - tf.exp(self.log_var), 1)
 
     def _training_ops(self):
         self.generator_vars = self.generator.get_update_list()
@@ -279,11 +284,20 @@ class VAE(BaseModel):
         self.mu_sum = tf.summary.histogram('mu', self.mu)
         self.logvar_sum = tf.summary.histogram('logvar', self.log_var)
 
+        self.loss_sum = tf.summary.scalar('loss', self.loss)
+        self.recon_sum = tf.summary.scalar('recon', tf.reduce_mean(self.recon_loss))
+        self.kld_sum = tf.summary.scalar('kld', tf.reduce_mean(self.kld))
+
         self.summary_op = tf.summary.merge_all()
 
     def train_step(self):
         self.global_step += 1
-        self.sess.run(self.train_op)
+        # if self.iterator_dataset:
+        feed_dict = {self.x_in: next(self.dataset.iterator)}
+        self.sess.run(self.train_op, feed_dict=feed_dict)
+        # else:
+        #     self.sess.run(self.train_op)
+
         if self.global_step % self.summary_iters == 0:
-            summary_str = self.sess.run(self.summary_op)
+            summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
             self.summary_writer.add_summary(summary_str, self.global_step)

@@ -258,13 +258,14 @@ class GAN(BaseModel):
         self.summary_writer.add_summary(summary_str, 0)
 
 
-    def train_step(self, global_step):
+    def train_step(self):
+        self.global_step += 1
         if self.iterator_dataset:
             feed_dict = {self.x_in: next(self.dataset.iterator)}
-            summary_str = self.sess.run(self.training_op_list, feed_dict=feed_dict)
+            self.sess.run(self.train_op, feed_dict=feed_dict)
         else:
-            summary_str = self.sess.run(self.training_op_list)
+            self.sess.run(self.train_op)
 
-        if global_step % self.summary_iters == 0:
-            summary_str = summary_str[-1]
-            self.summary_writer.add_summary(summary_str, global_step)
+        if self.global_step % self.summary_iters == 0:
+            summary_str = self.sess.run(self.summary_op)
+            self.summary_writer.add_summary(summary_str, self.global_step)

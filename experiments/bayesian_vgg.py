@@ -20,7 +20,7 @@ image_dir = '{}/combo'.format(data_home)
 epochs = 50
 iterations = 1000
 batch_size = 64
-step_start = 0
+step_start = 17200
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'pca128vgg_w/logs/{}'.format(expdate)
@@ -97,8 +97,9 @@ with tf.Session(config=config) as sess:
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
 
-    print 'Pretraining'
-    model.pretrain()
+    if step_start == 0:
+        print 'Pretraining'
+        model.pretrain()
 
     print 'Starting at step {}'.format(model.global_step)
     global_step = step_start

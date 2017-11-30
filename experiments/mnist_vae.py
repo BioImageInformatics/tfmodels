@@ -13,7 +13,7 @@ data_home = ''
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 500
-iterations = 100
+iterations = 1000
 batch_size = 256
 step_start = 0
 
@@ -30,7 +30,7 @@ with tf.Session(config=config) as sess:
 
     dataset = tfmodels.IteratorDataSet(sess=sess,
         batch_size=batch_size,
-        capacity=512,
+        capacity=1024,
         # source_dir='/Users/nathaning/Envs/tensorflow/MNIST_data')
         source_dir='/home/nathan/envs/tensorflow/MNIST_data')
     dataset.print_info()
@@ -42,11 +42,11 @@ with tf.Session(config=config) as sess:
     model = tfmodels.VAE(sess=sess,
         batch_size=batch_size,
         dataset=dataset,
-        enc_kernels=[32, 64, 128],
+        enc_kernels=[32, 64, 256],
         gen_kernels=[64, 32],
         global_step= step_start,
         iterator_dataset=True,
-        learning_rate=1e-4,
+        learning_rate=1e-5,
         log_dir=log_dir,
         mode='TRAIN',
         n_upsamples=2,

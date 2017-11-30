@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import datetime
+import datetime, os
 
 class BaseModel(object):
     ## Defaults
@@ -52,7 +52,7 @@ class BaseModel(object):
     def test_step(self, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
-    def tf_ops(self):
+    def _tf_ops(self):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path

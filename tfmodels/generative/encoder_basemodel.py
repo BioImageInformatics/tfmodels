@@ -7,6 +7,7 @@ class BaseEncoder(BaseModel):
     discriminator_defaults = {
         'enc_kernels': [32, 64, 128],
         'name': 'encoder',
+        'z_dim': 32,
     }
 
     def __init__(self, **kwargs):
