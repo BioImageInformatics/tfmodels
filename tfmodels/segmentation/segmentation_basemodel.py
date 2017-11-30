@@ -3,13 +3,12 @@ import numpy as np
 import sys, os
 
 from ..utilities.basemodel import BaseModel
-# from ..utilities.ops import class_weighted_pixelwise_crossentropy
 from discriminator import SegmentationDiscriminator
 
 class SegmentationBaseModel(BaseModel):
     ## Defaults
     segmentation_defaults={
-        'adversarial': False,
+        'adversary': False,
         'adversary_lr': 1e-4,
         'adversary_lambda': 1,
         'adversary_feature_matching': False,
@@ -30,7 +29,6 @@ class SegmentationBaseModel(BaseModel):
         'save_dir': None,
         'sess': None,
         'seg_training_op_list': [],
-        'snapshot_name': 'snapshot',
         'summary_iters': 50,
         'summary_op_list': [],
         'x_dims': [256, 256, 3],
@@ -84,7 +82,7 @@ class SegmentationBaseModel(BaseModel):
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
             name='{}_Adam'.format(self.name))
 
-        if self.adversarial:
+        if self.adversary:
             self.discriminator = SegmentationDiscriminator(sess=self.sess,
                 x_in=self.x_in,
                 y_real=self.y_in,
@@ -108,7 +106,7 @@ class SegmentationBaseModel(BaseModel):
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
         self.snapshot_path = os.path.join(self.save_dir,
-            '{}.ckpt'.format(self.snapshot_name))
+            '{}.ckpt'.format(self.name))
         # self.make_saver() ## In progress (SAVE1)
         self.saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
@@ -116,12 +114,12 @@ class SegmentationBaseModel(BaseModel):
         self._print_info_to_file(filename=os.path.join(self.save_dir,
             '{}_settings.txt'.format(self.name)))
 
-        if self.adversarial:
+        if self.adversary:
             self.discriminator._print_info_to_file(filename=os.path.join(self.save_dir,
                 '{}_settings.txt'.format(self.discriminator.name)))
 
         ## Somehow calling this during init() makes it not work
-        # if self.adversarial and self.pretraining_iters:
+        # if self.adversary and self.pretraining_iters:
         #     self.pretrain()
 
     def _test_mode(self):
@@ -207,7 +205,7 @@ class SegmentationBaseModel(BaseModel):
             self.seg_loss_sum = tf.summary.scalar('seg_loss', self.seg_loss)
             self.summary_op_list.append(self.seg_loss_sum)
 
-            if self.adversarial:
+            if self.adversary:
                 ## Train the generator w.r.t. the current discriminator
                 ## The discriminator itself is updated elsewhere
                 p_real_fake = self.discriminator.p_real_fake

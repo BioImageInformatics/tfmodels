@@ -42,7 +42,7 @@ with tf.Session(config=config) as sess:
     dataset.print_info()
 
     model = tfmodels.VGGTraining(sess=sess,
-        adversarial=True,
+        adversary=True,
         adversary_lambda=1,
         adversary_lr=1e-5,
         adversary_feature_matching=True,

@@ -3,7 +3,6 @@ import numpy as np
 import sys, os
 
 from ..utilities.basemodel import BaseModel
-from discriminator_basemodel import BaseDiscriminator
 from encoder_basemodel import BaseEncoder
 from generator_basemodel import BaseGenerator
 from ..utilities.ops import (
@@ -13,84 +12,82 @@ from ..utilities.ops import (
     conv_cond_concat
 )
 
-''' Generative Adversarial Network
+''' Variational Autoencoder
 
-1. Define the disciminator and generator according to the template models
-2. implement the loss functions and regularizers
-3. ???
+Kingma and Welling, 2013
 
 '''
-class Discriminator(BaseDiscriminator):
-    vae_discriminator_defaults = {
-        'dis_kernels': [32, 64, 128]
-    }
-
-    def __init__(self, **kwargs):
-        self.vae_discriminator_defaults.update(**kwargs)
-        super(Discriminator, self).__init__(**self.vae_discriminator_defaults)
-
-
-    def model(self, x_in, keep_prob=0.5, reuse=False):
-        with tf.variable_scope(self.name) as scope:
-            if reuse:
-                scope.reuse_variables()
-
-            print 'Setting up VAE/Discriminator'
-            print 'Nonlinearity: ', self.nonlin
-            nonlin = self.nonlin
-
-            print '\t x_in', x_in.get_shape()
-            c0 = nonlin(conv(x_in, self.dis_kernels[0], k_size=5, stride=3, var_scope='c0'))
-            print '\t c0', c0.get_shape()
-            c1 = nonlin(conv(c0, self.dis_kernels[1], k_size=5, stride=3, var_scope='c1'))
-            print '\t c1', c1.get_shape()
-            # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
-            flat = tf.contrib.layers.flatten(c1)
-            print '\t flat', flat.get_shape()
-            h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0'))
-            print '\t h0', h0.get_shape()
-            p_real = linear(h0, 1, var_scope='p_real')
-            print '\t p_real', p_real.get_shape()
-
-            return p_real
-
-
-## FOR Adversarial autoencoder
-class VectorDiscriminator(BaseDiscriminator):
-    vae_discriminator_defaults = {
-        'dis_vec_kernels': [128, 128, 64]
-    }
-
-    def __init__(self, **kwargs):
-        self.vae_discriminator_defaults.update(**kwargs)
-        super(VectorDiscriminator, self).__init__(**self.vae_discriminator_defaults)
+# class Discriminator(BaseDiscriminator):
+#     vae_discriminator_defaults = {
+#         'dis_kernels': [32, 64, 128]
+#     }
+#
+#     def __init__(self, **kwargs):
+#         self.vae_discriminator_defaults.update(**kwargs)
+#         super(Discriminator, self).__init__(**self.vae_discriminator_defaults)
+#
+#
+#     def model(self, x_in, keep_prob=0.5, reuse=False):
+#         with tf.variable_scope(self.name) as scope:
+#             if reuse:
+#                 scope.reuse_variables()
+#
+#             print 'Setting up VAE/Discriminator'
+#             print 'Nonlinearity: ', self.nonlin
+#             nonlin = self.nonlin
+#
+#             print '\t x_in', x_in.get_shape()
+#             c0 = nonlin(conv(x_in, self.dis_kernels[0], k_size=5, stride=3, var_scope='c0'))
+#             print '\t c0', c0.get_shape()
+#             c1 = nonlin(conv(c0, self.dis_kernels[1], k_size=5, stride=3, var_scope='c1'))
+#             print '\t c1', c1.get_shape()
+#             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
+#             flat = tf.contrib.layers.flatten(c1)
+#             print '\t flat', flat.get_shape()
+#             h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0'))
+#             print '\t h0', h0.get_shape()
+#             p_real = linear(h0, 1, var_scope='p_real')
+#             print '\t p_real', p_real.get_shape()
+#
+#             return p_real
 
 
-    def model(self, vec_in, keep_prob=0.5, reuse=False):
-        with tf.variable_scope(self.name) as scope:
-            if reuse:
-                scope.reuse_variables()
-
-            print 'Setting up VAE/VectorDiscriminator'
-            print 'Nonlinearity: ', self.nonlin
-            nonlin = self.nonlin
-
-            print '\t vec_in', vec_in.get_shape()
-            c0 = nonlin(linear(vec_in, self.dis_vec_kernels[0], var_scope='c0'))
-            print '\t c0', c0.get_shape()
-            c1 = nonlin(linear(c0, self.dis_vec_kernels[1], var_scope='c1'))
-            print '\t c1', c1.get_shape()
-            h0 = nonlin(linear(c1, self.dis_vec_kernels[2], var_scope='h0'))
-            print '\t h0', h0.get_shape()
-            p_real = linear(h0, 1, var_scope='p_real')
-            print '\t p_real', p_real.get_shape()
-
-            return p_real
+# ## FOR Adversarial autoencoder
+# class VectorDiscriminator(BaseDiscriminator):
+#     vae_discriminator_defaults = {
+#         'dis_vec_kernels': [128, 128, 64]
+#     }
+#
+#     def __init__(self, **kwargs):
+#         self.vae_discriminator_defaults.update(**kwargs)
+#         super(VectorDiscriminator, self).__init__(**self.vae_discriminator_defaults)
+#
+#
+#     def model(self, vec_in, keep_prob=0.5, reuse=False):
+#         with tf.variable_scope(self.name) as scope:
+#             if reuse:
+#                 scope.reuse_variables()
+#
+#             print 'Setting up VAE/VectorDiscriminator'
+#             print 'Nonlinearity: ', self.nonlin
+#             nonlin = self.nonlin
+#
+#             print '\t vec_in', vec_in.get_shape()
+#             c0 = nonlin(linear(vec_in, self.dis_vec_kernels[0], var_scope='c0'))
+#             print '\t c0', c0.get_shape()
+#             c1 = nonlin(linear(c0, self.dis_vec_kernels[1], var_scope='c1'))
+#             print '\t c1', c1.get_shape()
+#             h0 = nonlin(linear(c1, self.dis_vec_kernels[2], var_scope='h0'))
+#             print '\t h0', h0.get_shape()
+#             p_real = linear(h0, 1, var_scope='p_real')
+#             print '\t p_real', p_real.get_shape()
+#
+#             return p_real
 
 
 class Encoder(BaseEncoder):
     vae_discriminator_defaults = {
-        'enc_kernels': [32, 64, 128]
+        'enc_kernels': [32, 64, 128],
         'z_dim': 64,
     }
 
@@ -178,27 +175,19 @@ class VAE(BaseModel):
     vae_defaults = {
         'batch_size': 128,
         'dataset': None,
-        'discriminator': None,
-        'dis_learning_rate': 1e-4,
-        'dis_kernels': [32, 64, 128, 256],
         'enc_kernels': [32, 64, 128],
-        'generator': None,
-        'gen_learning_rate': 2e-4,
         'gen_kernels': [32, 64, 128, 256],
+        'global_step': 0,
         'iterator_dataset': False,
+        'learning_rate': 1e-4,
         'log_dir': None,
         'mode': 'TRAIN',
-        'name': 'GAN',
-        'n_upsamples': 3,
-        'pretraining': 500,
+        'name': 'vae',
         'save_dir': None,
         'sess': None,
-        'soften_labels': False,
-        'soften_sddev': 0.01,
         'summary_iters': 50,
         'x_dims': [256, 256, 3],
-        'x_in': None,
-        'z_dim': 64, }
+        'z_dim': 16, }
 
     def __init__(self, **kwargs):
         self.vae_defaults.update(**kwargs)
@@ -239,9 +228,6 @@ class VAE(BaseModel):
         ## ---------------------- Model ops ----------------------- ##
         self.zed, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
         self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
-        # self.p_real_real = self.discriminator.model(self.x_in, keep_prob=self.keep_prob)
-        # self.p_real_fake = self.discriminator.model(self.x_hat, keep_prob=self.keep_prob, reuse=True)
-
 
         ## ---------------------- Loss ops ------------------------ ##
         self._loss_op()
@@ -252,67 +238,52 @@ class VAE(BaseModel):
         ## --------------------- Summary ops ---------------------- ##
         self._summary_ops()
 
-        ## ------------------- Done with setup -------------------- ##
-        self._print_info_to_file(filename=os.path.join(self.save_dir, 'gan_settings.txt'))
+        ## ------------------- TensorFlow ops --------------------- ##
+        self._tf_ops()
 
         ## ---------------------- Initialize ---------------------- ##
+        self._print_info_to_file(filename=os.path.join(self.save_dir,
+            '{}_settings.txt'.format(self.name)))
         self.sess.run(tf.global_variables_initializer())
 
-        ## ---------------------- Pretraining --------------------- ##
-        self._pretraining()
-
-        print self.training_op_list
 
 
     def _loss_op(self):
-        # self._image_adversarial_loss()
+        self.loss = tf.constant(0.0)
+        self._reconstruction_loss()
         self._kl_divergence()
 
-
-    def _image_adversarial_loss(self):
-        self.real_target = tf.ones_like(self.p_real_real)
-        self.fake_target = tf.zeros_like(self.p_real_fake)
-
-        if self.soften_labels:
-            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
-                mean=0.0, stddev=self.soften_sddev)
-            fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
-                mean=0.0, stddev=self.soften_sddev)
-            self.real_target = self.real_target + real_epsilon
-            self.fake_target = self.fake_target + fake_epsilon
-
-        self.dis_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=self.real_target, logits=self.p_real_real ))
-        self.dis_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=self.fake_target, logits=self.p_real_fake ))
-
-        self.generator_adv_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=self.real_target, logits=self.p_real_fake ))
-
-        self.img_discriminator_loss = self.dis_loss_real + self.dis_loss_fake
-
-        self.discriminator_loss_sum = tf.summary.scalar('img_discriminator_loss', self.img_discriminator_loss)
-        self.generator_loss_sum = tf.summary.scalar('generator_adv_loss', self.generator_adv_loss)
-
+    def _reconstruction_loss(self):
+        self.recon_loss = tf.losses.mean_squared_error(
+            labels=self.x_in, predictions=self.x_hat)
+        tf.assign_add(self.loss, self.recon_loss)
 
     def _kl_divergence(self):
         self.kld = -0.5 * tf.reduce_sum(1 + self.log_var
             - tf.square(self.mu)
             - tf.exp(self.log_var), 1)
-
-
+        tf.assign_add(self.loss, self.kld)
 
     def _training_ops(self):
         self.generator_vars = self.generator.get_update_list()
         self.encoder_vars = self.encoder.get_update_list()
 
-        self.generator_optimizer = tf.train.AdamOptimizer(self.gen_learning_rate)
-        self.discriminator_optimizer = tf.train.AdamOptimizer(self.dis_learning_rate)
-
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.loss)
 
     def _summary_ops(self):
-        pass
+        self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
+        self.x_hat_sum = tf.summary.image('x_hat', self.x_hat, max_outputs=8)
 
+        self.zed_sum = tf.summary.histogram('z', self.zed)
+        self.mu_sum = tf.summary.histogram('mu', self.mu)
+        self.logvar_sum = tf.summary.histogram('logvar', self.log_var)
 
-    def _pretraining(self):
-        pass
+        self.summary_op = tf.summary.merge_all()
+
+    def train_step(self):
+        self.global_step += 1
+        self.sess.run(self.train_op)
+        if self.global_step % self.summary_iters == 0:
+            summary_str = self.sess.run(self.summary_op)
+            self.summary_writer.add_summary(summary_str, self.global_step)

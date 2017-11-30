@@ -21,9 +21,6 @@ class BaseModel(object):
         ## Set nonlinearity for all downstream models
         self.nonlin = tf.nn.selu
 
-    def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
-        raise Exception(NotImplementedError)
-
     ## In progress for saving each model in its own snapshot (SAVE1)
     # def make_saver(self):
     #     t_vars = tf.trainable_variables()
@@ -34,25 +31,36 @@ class BaseModel(object):
         t_vars = tf.trainable_variables()
         return [var for var in t_vars if self.name in var.name]
 
-    def summaries(self):
+    def inference(self, x_in, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
-    def train_step(self, global_step):
+    def loss_op(self):
         raise Exception(NotImplementedError)
 
-    def snapshot(self, step):
+    def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
 
     def restore(self, snapshot_path):
         raise Exception(NotImplementedError)
 
+    def snapshot(self, step):
+        raise Exception(NotImplementedError)
+
+    def summaries(self):
+        raise Exception(NotImplementedError)
+
     def test_step(self, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
-    def inference(self, x_in, keep_prob=1.0):
-        raise Exception(NotImplementedError)
+    def tf_ops(self):
+        self.summary_writer = tf.summary.FileWriter(self.log_dir,
+            graph=self.sess.graph, flush_secs=30)
+        ## Append a model name to the save path
+        self.snapshot_path = os.path.join(self.save_dir, '{}.ckpt'.format(self.name))
+        # self.make_saver() ## In progress (SAVE1)
+        self.saver = tf.train.Saver(max_to_keep=5)
 
-    def loss_op(self):
+    def train_step(self, global_step):
         raise Exception(NotImplementedError)
 
     def print_info(self):
