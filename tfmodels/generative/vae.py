@@ -121,15 +121,15 @@ class Encoder(BaseEncoder):
 
             mu = linear(h0, self.z_dim, var_scope='mu')
             print '\t mu', mu.get_shape()
-            sigma = linear(h0, self.z_dim, var_scope='log_var')
+            log_var = linear(h0, self.z_dim, var_scope='log_var')
             print '\t var', log_var.get_shape()
 
             epsilon = tf.random_normal(shape=[batch_size, self.z_dim], mean=0.0, stddev=1.0)
-            # zed = mu + epsilon * tf.sqrt(tf.exp(log_var))
-            zed = mu + epsilon * sigma
+            zed = mu + epsilon * tf.exp(0.5 * log_var)
+            # zed = mu + epsilon * sigma
             print '\t zed', zed.get_shape()
 
-            return zed, mu, sigma
+            return zed, mu, log_var
 
 
 class Generator(BaseGenerator):
@@ -229,7 +229,7 @@ class VAE(BaseModel):
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
 
         ## ---------------------- Model ops ----------------------- ##
-        self.zed, self.mu, self.sigma = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
+        self.zed, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
         self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
 
         ## ---------------------- Loss ops ------------------------ ##
@@ -268,18 +268,25 @@ class VAE(BaseModel):
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
-            self.recon_loss = tf.losses.mean_squared_error(
-                labels=self.x_in, predictions=self.x_hat,
-                reduction=tf.losses.Reduction.NONE)
-            self.recon_loss = tf.reduce_mean(self.recon_loss, axis=[1,2,3])
+            self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=self.x_hat,
+                labels=self.x_in), axis=[1,2,3])
+
+            # self.recon_loss = tf.losses.mean_squared_error(
+            #     labels=self.x_in, predictions=self.x_hat,
+            #     reduction=tf.losses.Reduction.NONE)
+            # self.recon_loss = tf.reduce_mean(self.recon_loss, axis=[1,2,3])
 
     def _kl_divergence(self):
         with tf.name_scope('kld'):
-            self.kld = -0.5 * tf.reduce_sum(1 + tf.square(self.sigma) - \
+            # self.kld = -0.5 * tf.reduce_sum(1 + tf.square(self.sigma) - \
+            #     tf.square(self.mu) - \
+            #     tf.log(1e-8 + \
+            #     tf.square(self.sigma)), 1)
+            self.kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
                 tf.square(self.mu) - \
-                tf.log(1e-8 + \
-                tf.square(self.sigma)), 1)
-            self.kld = tf.reduce_mean(self.kld)
+                tf.exp(self.log_var), 1)
+            # self.kld = tf.reduce_mean(self.kld)
 
     def _training_ops(self):
         self.generator_vars = self.generator.get_update_list()
