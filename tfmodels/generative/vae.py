@@ -114,19 +114,22 @@ class Encoder(BaseEncoder):
             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
             flat = tf.contrib.layers.flatten(c1)
             print '\t flat', flat.get_shape()
-            h0 = nonlin(linear(flat, self.enc_kernels[2], var_scope='h0'))
+
+            flat_dropout = tf.contrib.nn.alpha_dropout(flat, keep_prob=keep_prob)
+            h0 = nonlin(linear(flat_dropout, self.enc_kernels[2], var_scope='h0'))
             print '\t h0', h0.get_shape()
 
             mu = linear(h0, self.z_dim, var_scope='mu')
             print '\t mu', mu.get_shape()
-            log_var = linear(h0, self.z_dim, var_scope='log_var')
+            sigma = linear(h0, self.z_dim, var_scope='log_var')
             print '\t var', log_var.get_shape()
 
             epsilon = tf.random_normal(shape=[batch_size, self.z_dim], mean=0.0, stddev=1.0)
-            zed = mu + epsilon * tf.sqrt(tf.exp(log_var))
+            # zed = mu + epsilon * tf.sqrt(tf.exp(log_var))
+            zed = mu + epsilon * sigma
             print '\t zed', zed.get_shape()
 
-            return zed, mu, log_var
+            return zed, mu, sigma
 
 
 class Generator(BaseGenerator):
@@ -226,7 +229,7 @@ class VAE(BaseModel):
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
 
         ## ---------------------- Model ops ----------------------- ##
-        self.zed, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
+        self.zed, self.mu, self.sigma = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
         self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
 
         ## ---------------------- Loss ops ------------------------ ##
@@ -265,9 +268,9 @@ class VAE(BaseModel):
 
     def _kl_divergence(self):
         with tf.name_scope('kld'):
-            self.kld = -0.5 * tf.reduce_sum(1 + self.log_var
+            self.kld = -0.5 * tf.reduce_sum(1 + tf.square(self.sigma)
                 - tf.square(self.mu)
-                - tf.exp(self.log_var), 1)
+                - tf.log(1e-8 + tf.square(self.sigma)), 1)
 
     def _training_ops(self):
         self.generator_vars = self.generator.get_update_list()
@@ -282,7 +285,7 @@ class VAE(BaseModel):
 
         self.zed_sum = tf.summary.histogram('z', self.zed)
         self.mu_sum = tf.summary.histogram('mu', self.mu)
-        self.logvar_sum = tf.summary.histogram('logvar', self.log_var)
+        self.sigma_sum = tf.summary.histogram('sigma', self.sigma)
 
         self.loss_sum = tf.summary.scalar('loss', self.loss)
         self.recon_sum = tf.summary.scalar('recon', tf.reduce_mean(self.recon_loss))
