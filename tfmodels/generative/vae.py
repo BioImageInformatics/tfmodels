@@ -253,11 +253,18 @@ class VAE(BaseModel):
 
     def _loss_op(self):
         # self.loss = tf.Variable(0.0, name='loss')
-        self._reconstruction_loss()
+        # self._reconstruction_loss()
+        self._marginal_likelihood()
         self._kl_divergence()
 
         self.loss = self.recon_loss + self.kld
+        # self.ELBO = self.marginal_likelihood + self.kld
         self.loss = tf.reduce_mean(self.loss)
+
+    ## wtf?
+    def _marginal_likelihood(self):
+        self.marginal_likelihood = tf.reduce_sum(self.x_in * tf.log(self.x_hat) + \
+            (1 - self.x_in) * tf.log(1 - self.x_hat), 1)
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
@@ -268,9 +275,11 @@ class VAE(BaseModel):
 
     def _kl_divergence(self):
         with tf.name_scope('kld'):
-            self.kld = -0.5 * tf.reduce_sum(1 + tf.square(self.sigma)
-                - tf.square(self.mu)
-                - tf.log(1e-8 + tf.square(self.sigma)), 1)
+            self.kld = -0.5 * tf.reduce_sum(1 + tf.square(self.sigma) - \
+                tf.square(self.mu) - \
+                tf.log(1e-8 + \
+                tf.square(self.sigma)), 1)
+            self.kld = tf.reduce_mean(self.kld)
 
     def _training_ops(self):
         self.generator_vars = self.generator.get_update_list()
@@ -288,8 +297,8 @@ class VAE(BaseModel):
         self.sigma_sum = tf.summary.histogram('sigma', self.sigma)
 
         self.loss_sum = tf.summary.scalar('loss', self.loss)
-        self.recon_sum = tf.summary.scalar('recon', tf.reduce_mean(self.recon_loss))
-        self.kld_sum = tf.summary.scalar('kld', tf.reduce_mean(self.kld))
+        self.recon_sum = tf.summary.scalar('recon', self.recon_loss)
+        self.kld_sum = tf.summary.scalar('kld', self.kld)
 
         self.summary_op = tf.summary.merge_all()
 
