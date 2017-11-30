@@ -121,13 +121,10 @@ class Encoder(BaseEncoder):
 
             mu = linear(h0, self.z_dim, var_scope='mu')
             print '\t mu', mu.get_shape()
-<<<<<<< HEAD
-            sigma = linear(h0, self.z_dim, var_scope='sigma')
-            print '\t sigma', sigma.get_shape()
-=======
+
+            # sigma = linear(h0, self.z_dim, var_scope='sigma')
             log_var = linear(h0, self.z_dim, var_scope='log_var')
             print '\t var', log_var.get_shape()
->>>>>>> 60061a10e3ca5bfff1531f3d7a0fc561f679915d
 
             epsilon = tf.random_normal(shape=[batch_size, self.z_dim], mean=0.0, stddev=1.0)
             zed = mu + epsilon * tf.exp(0.5 * log_var)
@@ -277,6 +274,7 @@ class VAE(BaseModel):
             self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=self.x_hat,
                 labels=self.x_in), axis=[1,2,3])
+            print 'recon_loss', self.recon_loss.get_shape()
 
             # self.recon_loss = tf.losses.mean_squared_error(
             #     labels=self.x_in, predictions=self.x_hat,
@@ -292,6 +290,7 @@ class VAE(BaseModel):
             self.kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
                 tf.square(self.mu) - \
                 tf.exp(self.log_var), 1)
+            print 'kld', self.kld.get_shape()
             # self.kld = tf.reduce_mean(self.kld)
 
     def _training_ops(self):
@@ -307,11 +306,11 @@ class VAE(BaseModel):
 
         self.zed_sum = tf.summary.histogram('z', self.zed)
         self.mu_sum = tf.summary.histogram('mu', self.mu)
-        self.sigma_sum = tf.summary.histogram('sigma', self.sigma)
+        self.sigma_sum = tf.summary.histogram('log_var', self.log_var)
 
         self.loss_sum = tf.summary.scalar('loss', self.loss)
-        self.recon_sum = tf.summary.scalar('recon', self.recon_loss)
-        self.kld_sum = tf.summary.scalar('kld', self.kld)
+        self.recon_sum = tf.summary.scalar('recon', tf.reduce_mean(self.recon_loss))
+        self.kld_sum = tf.summary.scalar('kld', tf.reduce_mean(self.kld))
         self.m_lik_sum = tf.summary.scalar('m_lik', self.marginal_likelihood)
 
         self.summary_op = tf.summary.merge_all()
