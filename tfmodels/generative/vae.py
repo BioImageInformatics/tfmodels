@@ -121,8 +121,8 @@ class Encoder(BaseEncoder):
 
             mu = linear(h0, self.z_dim, var_scope='mu')
             print '\t mu', mu.get_shape()
-            sigma = linear(h0, self.z_dim, var_scope='log_var')
-            print '\t var', log_var.get_shape()
+            sigma = linear(h0, self.z_dim, var_scope='sigma')
+            print '\t sigma', sigma.get_shape()
 
             epsilon = tf.random_normal(shape=[batch_size, self.z_dim], mean=0.0, stddev=1.0)
             # zed = mu + epsilon * tf.sqrt(tf.exp(log_var))
