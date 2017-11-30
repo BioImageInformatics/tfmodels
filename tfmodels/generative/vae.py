@@ -253,7 +253,7 @@ class VAE(BaseModel):
 
     def _loss_op(self):
         # self.loss = tf.Variable(0.0, name='loss')
-        # self._reconstruction_loss()
+        self._reconstruction_loss()
         self._marginal_likelihood()
         self._kl_divergence()
 
@@ -265,13 +265,15 @@ class VAE(BaseModel):
     def _marginal_likelihood(self):
         self.marginal_likelihood = tf.reduce_sum(self.x_in * tf.log(self.x_hat) + \
             (1 - self.x_in) * tf.log(1 - self.x_hat), 1)
+        self.marginal_likelihood = tf.reduce_mean(self.marginal_likelihood)
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
             self.recon_loss = tf.losses.mean_squared_error(
                 labels=self.x_in, predictions=self.x_hat,
                 reduction=tf.losses.Reduction.NONE)
-            self.recon_loss = tf.reduce_mean(self.recon_loss, axis=[1,2,3])
+            #self.recon_loss = tf.reduce_mean(self.recon_loss, axis=[1,2,3])
+            self.recon_loss = tf.reduce_mean(self.recon_loss)
 
     def _kl_divergence(self):
         with tf.name_scope('kld'):
@@ -299,6 +301,7 @@ class VAE(BaseModel):
         self.loss_sum = tf.summary.scalar('loss', self.loss)
         self.recon_sum = tf.summary.scalar('recon', self.recon_loss)
         self.kld_sum = tf.summary.scalar('kld', self.kld)
+        self.m_lik_sum = tf.summary.scalar('m_lik', self.marginal_likelihood)
 
         self.summary_op = tf.summary.merge_all()
 
