@@ -17,16 +17,16 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 250
+epochs = 50
 iterations = 1000
 batch_size = 64
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128vgg_a/logs/{}'.format(expdate)
-save_dir         = 'pca128vgg_a/snapshots'
-debug_dir        = 'pca128vgg_a/debug'
-snapshot_restore = 'pca128vgg_a/snapshots/vgg.ckpt-{}'.format(step_start)
+log_dir          = 'pca128vgg_w/logs/{}'.format(expdate)
+save_dir         = 'pca128vgg_w/snapshots'
+debug_dir        = 'pca128vgg_w/debug'
+snapshot_restore = 'pca128vgg_w/snapshots/vgg.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -46,6 +46,7 @@ with tf.Session(config=config) as sess:
         adversary_lambda=1,
         adversary_lr=1e-5,
         adversary_feature_matching=True,
+        class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         conv_kernels=[64, 128, 256, 256],
         dataset=dataset,
         deconv_kernels=[64, 128],
