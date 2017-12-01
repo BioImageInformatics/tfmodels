@@ -41,10 +41,25 @@ class BaseModel(object):
         raise Exception(NotImplementedError)
 
     def restore(self, snapshot_path):
-        raise Exception(NotImplementedError)
+        print 'Restoring from {}'.format(snapshot_path)
+        try:
+            self.saver.restore(self.sess, snapshot_path)
+            print 'Success!'
+            ## In progress for restoring model + discriminator separately (SAVE1)
+            # for saver, snap_path in zip(self.saver):
+        except:
+            print 'Failed! Continuing without loading snapshot.'
 
-    def snapshot(self, step):
-        raise Exception(NotImplementedError)
+    def snapshot(self):
+        ## In progress for saving model + discriminator separately (SAVE1)
+        ## have to work up the if/else logic upstream first
+        # for saver, snap_dir in zip(self.saver_list, self.snap_dir_list):
+        #     print 'Snapshotting to [{}] step [{}]'.format(snap_dir, step),
+        #     saver.save(self.sess, snap_dir, global_step=step)
+
+        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_path, self.global_step),
+        self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step)
+        print 'Done'
 
     def summaries(self):
         raise Exception(NotImplementedError)

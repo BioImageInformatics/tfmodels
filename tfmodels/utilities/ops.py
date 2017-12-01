@@ -7,6 +7,16 @@ https://raw.githubusercontent.com/carpedm20/DCGAN-tensorflow/master/ops.py
 (the most popular DCGAN implementation on github)
 """
 
+def selu_initializer(shape):
+    if len(shape) == 2:
+        input_size = shape[0]
+    if len(shape) == 4:
+        input_size = np.prod(shape[:-1])
+
+    sqrt_1_input = np.sqrt(1.0/input_size)
+    print '\t SELU intializer stddev = {:1.5f}'.format(sqrt_1_input)
+    return tf.random_normal_initializer(mean=0.0, stddev=sqrt_1_input)
+
 def conv_cond_concat(x, y):
   """Concatenate conditioning vector on feature map axis.s"""
   x_shapes = x.get_shape()
@@ -15,32 +25,42 @@ def conv_cond_concat(x, y):
     x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
 
 def weight_variable(shape, name='weight',
-    initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
-    return tf.get_variable(name, shape=shape,
-        initializer=initializer)
+    initializer=tf.contrib.layers.xavier_initializer(uniform=False),
+    selu=False):
+
+    if selu:
+        initializer = selu_initializer(shape)
+
+    return tf.get_variable(name, shape=shape, initializer=initializer)
 
 def bias_variable(shape, name='bias'):
-    return tf.get_variable(name, shape=shape,
-        initializer=tf.constant_initializer(0.0))
+    return tf.get_variable(name, shape=shape, initializer=tf.constant_initializer(0.0))
 
 def linear(features, n_output, var_scope='linear', no_bias=False,
-    initializer=tf.random_normal_initializer(mean=0.0, stddev=0.01)):
+    initializer=tf.random_normal_initializer(mean=0.0, stddev=0.01),
+    selu=False):
     with tf.variable_scope(var_scope) as scope:
         dim_in = features.get_shape().as_list()[-1]
-        weight = weight_variable([dim_in, n_output], name='w',
-            initializer=initializer)
+        weight_shape = [dim_in, n_output]
+
+        weight = weight_variable(weight_shape, name='w',
+            initializer=initializer, selu=selu)
 
         if no_bias:
-            return tf.matmul(features, weight)
+            out = tf.matmul(features, weight)
         else:
             bias = bias_variable(n_output, name='b')
-            return tf.matmul(features, weight) + bias
+            out = tf.matmul(features, weight) + bias
 
-def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv'):
+        print '\t {} dense: {}'.format(var_scope, out.get_shape())
+        return out
+
+def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv', selu=False):
     ## Check features is 4D
     with tf.variable_scope(var_scope) as scope:
         dim_in = features.get_shape().as_list()[-1]
-        weight = weight_variable([k_size, k_size, dim_in, n_kernel], name='w')
+        weight_shape = [k_size, k_size, dim_in, n_kernel]
+        weight = weight_variable(weight_shape, name='w', selu=selu)
         bias = bias_variable([n_kernel], name='b')
 
         ## WHYY
@@ -48,10 +68,11 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv'):
             padding=pad)
         oH, oW, oC = out.get_shape().as_list()[1:]
         out = tf.reshape(tf.nn.bias_add(out, bias), [-1, oH, oW, oC])
+        print '\t {} conv: {}'.format(var_scope, out.get_shape())
         return out
 
 def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
-    var_scope='deconv'):
+    var_scope='deconv', selu=False):
     with tf.variable_scope(var_scope) as scope:
         dim_h_in, dim_w_in, dim_k_in = features.get_shape().as_list()[1:]
         ## output must be whole numbered
@@ -61,7 +82,8 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
         output_shape = [batch_size, out_h, out_w, n_kernel]
         # print 'ops/deconv: output_shape', output_shape
 
-        weight = weight_variable([k_size, k_size, n_kernel, dim_k_in], name='w')
+        weight_shape = [k_size, k_size, n_kernel, dim_k_in]
+        weight = weight_variable(weight_shape, name='w', selu=selu)
         bias = bias_variable([n_kernel], name='b')
 
         ## why
@@ -69,7 +91,7 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
             strides=[1, upsample_rate, upsample_rate, 1], padding=pad)
         # out_shape = tf.shape(out)
         out = tf.reshape(tf.nn.bias_add(out, bias), [-1, out_h, out_w, n_kernel])
-
+        print '\t {} deconv: {}'.format(var_scope, out.get_shape())
         return out
 
 ## BUG batch norm with trainig
@@ -115,6 +137,8 @@ def unpool(pool, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
         set_input_shape = pool.get_shape()
         set_output_shape = [set_input_shape[0], set_input_shape[1] * k_size[1], set_input_shape[2] * k_size[2], set_input_shape[3]]
         ret.set_shape(set_output_shape)
+
+        print '\t {} unpool: {}'.format(var_scope, ret.get_shape())
         return ret
 #
 # def class_weighted_pixelwise_crossentropy(labels, logits, weights=1):

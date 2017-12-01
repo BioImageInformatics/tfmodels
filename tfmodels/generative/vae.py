@@ -95,7 +95,6 @@ class Encoder(BaseEncoder):
         self.vae_discriminator_defaults.update(**kwargs)
         super(Encoder, self).__init__(**self.vae_discriminator_defaults)
 
-
     def model(self, x_in, keep_prob=0.5, reuse=False):
         with tf.variable_scope(self.name) as scope:
             if reuse:
@@ -107,24 +106,19 @@ class Encoder(BaseEncoder):
 
             batch_size = tf.shape(x_in)[0]
             print '\t x_in', x_in.get_shape()
-            c0 = nonlin(conv(x_in, self.enc_kernels[0], k_size=4, stride=2, var_scope='c0'))
-            print '\t c0', c0.get_shape()
-            c1 = nonlin(conv(c0, self.enc_kernels[1], k_size=4, stride=2, var_scope='c1'))
-            print '\t c1', c1.get_shape()
+            c0 = nonlin(conv(x_in, self.enc_kernels[0], k_size=4, stride=2, var_scope='c0', selu=1))
+            c1 = nonlin(conv(c0, self.enc_kernels[1], k_size=4, stride=2, var_scope='c1', selu=1))
             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
             flat = tf.contrib.layers.flatten(c1)
             print '\t flat', flat.get_shape()
 
             flat_dropout = tf.contrib.nn.alpha_dropout(flat, keep_prob=keep_prob)
-            h0 = nonlin(linear(flat_dropout, self.enc_kernels[2], var_scope='h0'))
-            print '\t h0', h0.get_shape()
+            h0 = nonlin(linear(flat_dropout, self.enc_kernels[2], var_scope='h0', selu=1))
 
             mu = linear(h0, self.z_dim, var_scope='mu')
-            print '\t mu', mu.get_shape()
 
             # sigma = linear(h0, self.z_dim, var_scope='sigma')
             log_var = linear(h0, self.z_dim, var_scope='log_var')
-            print '\t var', log_var.get_shape()
 
             epsilon = tf.random_normal(shape=tf.shape(mu), mean=0.0, stddev=1.0)
             zed = mu + epsilon * tf.exp(0.5 * log_var)
@@ -137,7 +131,6 @@ class Encoder(BaseEncoder):
 class Generator(BaseGenerator):
     vae_generator_defaults = {
         'gen_kernels': [128, 64, 32],
-        'n_upsamples': 3,
         'x_dims': [128, 128, 3],
         # 'z_in': None
     }
@@ -145,7 +138,6 @@ class Generator(BaseGenerator):
     def __init__(self, **kwargs):
         self.vae_generator_defaults.update(**kwargs)
         super(Generator, self).__init__(**self.vae_generator_defaults)
-
 
     def model(self, z_in, keep_prob=0.5, reuse=False):
         with tf.variable_scope(self.name) as scope:
@@ -159,23 +151,15 @@ class Generator(BaseGenerator):
             ## These first two layers will be pretty much the same in all generators
             ## Project
             print '\t z_in', z_in.get_shape()
-            projection = nonlin(linear(z_in, self.project_shape, var_scope='projection')) ## [16*16]
-            print '\t projection', projection.get_shape()
-            project_conv = tf.reshape(projection, self.resize_shape) ## [16, 16, 1]
-            print '\t project_conv', project_conv.get_shape()
-            h0 = nonlin(deconv(project_conv, self.gen_kernels[0], k_size=4, var_scope='h0')) ## [32, 32, 128]
-            print '\t h0', h0.get_shape()
-            h1 = nonlin(deconv(h0, self.gen_kernels[1], k_size=4, var_scope='h1')) ## [64, 64, 64]
-            print '\t h1', h1.get_shape()
+            projection = nonlin(linear(z_in, self.project_shape, var_scope='projection', selu=1))
+            project_conv = tf.reshape(projection, self.resize_shape)
+            h0 = nonlin(deconv(project_conv, self.gen_kernels[0], k_size=4, var_scope='h0', selu=1))
+            h1 = nonlin(deconv(h0, self.gen_kernels[1], k_size=4, var_scope='h1', selu=1))
 
             x_hat_logit = conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat')
             x_hat = tf.nn.sigmoid(x_hat_logit)
-            print '\t x_hat', x_hat.get_shape()
 
             return x_hat, x_hat_logit
-
-
-
 
 
 class VAE(BaseModel):
@@ -209,7 +193,6 @@ class VAE(BaseModel):
             z_dim=self.z_dim )
         self.generator = Generator(
             gen_kernels=self.gen_kernels,
-            n_upsamples=self.n_upsamples,
             x_dims=self.x_dims )
         # self.discriminator = Discriminator(
         #     dis_kernels=self.dis_kernels,
@@ -226,14 +209,12 @@ class VAE(BaseModel):
                 shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
                 name='x_in')
 
-        self.z_in_default = tf.random_normal([self.batch_size, self.z_dim],
-            mean=0.0, stddev=1.0)
-        self.z_in = tf.placeholder_with_default(self.z_in_default,
-            shape=[None, self.z_dim])
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
 
         ## ---------------------- Model ops ----------------------- ##
-        self.zed, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
+        self.zed_model, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
+        self.zed = tf.placeholder_with_default(self.zed_model,
+            shape=[None, self.z_dim], name='zed')
         self.x_hat, self.x_hat_logit = self.generator.model(self.zed, keep_prob=self.keep_prob)
 
         ## ---------------------- Loss ops ------------------------ ##
@@ -253,23 +234,6 @@ class VAE(BaseModel):
             '{}_settings.txt'.format(self.name)))
         self.sess.run(tf.global_variables_initializer())
 
-
-    def _loss_op(self):
-        self._reconstruction_loss()
-        self._kl_divergence()
-
-        self.loss = self.recon_loss + self.kld
-        self.loss = tf.reduce_mean(self.loss)
-
-
-    def _reconstruction_loss(self):
-        with tf.name_scope('MSE'):
-            self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.x_hat_logit,
-                labels=self.x_in), axis=[1,2,3])
-            print 'recon_loss', self.recon_loss.get_shape()
-
-
     def _kl_divergence(self):
         with tf.name_scope('kld'):
             self.kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
@@ -278,14 +242,19 @@ class VAE(BaseModel):
             print 'kld', self.kld.get_shape()
             # self.kld = tf.reduce_mean(self.kld)
 
+    def _loss_op(self):
+        self._reconstruction_loss()
+        self._kl_divergence()
 
-    def _training_ops(self):
-        self.generator_vars = self.generator.get_update_list()
-        self.encoder_vars = self.encoder.get_update_list()
+        self.loss = self.recon_loss + self.kld
+        self.loss = tf.reduce_mean(self.loss)
 
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        self.train_op = self.optimizer.minimize(self.loss)
-
+    def _reconstruction_loss(self):
+        with tf.name_scope('MSE'):
+            self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=self.x_hat_logit,
+                labels=self.x_in), axis=[1,2,3])
+            print 'recon_loss', self.recon_loss.get_shape()
 
     def _summary_ops(self):
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
@@ -298,9 +267,16 @@ class VAE(BaseModel):
         self.loss_sum = tf.summary.scalar('loss', self.loss)
         self.recon_sum = tf.summary.scalar('recon', tf.reduce_mean(self.recon_loss))
         self.kld_sum = tf.summary.scalar('kld', tf.reduce_mean(self.kld))
-        self.m_lik_sum = tf.summary.scalar('m_lik', self.marginal_likelihood)
 
         self.summary_op = tf.summary.merge_all()
+
+    def _training_ops(self):
+        self.generator_vars = self.generator.get_update_list()
+        self.encoder_vars = self.encoder.get_update_list()
+
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.minimize(self.loss)
+
 
 
     def train_step(self):

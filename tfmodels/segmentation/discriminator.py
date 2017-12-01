@@ -5,7 +5,7 @@ from ..utilities.ops import *
 class SegmentationDiscriminator(BaseDiscriminator):
     seg_discrim_defaults={
         'discriminator_train_op_list': [],
-        'kernels': [32, 32, 32, 128],
+        'segdis_kernels': [32, 32, 32, 512],
         'learning_rate': 5e-5,
         'name': 'adversary',
         'soften_labels': True,
@@ -49,31 +49,25 @@ class SegmentationDiscriminator(BaseDiscriminator):
             y_hat_x_in = tf.concat([y_hat, x_in], axis=-1)
             print '\t y_hat_x_in', y_hat_x_in.get_shape()
 
-            h0_0 = nonlin(conv(y_hat_x_in, self.kernels[0], k_size=5, stride=1, var_scope='h0_0'))
-            h0_1 = nonlin(conv(h0_0, self.kernels[0], k_size=5, stride=1, var_scope='h0_1'))
+            h0_0 = nonlin(conv(y_hat_x_in, self.segdis_kernels[0], k_size=5, stride=1, var_scope='h0_0', selu=1))
+            h0_1 = nonlin(conv(h0_0, self.segdis_kernels[0], k_size=5, stride=1, var_scope='h0_1', selu=1))
             h0_pool = tf.nn.max_pool(h0_1, [1,4,4,1], [1,4,4,1], padding='VALID', name='h0_pool')
-            print '\t h0_pool', h0_pool.get_shape()
 
-            h1_0 = nonlin(conv(h0_pool, self.kernels[1], stride=1, var_scope='h1_0'))
-            h1_1 = nonlin(conv(h1_0, self.kernels[1], stride=1, var_scope='h1_1'))
+            h1_0 = nonlin(conv(h0_pool, self.segdis_kernels[1], stride=1, var_scope='h1_0', selu=1))
+            h1_1 = nonlin(conv(h1_0, self.segdis_kernels[1], stride=1, var_scope='h1_1', selu=1))
             h1_pool = tf.nn.max_pool(h1_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h1_pool')
-            print '\t h1_pool', h1_pool.get_shape()
 
-            h2_0 = nonlin(conv(h1_pool, self.kernels[2], stride=1, var_scope='h2_0'))
-            h2_1 = nonlin(conv(h2_0, self.kernels[2], stride=1, var_scope='h2_1'))
+            h2_0 = nonlin(conv(h1_pool, self.segdis_kernels[2], stride=1, var_scope='h2_0', selu=1))
+            h2_1 = nonlin(conv(h2_0, self.segdis_kernels[2], stride=1, var_scope='h2_1', selu=1))
             h2_pool = tf.nn.max_pool(h2_1, [1,2,2,1], [1,2,2,1], padding='VALID', name='h2_pool')
-            print '\t h2_pool', h2_pool.get_shape()
 
             h_flat = tf.contrib.layers.flatten(h2_pool)
             h_flat = tf.contrib.nn.alpha_dropout(h_flat, keep_prob=keep_prob, name='h_flat_do')
-            print '\t h_flat', h_flat.get_shape()
 
-            h3 = nonlin(linear(h_flat, self.kernels[3], var_scope='h3'))
+            h3 = nonlin(linear(h_flat, self.segdis_kernels[3], var_scope='h3', selu=1))
             # h3 = tf.contrib.nn.alpha_dropout(h3, keep_prob=keep_prob, name='h3_do')
-            print '\t h3', h3.get_shape()
 
             p_real = linear(h3, 1, var_scope='p_real')
-            print '\t p_real', p_real.get_shape()
 
             return p_real, h3
 

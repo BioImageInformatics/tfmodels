@@ -23,7 +23,6 @@ class SegmentationBaseModel(BaseModel):
         'mode': 'TRAIN',
         'name': 'Segmentation',
         'n_classes': None,
-        'pretraining': False,
         'pretrain_g': 2500,
         'pretrain_d': 1000,
         'save_dir': None,
@@ -172,6 +171,7 @@ class SegmentationBaseModel(BaseModel):
                      self.keep_prob: keep_prob,
                      self.training: False}
         y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
+        # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
         return y_hat_
 
 
@@ -256,6 +256,12 @@ class SegmentationBaseModel(BaseModel):
 
 
     def pretrain(self):
+        if not self.adversary:
+            print 'Pretraining requested but this model is not in adversarial mode'
+            print 'use adversary=True to include adversarial training'
+            print 'Continuing'
+            return
+
         print 'Pretraining Generator without adversary for {} iterations'.format(self.pretrain_g)
         for _ in xrange(self.pretrain_g):
             self.global_step += 1
@@ -267,7 +273,6 @@ class SegmentationBaseModel(BaseModel):
                 summary_str = self.sess.run(self.summary_op)
                 self.summary_writer.add_summary(summary_str, self.global_step)
 
-
         print 'Pretraining Discriminator for {} iterations'.format(self.pretrain_d)
         for _ in xrange(self.pretrain_d):
             self.global_step += 1
@@ -278,32 +283,28 @@ class SegmentationBaseModel(BaseModel):
                 summary_str = self.sess.run(self.summary_op)
                 self.summary_writer.add_summary(summary_str, self.global_step)
 
+    # def restore(self, snapshot_path):
+    #     print 'Restoring from {}'.format(snapshot_path)
+    #     try:
+    #         self.saver.restore(self.sess, snapshot_path)
+    #         print 'Success!'
+    #
+    #         ## In progress for restoring model + discriminator separately (SAVE1)
+    #         # for saver, snap_path in zip(self.saver):
+    #     except:
+    #         print 'Failed! Continuing without loading snapshot.'
 
-
-    def restore(self, snapshot_path):
-        print 'Restoring from {}'.format(snapshot_path)
-        try:
-            self.saver.restore(self.sess, snapshot_path)
-            print 'Success!'
-
-            ## In progress for restoring model + discriminator separately (SAVE1)
-            # for saver, snap_path in zip(self.saver):
-        except:
-            print 'Failed! Continuing without loading snapshot.'
-
-
-    def snapshot(self):
-        ## In progress for saving model + discriminator separately (SAVE1)
-        ## have to work up the if/else logic upstream first
-        # for saver, snap_dir in zip(self.saver_list, self.snap_dir_list):
-        #     print 'Snapshotting to [{}] step [{}]'.format(snap_dir, step),
-        #     saver.save(self.sess, snap_dir, global_step=step)
-
-        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_path, self.global_step),
-        self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step)
-
-        print 'Done'
-
+    # def snapshot(self):
+    #     ## In progress for saving model + discriminator separately (SAVE1)
+    #     ## have to work up the if/else logic upstream first
+    #     # for saver, snap_dir in zip(self.saver_list, self.snap_dir_list):
+    #     #     print 'Snapshotting to [{}] step [{}]'.format(snap_dir, step),
+    #     #     saver.save(self.sess, snap_dir, global_step=step)
+    #
+    #     print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_path, self.global_step),
+    #     self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step)
+    #
+    #     print 'Done'
 
     def summaries(self):
         ## Input image
@@ -319,7 +320,6 @@ class SegmentationBaseModel(BaseModel):
             self.y_in_sum,
             self.y_hat_sum,
             self.loss_sum]
-
 
     ## TODO -- maybe
     def test_step(self, keep_prob=1.0):

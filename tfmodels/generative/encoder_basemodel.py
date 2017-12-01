@@ -20,6 +20,7 @@ class BaseEncoder(BaseModel):
         ## Set up discriminator and inputs
 
 
+    """ return q(z|x) """
     def model(self, x_in, keep_prob=0.5, reuse=False):
         raise Exception(NotImplementedError)
 

@@ -19,14 +19,14 @@ image_dir = '{}/combo'.format(data_home)
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 50
 iterations = 1000
-batch_size = 64
-step_start = 17200
+batch_size = 48
+step_start = 10200
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128vgg_w/logs/{}'.format(expdate)
-save_dir         = 'pca128vgg_w/snapshots'
-debug_dir        = 'pca128vgg_w/debug'
-snapshot_restore = 'pca128vgg_w/snapshots/vgg.ckpt-{}'.format(step_start)
+log_dir          = 'pca128vgg_s/logs/{}'.format(expdate)
+save_dir         = 'pca128vgg_s/snapshots'
+debug_dir        = 'pca128vgg_s/debug'
+snapshot_restore = 'pca128vgg_s/snapshots/vgg.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -42,7 +42,7 @@ with tf.Session(config=config) as sess:
     dataset.print_info()
 
     model = tfmodels.VGGTraining(sess=sess,
-        adversary=True,
+        adversary=False,
         adversary_lambda=1,
         adversary_lr=1e-5,
         adversary_feature_matching=True,
@@ -55,7 +55,6 @@ with tf.Session(config=config) as sess:
         learning_rate=1e-4,
         log_dir=log_dir,
         n_classes=4,
-        pretraining=True,
         pretrain_g=1000,
         pretrain_d=200,
         save_dir=save_dir,
