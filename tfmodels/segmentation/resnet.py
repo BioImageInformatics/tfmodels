@@ -95,4 +95,4 @@ class ResNetInference(ResNet):
 
     def __init__(self, **kwargs):
         self.inference_defaults.update(**kwargs)
-        super(ResNetTraining, self).__init__(**self.inference_defaults)
+        super(ResNetInference, self).__init__(**self.inference_defaults)
