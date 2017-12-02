@@ -7,6 +7,7 @@ import tfmodels
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
+# config.log_device_placement = True
 
 #data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
@@ -17,28 +18,27 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 100
+epochs = 50
 batch_size = 64
 # iterations = 500/batch_size
 iterations = 1000
-step_start = 0
+step_start = 40000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca64resnet/logs/{}'.format(expdate)
-save_dir         = 'pca64resnet/snapshots'
-debug_dir        = 'pca64resnet/debug'
+log_dir          = 'pca128resnet/logs/{}'.format(expdate)
+save_dir         = 'pca128resnet/snapshots'
+debug_dir        = 'pca128resnet/debug'
 snapshot_restore = 'pca64resnet/snapshots/resnet.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
-
     dataset = tfmodels.ImageComboDataSet(batch_size=batch_size,
         image_dir=image_dir,
         image_ext='png',
         capacity=2500,
         min_holding=1000,
-        threads=8,
+        threads=12,
         crop_size=512,
-        ratio=0.125,
+        ratio=0.25,
         augmentation='random')
     dataset.print_info()
 
@@ -51,12 +51,12 @@ with tf.Session(config=config) as sess:
         # deconv_kernels=[64, 64, 64],
         global_step=step_start,
         k_size=3,
-        learning_rate=1e-4,
+        learning_rate=1e-5,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
         summary_iters=50,
-        x_dims=[64, 64, 3],)
+        x_dims=[128, 128, 3],)
     model.print_info()
 
     if step_start > 0:
@@ -108,7 +108,7 @@ with tf.Session(config=config) as sess:
         print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
             epx, model.global_step, time.time()-epoch_start)
 
-        if epx % 20 == 0:
+        if epx % 10 == 0:
             model.snapshot()
             for test_idx, test_img in enumerate(test_x_list):
                 y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img,

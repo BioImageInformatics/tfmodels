@@ -227,7 +227,6 @@ class ImageMaskDataSet(DataSet):
         print 'self.image_op', self.image_op.get_shape()
         print 'self.mask_op', self.mask_op.get_shape()
 
-
         self.mask_op = tf.cast(self.mask_op, tf.uint8)
         self.image_shape = self.image_op.get_shape()
         self.mask_shape = self.mask_op.get_shape()
@@ -334,10 +333,10 @@ class ImageComboDataSet(DataSet):
                 image, mask = tf.split(image_mask, [3,1], axis=-1)
 
                 # image = tf.multiply(image, 2/255.0)-1
-                image = tf.image.random_brightness(image, max_delta=0.05)
-                # image = tf.image.random_contrast(image, lower=0.7, upper=1.0)
-                image = tf.image.random_hue(image, max_delta=0.05)
-                # image = tf.image.random_saturation(image, lower=0.7, upper=1.0)
+                image = tf.image.random_brightness(image, max_delta=0.1)
+                image = tf.image.random_contrast(image, lower=0.7, upper=1.0)
+                image = tf.image.random_hue(image, max_delta=0.1)
+                image = tf.image.random_saturation(image, lower=0.7, upper=1.0)
             else:
                 image, mask = tf.split(image_mask, [3,1], axis=-1)
 
