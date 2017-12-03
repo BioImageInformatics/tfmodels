@@ -18,17 +18,17 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 50
-batch_size = 64
+epochs = 150
+batch_size = 32
 # iterations = 500/batch_size
 iterations = 1000
-step_start = 40000
+step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128resnet/logs/{}'.format(expdate)
-save_dir         = 'pca128resnet/snapshots'
-debug_dir        = 'pca128resnet/debug'
-snapshot_restore = 'pca64resnet/snapshots/resnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca256resnet/logs/{}'.format(expdate)
+save_dir         = 'pca256resnet/snapshots'
+debug_dir        = 'pca256resnet/debug'
+snapshot_restore = 'pca256resnet/snapshots/resnet.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
     dataset = tfmodels.ImageComboDataSet(batch_size=batch_size,
@@ -38,12 +38,12 @@ with tf.Session(config=config) as sess:
         min_holding=1000,
         threads=12,
         crop_size=512,
-        ratio=0.25,
+        ratio=0.5,
         augmentation='random')
     dataset.print_info()
 
     model = tfmodels.ResNetTraining(sess=sess,
-        class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
+        #class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         # conv_kernels=[64, 128, 256, 384],
         # conv_kernels=[64, 64, 64, 128],
         dataset=dataset,
@@ -51,12 +51,12 @@ with tf.Session(config=config) as sess:
         # deconv_kernels=[64, 64, 64],
         global_step=step_start,
         k_size=3,
-        learning_rate=1e-5,
+        learning_rate=1e-4,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
         summary_iters=50,
-        x_dims=[128, 128, 3],)
+        x_dims=[256, 256, 3],)
     model.print_info()
 
     if step_start > 0:
@@ -75,7 +75,7 @@ with tf.Session(config=config) as sess:
     print '\t test_y', test_y.shape
 
     tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir, prefix='x_in_', scale='max', stack_axis=0)
-    tfmodels.save_image_stack(test_y, debug_dir, prefix='y__in_', scale=3, stack_axis=0)
+    tfmodels.save_image_stack(test_y, debug_dir, prefix='y_in_', scale=3, stack_axis=0)
     print 'Running initial test'
     for test_idx, test_img in enumerate(test_x_list):
         y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img, 50, keep_prob=0.5, ret_all=True)
