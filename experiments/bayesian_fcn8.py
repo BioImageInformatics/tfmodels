@@ -12,9 +12,10 @@ config.gpu_options.allow_growth = True
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
-data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
-# image_dir = '{}/combo_norm'.format(data_home)
-image_dir = '{}/combo'.format(data_home)
+
+data_home = '/home/maz/tf/data'
+image_dir = '{}/combo_norm'.format(data_home)
+
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 250
@@ -23,10 +24,12 @@ batch_size = 24
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128fcn_a/logs/{}'.format(expdate)
-save_dir         = 'pca128fcn_a/snapshots'
-debug_dir        = 'pca128fcn_a/debug'
-snapshot_restore = 'pca128fcn_a/snapshots/fcn.ckpt-{}'.format(step_start)
+
+log_dir          = 'pca256fcn/logs/{}'.format(expdate)
+save_dir         = 'pca256fcn/snapshots'
+debug_dir        = 'pca256fcn/debug'
+snapshot_restore = 'pca256fcn/snapshots/fcn.ckpt-{}'.format(step_start)
+
 
 with tf.Session(config=config) as sess:
 
@@ -37,7 +40,7 @@ with tf.Session(config=config) as sess:
         min_holding=1000,
         threads=8,
         crop_size=512,
-        ratio=0.25,
+        ratio=0.5,
         augmentation='random')
     dataset.print_info()
 

@@ -2,6 +2,10 @@ import tensorflow as tf
 from segmentation_basemodel import SegmentationBaseModel
 from ..utilities.ops import *
 
+
+'''
+Resnet model for segmentation
+'''
 class ResNet(SegmentationBaseModel):
     base_defaults={
         'conv_kernels': [64, 128, 256],
