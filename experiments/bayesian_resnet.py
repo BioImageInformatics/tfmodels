@@ -22,7 +22,7 @@ epochs = 150
 batch_size = 32
 # iterations = 500/batch_size
 iterations = 1000
-step_start = 0
+step_start = 20000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'pca256resnet/logs/{}'.format(expdate)
@@ -36,7 +36,7 @@ with tf.Session(config=config) as sess:
         image_ext='png',
         capacity=2500,
         min_holding=1000,
-        threads=12,
+        threads=8,
         crop_size=512,
         ratio=0.5,
         augmentation='random')

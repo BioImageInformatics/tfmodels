@@ -16,6 +16,15 @@ class ResNet(SegmentationBaseModel):
 
         assert self.n_classes is not None
 
+    """
+    Each resnet block applies a nonlinearity convolution to tensor_in, F(x)
+    Then adds x to F(x) : F(x)+x
+    and applies a nonlinearity:
+
+    x_2 = nonlin(F(x) + x)
+
+    Repeat for N times before returning x_n
+    """
     def _encode_module(self, tensor_in, kernels, k_size, selu, name_scope):
         pass
 
