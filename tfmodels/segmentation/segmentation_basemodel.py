@@ -29,6 +29,7 @@ class SegmentationBaseModel(BaseModel):
         'sess': None,
         'seg_training_op_list': [],
         'summary_iters': 50,
+        'summary_image_iters': 250,
         'summary_op_list': [],
         'x_dims': [256, 256, 3],
      }
@@ -95,10 +96,8 @@ class SegmentationBaseModel(BaseModel):
         self.make_training_ops()
 
         ## ------------------- Gather Summary ops ------------------- ##
-        self.summary_op_list += self.summaries()
-        # self.summary_op = tf.summary.merge(self.summary_op_list)
-        self.summary_op = tf.summary.merge_all()
-        # self.training_op_list.append(self.summary_op)
+
+        self.summaries()
 
         ## ------------------- TensorFlow helpers ------------------- ##
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
@@ -268,67 +267,60 @@ class SegmentationBaseModel(BaseModel):
             self.sess.run([self.seg_training_op])
             # print '\titeration {}'.format(self.global_step)
             if self.global_step % self.summary_iters == 0:
-                # print 'Saving summary'
-                # summary_str = self.sess.run([self.summary_op_list])[-1]
-                summary_str = self.sess.run(self.summary_op)
-                self.summary_writer.add_summary(summary_str, self.global_step)
+                self._write_scalar_summaries()
+            if self.global_step % self.summary_image_iters == 0:
+                self._write_scalar_summaries()
 
         print 'Pretraining Discriminator for {} iterations'.format(self.pretrain_d)
         for _ in xrange(self.pretrain_d):
             self.global_step += 1
             self.sess.run(self.discriminator.discriminator_train_op_list)
             if self.global_step % self.summary_iters == 0:
-                # print 'Saving summary'
-                # summary_str = self.sess.run([self.summary_op_list])[-1]
-                summary_str = self.sess.run(self.summary_op)
-                self.summary_writer.add_summary(summary_str, self.global_step)
-
-    # def restore(self, snapshot_path):
-    #     print 'Restoring from {}'.format(snapshot_path)
-    #     try:
-    #         self.saver.restore(self.sess, snapshot_path)
-    #         print 'Success!'
-    #
-    #         ## In progress for restoring model + discriminator separately (SAVE1)
-    #         # for saver, snap_path in zip(self.saver):
-    #     except:
-    #         print 'Failed! Continuing without loading snapshot.'
-
-    # def snapshot(self):
-    #     ## In progress for saving model + discriminator separately (SAVE1)
-    #     ## have to work up the if/else logic upstream first
-    #     # for saver, snap_dir in zip(self.saver_list, self.snap_dir_list):
-    #     #     print 'Snapshotting to [{}] step [{}]'.format(snap_dir, step),
-    #     #     saver.save(self.sess, snap_dir, global_step=step)
-    #
-    #     print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_path, self.global_step),
-    #     self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step)
-    #
-    #     print 'Done'
+                self._write_scalar_summaries()
+            if self.global_step % self.summary_image_iters == 0:
+                self._write_scalar_summaries()
 
     def summaries(self):
-        ## Input image
+
+        print tf.GraphKeys.SUMMARIES
+
+        ## Loss scalar
+        self.loss_sum = tf.summary.scalar('loss', self.loss)
+
+        ## Scalars:
+        ## Merge all before crating the image summary ops
+        self.summary_scalars_op = tf.summary.merge_all()
+
+        ## Images
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
         self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
         self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
-        ## Loss scalar
-        self.loss_sum = tf.summary.scalar('loss', self.loss)
+
         ## TODO Filters
 
-        return [
-            self.x_in_sum,
-            self.y_in_sum,
-            self.y_hat_sum,
-            self.loss_sum]
+        self.summary_images_op = tf.summary.merge(
+            [self.x_in_sum, self.y_in_sum, self.y_hat_sum])
 
     ## TODO -- maybe
     def test_step(self, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
-
     def train_step(self):
         self.global_step += 1
         self.sess.run(self.seg_training_op_list)
+
         if self.global_step % self.summary_iters == 0:
-            summary_str = self.sess.run(self.summary_op)
-            self.summary_writer.add_summary(summary_str, self.global_step)
+            self._write_scalar_summaries()
+
+        if self.global_step % self.summary_image_iters == 0:
+            self._write_image_summaries()
+
+    def _write_scalar_summaries(self):
+        print '[{:07d}] writing scalar summaries'.format(self.global_step)
+        summary_str = self.sess.run(self.summary_scalars_op)
+        self.summary_writer.add_summary(summary_str, self.global_step)
+
+    def _write_image_summaries(self):
+        print '[{:07d}] writing image summaries'.format(self.global_step)
+        summary_str = self.sess.run(self.summary_images_op)
+        self.summary_writer.add_summary(summary_str, self.global_step)

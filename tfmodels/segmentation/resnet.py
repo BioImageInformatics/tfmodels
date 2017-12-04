@@ -25,10 +25,10 @@ class ResNet(SegmentationBaseModel):
 
     Repeat for N times before returning x_n
     """
-    def _encode_module(self, tensor_in, kernels, k_size, selu, name_scope):
+    def _encode_block(self, tensor_in, kernels, k_size, selu, name_scope):
         pass
 
-    def _decode_module(self, tensor_in, kernels, k_size, selu, name_scope):
+    def _decode_block(self, tensor_in, kernels, k_size, selu, name_scope):
         pass
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):

@@ -14,15 +14,14 @@ config.gpu_options.allow_growth = True
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
-# image_dir = '{}/combo_norm'.format(data_home)
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 150
-batch_size = 32
+batch_size = 16
 # iterations = 500/batch_size
 iterations = 1000
-step_start = 20000
+step_start = 30000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'pca256resnet/logs/{}'.format(expdate)
@@ -42,7 +41,8 @@ with tf.Session(config=config) as sess:
         augmentation='random')
     dataset.print_info()
 
-    model = tfmodels.ResNetTraining(sess=sess,
+    # model = tfmodels.ResNetTraining(sess=sess,
+    model = tfmodels.ResNetBottleneckTraining(sess=sess,
         #class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         # conv_kernels=[64, 128, 256, 384],
         # conv_kernels=[64, 64, 64, 128],
@@ -56,6 +56,7 @@ with tf.Session(config=config) as sess:
         n_classes=4,
         save_dir=save_dir,
         summary_iters=50,
+        summary_image_iters=250,
         x_dims=[256, 256, 3],)
     model.print_info()
 
@@ -74,21 +75,12 @@ with tf.Session(config=config) as sess:
     print '\t test_x', test_x.shape
     print '\t test_y', test_y.shape
 
-    tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir, prefix='x_in_', scale='max', stack_axis=0)
-    tfmodels.save_image_stack(test_y, debug_dir, prefix='y_in_', scale=3, stack_axis=0)
+    tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir,
+        prefix='x_in', scale='max', stack_axis=0)
+    tfmodels.save_image_stack(test_y, debug_dir,
+        prefix='y_in', scale=3, stack_axis=0)
     print 'Running initial test'
-    for test_idx, test_img in enumerate(test_x_list):
-        y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img, 50, keep_prob=0.5, ret_all=True)
-        # y_bar = model.inference(x_in=test_img, keep_prob=1.0)
-        tfmodels.save_image_stack(y_bar, debug_dir,
-            prefix='y_bar_{:04d}'.format(test_idx),
-            scale=3, ext='png', stack_axis=0)
-        tfmodels.save_image_stack(y_bar_mean, debug_dir,
-            prefix='y_mean_{:04d}'.format(test_idx),
-            scale='max', ext='png', stack_axis=-1)
-        tfmodels.save_image_stack(y_bar_var, debug_dir,
-            prefix='y_var_{:04d}'.format(test_idx),
-            scale='max', ext='png', stack_axis=-1)
+    tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
@@ -110,18 +102,7 @@ with tf.Session(config=config) as sess:
 
         if epx % 10 == 0:
             model.snapshot()
-            for test_idx, test_img in enumerate(test_x_list):
-                y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img,
-                    50, keep_prob=0.5, ret_all=True)
-                tfmodels.save_image_stack(y_bar, debug_dir,
-                    prefix='y_bar_{:04d}'.format(test_idx),
-                    scale=3, ext='png', stack_axis=0)
-                tfmodels.save_image_stack(y_bar_mean, debug_dir,
-                    prefix='y_mean_{:04d}'.format(test_idx),
-                    scale='max', ext='png', stack_axis=-1)
-                tfmodels.save_image_stack(y_bar_var, debug_dir,
-                    prefix='y_var_{:04d}'.format(test_idx),
-                    scale='max', ext='png', stack_axis=-1)
+            tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 
 
     print 'Stopping threads'
