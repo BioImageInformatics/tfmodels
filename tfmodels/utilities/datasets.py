@@ -118,6 +118,7 @@ Assume the images and masks are named similarly and are in different folders
 class DataSet(object):
     defaults = {
         'capacity': 5000,
+        'name': 'DataSet',
         'seed': 5555,
         'threads': 4,
         'min_holding': 1250,}
@@ -132,10 +133,10 @@ class DataSet(object):
 
 
     def print_info(self):
-        print '------------------------ DataSet ---------------------- '
+        print '-------------------- {} ---------------------- '.format(self.name)
         for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ DataSet ---------------------- '
+            print '|\t{}: {}'.format(key, value)
+        print '-------------------- {} ---------------------- '.format(self.name)
 
 
     def _preprocessing(self, image, mask):
@@ -167,6 +168,7 @@ class ImageMaskDataSet(DataSet):
         'image_ext': 'jpg',
         'mask_dir': None,
         'mask_ext': 'png',
+        'name': 'ImageMask',
         'ratio': 1.0,
         'capacity': 5000,
         'seed': 5555,
@@ -238,8 +240,6 @@ class ImageMaskDataSet(DataSet):
             mask = tf.cast(mask, tf.float32)
             image_mask = tf.concat([image, mask], -1)
 
-
-
             ## Cropping
             if self.augmentation == 'random':
                 image_mask = tf.random_crop(image_mask,
@@ -273,13 +273,6 @@ class ImageMaskDataSet(DataSet):
         image, mask = sess.run([self.image_op, self.mask_op])
         return image, mask
 
-    def print_info(self):
-        print '------------------------ ImageMaskDataSet ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ ImageMaskDataSet ---------------------- '
-
-
 
 
 class ImageComboDataSet(DataSet):
@@ -291,6 +284,7 @@ class ImageComboDataSet(DataSet):
         'dstype': 'ImageMask',
         'image_dir': None,
         'image_ext': 'png',
+        'name': 'ImageCombo',
         'ratio': 1.0,
         'seed': 5555
     }
@@ -341,9 +335,9 @@ class ImageComboDataSet(DataSet):
 
                 # image = tf.multiply(image, 2/255.0)-1
                 image = tf.image.random_brightness(image, max_delta=0.05)
-                image = tf.image.random_contrast(image, lower=0.7, upper=1.0)
+                # image = tf.image.random_contrast(image, lower=0.7, upper=1.0)
                 image = tf.image.random_hue(image, max_delta=0.05)
-                image = tf.image.random_saturation(image, lower=0.7, upper=1.0)
+                # image = tf.image.random_saturation(image, lower=0.7, upper=1.0)
             else:
                 image, mask = tf.split(image_mask, [3,1], axis=-1)
 
@@ -365,11 +359,6 @@ class ImageComboDataSet(DataSet):
         return image, mask
 
 
-    def print_info(self):
-        print '------------------------ ImageComboDataSet ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ ImageComboDataSet ---------------------- '
 
 
 '''
@@ -385,6 +374,7 @@ class ImageFeeder(DataSet):
         'image_dir': None,
         'image_ext': 'jpg',
         'min_holding': 1250,
+        'name': 'ImageFeeder',
         'ratio': 1.0,
         'seed': 5555,
         'threads': 1,
@@ -453,12 +443,6 @@ class ImageFeeder(DataSet):
         image = sess.run([self.image_op])[0]
         return image
 
-
-    def print_info(self):
-        print '------------------------ ImageDataSet ---------------------- '
-        for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '------------------------ ImageDataSet ----------------------'
 
 
 

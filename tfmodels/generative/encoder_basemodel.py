@@ -1,30 +1,26 @@
 import tensorflow as tf
 from ..utilities.basemodel import BaseModel
 
-class BaseDiscriminator(BaseModel):
+class BaseEncoder(BaseModel):
     ## Overload the base class.. do I even need the base class?
     ## TODO expose number of kernels and number of upsample steps to the world
     discriminator_defaults = {
-        'dis_kernels': [32, 64, 128],
-        'adversary_feature_matching': False,
-        'name': 'discriminator',
-        'soften_labels': False,
-        'soften_sddev': 0.01,
+        'enc_kernels': [32, 64, 128],
+        'name': 'encoder',
+        'z_dim': 32,
     }
 
     def __init__(self, **kwargs):
         self.discriminator_defaults.update(**kwargs)
-        super(BaseDiscriminator, self).__init__(**self.discriminator_defaults)
+        super(BaseEncoder, self).__init__(**self.discriminator_defaults)
 
         # assert self.real is not None
         # assert self.fake is not None
 
-        self.p_real_fake = None
-        self.p_real_real = None
-
         ## Set up discriminator and inputs
 
 
+    """ return q(z|x) """
     def model(self, x_in, keep_prob=0.5, reuse=False):
         raise Exception(NotImplementedError)
 

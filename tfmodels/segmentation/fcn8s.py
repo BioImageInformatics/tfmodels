@@ -13,7 +13,6 @@ class FCN(SegmentationBaseModel):
         super(FCN, self).__init__(**self.base_defaults)
 
         assert self.n_classes is not None
-        if self.mode=='TRAIN': assert self.dataset.dstype=='ImageMask'
 
     ## Layer flow copied from:
     ## https://github.com/MarvinTeichmann/tensorflow-fcn/blob/master/fcn8_vgg.py
@@ -83,20 +82,20 @@ class FCN(SegmentationBaseModel):
             print '\t prediction_2', prediction_2.get_shape()
             print '\t prediction_1', prediction_1.get_shape()
 
-            upscore3 = nonlin(deconv(prediction_3, self.n_classes, k_size=k_size[3], upsample_rate=2, var_scope='ups3'))
+            upscore3 = nonlin(deconv(prediction_3, self.n_classes, k_size=4, upsample_rate=2, var_scope='ups3'))
             print '\t upscore3', upscore3.get_shape()
             upscore3 = upscore3 + prediction_2
-            upscore3_ups = nonlin(deconv(upscore3, self.n_classes, k_size=k_size[2], upsample_rate=2, var_scope='ups3_ups'))
+            upscore3_ups = nonlin(deconv(upscore3, self.n_classes, k_size=4, upsample_rate=2, var_scope='ups3_ups'))
             print '\t upscore3_ups', upscore3_ups.get_shape()
 
-            upscore2 = nonlin(deconv(prediction_2, self.n_classes, k_size=k_size[1], upsample_rate=2, var_scope='ups2'))
+            upscore2 = nonlin(deconv(prediction_2, self.n_classes, k_size=4, upsample_rate=2, var_scope='ups2'))
             print '\t upscore2', upscore2.get_shape()
             upscore2 = upscore2 + upscore3_ups
-            upscore2_ups = nonlin(deconv(upscore2, self.n_classes, k_size=k_size[0], upsample_rate=2, var_scope='ups2_ups'))
+            upscore2_ups = nonlin(deconv(upscore2, self.n_classes, k_size=4, upsample_rate=2, var_scope='ups2_ups'))
             print '\t upscore2_ups', upscore2_ups.get_shape()
             upscore2 = prediction_1 + upscore2_ups
 
-            preout = nonlin(deconv(upscore2, self.n_classes, k_size=7, upsample_rate=4, var_scope='preout'))
+            preout = nonlin(deconv(upscore2, self.n_classes, k_size=4, upsample_rate=4, var_scope='preout'))
             print '\t preout', preout.get_shape()
 
             y_hat = conv(preout, self.n_classes, k_size=3, stride=1, var_scope='y_hat')

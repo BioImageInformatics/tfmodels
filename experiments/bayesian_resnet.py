@@ -18,16 +18,16 @@ image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 100
-batch_size = 32
+batch_size = 64
 # iterations = 500/batch_size
-iterations = 500
-step_start = 24500
+iterations = 1000
+step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca256segnet_a/logs/{}'.format(expdate)
-save_dir         = 'pca256segnet_a/snapshots'
-debug_dir        = 'pca256segnet_a/debug'
-snapshot_restore = 'pca256segnet_a/snapshots/segnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca64resnet/logs/{}'.format(expdate)
+save_dir         = 'pca64resnet/snapshots'
+debug_dir        = 'pca64resnet/debug'
+snapshot_restore = 'pca64resnet/snapshots/resnet.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -38,23 +38,25 @@ with tf.Session(config=config) as sess:
         min_holding=1000,
         threads=8,
         crop_size=512,
-        ratio=0.5,
+        ratio=0.125,
         augmentation='random')
     dataset.print_info()
 
-    model = tfmodels.SegNetTraining(sess=sess,
-        # class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
-        conv_kernels=[64, 64, 64, 128],
+    model = tfmodels.ResNetTraining(sess=sess,
+        class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
+        # conv_kernels=[64, 128, 256, 384],
+        # conv_kernels=[64, 64, 64, 128],
         dataset=dataset,
-        deconv_kernels=[64, 64, 64],
+        # deconv_kernels=[64, 128, 256],
+        # deconv_kernels=[64, 64, 64],
         global_step=step_start,
-        k_size=5,
-        learning_rate=5e-6,
+        k_size=3,
+        learning_rate=1e-4,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
         summary_iters=50,
-        x_dims=[256, 256, 3],)
+        x_dims=[64, 64, 3],)
     model.print_info()
 
     if step_start > 0:

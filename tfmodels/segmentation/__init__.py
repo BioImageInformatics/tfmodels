@@ -4,6 +4,7 @@ from discriminator import SegmentationDiscriminator
 from segnet import SegNetTraining, SegNetInference
 from vgg import VGGTraining, VGGInference
 from fcn8s import FCNTraining, FCNInference
+from resnet import ResNetTraining, ResNetInference
 
 __all__ = ['SegmentationDiscriminator',
            'SegNetTraining',
@@ -11,4 +12,7 @@ __all__ = ['SegmentationDiscriminator',
            'VGGTraining',
            'VGGInference',
            'FCNTraining',
-           'FCNInference', ]
+           'FCNInference',
+           'ResNetTraining',
+           'ResNetInference', 
+       ]
