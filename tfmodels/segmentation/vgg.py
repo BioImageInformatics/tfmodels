@@ -2,6 +2,9 @@ import tensorflow as tf
 from segmentation_basemodel import SegmentationBaseModel
 from ..utilities.ops import *
 
+"""
+Segmentation VGG style network
+"""
 class VGG(SegmentationBaseModel):
     vgg_defaults={
         'conv_kernels': [64, 128, 256, 256],

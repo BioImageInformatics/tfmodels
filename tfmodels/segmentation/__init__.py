@@ -1,10 +1,11 @@
 from segmentation_basemodel import SegmentationBaseModel
 from discriminator import SegmentationDiscriminator
-# from generic import GenericSegmentation
 from segnet import SegNetTraining, SegNetInference
 from vgg import VGGTraining, VGGInference
 from fcn8s import FCNTraining, FCNInference
 from resnet import ResNetTraining, ResNetInference
+from resnet_bottleneck import ResNetBottleneckTraining, ResNetBottleneckInference
+
 
 __all__ = ['SegmentationDiscriminator',
            'SegNetTraining',
@@ -14,5 +15,7 @@ __all__ = ['SegmentationDiscriminator',
            'FCNTraining',
            'FCNInference',
            'ResNetTraining',
-           'ResNetInference', 
+           'ResNetInference',
+           'ResNetBottleneckTraining',
+           'ResNetBottleneckInference',
        ]

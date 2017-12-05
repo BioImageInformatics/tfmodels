@@ -20,14 +20,15 @@ image_dir = '{}/combo'.format(data_home)
 epochs = 100
 batch_size = 32
 # iterations = 500/batch_size
-iterations = 500
-step_start = 24500
+iterations = 1000
+snapshot_epochs = 5
+step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca256segnet_a/logs/{}'.format(expdate)
-save_dir         = 'pca256segnet_a/snapshots'
-debug_dir        = 'pca256segnet_a/debug'
-snapshot_restore = 'pca256segnet_a/snapshots/segnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca128segnet_full/logs/{}'.format(expdate)
+save_dir         = 'pca128segnet_full/snapshots'
+debug_dir        = 'pca128segnet_full/debug'
+snapshot_restore = 'pca128segnet_full/snapshots/segnet.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -36,25 +37,24 @@ with tf.Session(config=config) as sess:
         image_ext='png',
         capacity=2500,
         min_holding=1000,
-        threads=8,
+        threads=6,
         crop_size=512,
-        ratio=0.5,
+        ratio=0.25,
         augmentation='random')
     dataset.print_info()
 
     model = tfmodels.SegNetTraining(sess=sess,
         # class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
-        conv_kernels=[64, 64, 64, 128],
         dataset=dataset,
-        deconv_kernels=[64, 64, 64],
         global_step=step_start,
-        k_size=5,
-        learning_rate=5e-6,
+        k_size=3,
+        learning_rate=1e-5,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
         summary_iters=50,
-        x_dims=[256, 256, 3],)
+        summary_image_iters=250,
+        x_dims=[128, 128, 3],)
     model.print_info()
 
     if step_start > 0:
@@ -75,18 +75,7 @@ with tf.Session(config=config) as sess:
     tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir, prefix='x_in_', scale='max', stack_axis=0)
     tfmodels.save_image_stack(test_y, debug_dir, prefix='y__in_', scale=3, stack_axis=0)
     print 'Running initial test'
-    for test_idx, test_img in enumerate(test_x_list):
-        y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img, 50, keep_prob=0.5, ret_all=True)
-        # y_bar = model.inference(x_in=test_img, keep_prob=1.0)
-        tfmodels.save_image_stack(y_bar, debug_dir,
-            prefix='y_bar_{:04d}'.format(test_idx),
-            scale=3, ext='png', stack_axis=0)
-        tfmodels.save_image_stack(y_bar_mean, debug_dir,
-            prefix='y_mean_{:04d}'.format(test_idx),
-            scale='max', ext='png', stack_axis=-1)
-        tfmodels.save_image_stack(y_bar_var, debug_dir,
-            prefix='y_var_{:04d}'.format(test_idx),
-            scale='max', ext='png', stack_axis=-1)
+    tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
@@ -106,20 +95,9 @@ with tf.Session(config=config) as sess:
         print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
             epx, model.global_step, time.time()-epoch_start)
 
-        if epx % 20 == 0:
+        if epx % snapshot_epochs == 0:
             model.snapshot()
-            for test_idx, test_img in enumerate(test_x_list):
-                y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img,
-                    50, keep_prob=0.5, ret_all=True)
-                tfmodels.save_image_stack(y_bar, debug_dir,
-                    prefix='y_bar_{:04d}'.format(test_idx),
-                    scale=3, ext='png', stack_axis=0)
-                tfmodels.save_image_stack(y_bar_mean, debug_dir,
-                    prefix='y_mean_{:04d}'.format(test_idx),
-                    scale='max', ext='png', stack_axis=-1)
-                tfmodels.save_image_stack(y_bar_var, debug_dir,
-                    prefix='y_var_{:04d}'.format(test_idx),
-                    scale='max', ext='png', stack_axis=-1)
+            tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 
 
     print 'Stopping threads'

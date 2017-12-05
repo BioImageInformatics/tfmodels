@@ -19,7 +19,8 @@ from basemodel import BaseModel
 from general import (
     save_image_stack,
     bayesian_inference,
-    write_image_mask_combos
+    write_image_mask_combos,
+    test_bayesian_inference
 )
 
 __all__ = [
@@ -29,5 +30,6 @@ __all__ = [
     'ImageFeeder',
     'save_image_stack',
     'bayesian_inference',
-    'write_image_mask_combos'
+    'write_image_mask_combos',
+    'test_bayesian_inference'
 ]

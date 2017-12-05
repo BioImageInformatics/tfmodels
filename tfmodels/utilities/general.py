@@ -76,3 +76,18 @@ def write_image_mask_combos(img_src_dir=None,
 
         success = cv2.imwrite(outname, img_mask)
         print img_mask.shape, img_mask.dtype, outname
+
+
+"""
+Convenience function for performing a test
+"""
+def test_bayesian_inference(model, test_x_list, output_dir, keep_prob=0.5, samples=50):
+    for test_idx, test_img in enumerate(test_x_list):
+        y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img,
+            samples, keep_prob=keep_prob, ret_all=True)
+        save_image_stack(y_bar, output_dir, prefix='y_bar_{:04d}'.format(test_idx),
+            scale=3, ext='png', stack_axis=0)
+        save_image_stack(y_bar_mean, output_dir, prefix='y_mean_{:04d}'.format(test_idx),
+            scale='max', ext='png', stack_axis=-1)
+        save_image_stack(y_bar_var, output_dir, prefix='y_var_{:04d}'.format(test_idx),
+            scale='max', ext='png', stack_axis=-1)

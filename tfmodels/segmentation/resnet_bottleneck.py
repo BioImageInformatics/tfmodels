@@ -3,20 +3,20 @@ from segmentation_basemodel import SegmentationBaseModel
 from ..utilities.ops import *
 
 
-'''
-Resnet model for segmentation
-'''
-class ResNet(SegmentationBaseModel):
+"""
+More downsampling and deeper
+"""
+class ResNetBottleneck(SegmentationBaseModel):
     base_defaults={
-        'conv_kernels': [64, 128, 256],
-        'deconv_kernels': [64, 128, 256],
+        'conv_kernels': [64, 128, 128, 128],
+        'deconv_kernels': [64, 128, 128, 128],
         'k_size': 3,
         'name': 'resnet',
     }
 
     def __init__(self, **kwargs):
         self.base_defaults.update(**kwargs)
-        super(ResNet, self).__init__(**self.base_defaults)
+        super(ResNetBottleneck, self).__init__(**self.base_defaults)
 
         assert self.n_classes is not None
 
@@ -76,12 +76,33 @@ class ResNet(SegmentationBaseModel):
             r2_1_1 = conv(r2_1_0, self.conv_kernels[2], stride=1, k_size=self.k_size, var_scope='r2_1_1', selu=1)
             r2 = nonlin(r2_0 + r2_1_1)
             r2 = tf.contrib.nn.alpha_dropout(r2, keep_prob=keep_prob)
-            r2_residual = deconv(r2, self.deconv_kernels[2], upsample_rate=2, k_size=1, var_scope='r2_residual')
+            r2_residual = conv(r2, self.conv_kernels[3], stride=2, k_size=1, var_scope='r2_residual')
             print '\t r2_residual', r2_residual.get_shape()
 
-            d2_0_0 = nonlin(deconv(r2, self.deconv_kernels[2], upsample_rate=2, k_size=self.k_size, var_scope='d2_0_0', selu=1))
+            r3_0_0 = nonlin(conv(r2, self.conv_kernels[3], stride=2, k_size=self.k_size, var_scope='r3_0_0', selu=1))
+            r3_0_1 = conv(r3_0_0, self.conv_kernels[3], stride=1, k_size=self.k_size, var_scope='r3_0_1', selu=1)
+            r3_0 = nonlin(r2_residual + r3_0_1)
+            r3_1_0 = nonlin(conv(r3_0, self.conv_kernels[3], stride=1, k_size=self.k_size, var_scope='r3_1_0', selu=1))
+            r3_1_1 = conv(r3_1_0, self.conv_kernels[3], stride=1, k_size=self.k_size, var_scope='r3_1_1', selu=1)
+            r3 = nonlin(r3_0 + r3_1_1)
+            r3 = tf.contrib.nn.alpha_dropout(r3, keep_prob=keep_prob)
+            r3_residual = deconv(r3, self.deconv_kernels[3], upsample_rate=2, k_size=1, var_scope='r3_residual')
+            print '\t r3_residual', r3_residual.get_shape()
+
+            d3_0_0 = nonlin(deconv(r3, self.deconv_kernels[3], upsample_rate=2, k_size=self.k_size, var_scope='d3_0_0', selu=1))
+            d3_0_1 = conv(d3_0_0, self.deconv_kernels[3], stride=1, k_size=self.k_size, var_scope='d3_0_1', selu=1)
+            d3_0 = nonlin(r3_residual + d3_0_1)
+            d3_1_0 = nonlin(conv(d3_0, self.deconv_kernels[3], stride=1, k_size=self.k_size, var_scope='d3_1_0', selu=1))
+            d3_1_1 = conv(d3_1_0, self.deconv_kernels[3], stride=1, k_size=self.k_size, var_scope='d3_1_1', selu=1)
+            d3 = nonlin(d3_0 + d3_1_1)
+            d3 = tf.contrib.nn.alpha_dropout(d3, keep_prob=keep_prob)
+            d3_residual = deconv(d3, self.deconv_kernels[2], upsample_rate=2, k_size=1, var_scope='d2_residual')
+            print '\t d3_residual', d3_residual.get_shape()
+
+            d2_0_0 = nonlin(deconv(d3, self.deconv_kernels[2], upsample_rate=2, k_size=self.k_size, var_scope='d2_0_0', selu=1))
             d2_0_1 = conv(d2_0_0, self.deconv_kernels[2], stride=1, k_size=self.k_size, var_scope='d2_0_1', selu=1)
-            d2_0 = nonlin(r2_residual + d2_0_1)
+            # d2_0 = nonlin(r2_residual + d2_0_1) ## skip connection
+            d2_0 = nonlin(d3_residual + d2_0_1)
             d2_1_0 = nonlin(conv(d2_0, self.deconv_kernels[2], stride=1, k_size=self.k_size, var_scope='d2_1_0', selu=1))
             d2_1_1 = conv(d2_1_0, self.deconv_kernels[2], stride=1, k_size=self.k_size, var_scope='d2_1_1', selu=1)
             d2 = nonlin(d2_0 + d2_1_1)
@@ -113,17 +134,17 @@ class ResNet(SegmentationBaseModel):
 
 
 
-class ResNetTraining(ResNet):
+class ResNetBottleneckTraining(ResNetBottleneck):
     train_defaults = { 'mode': 'TRAIN' }
 
     def __init__(self, **kwargs):
         self.train_defaults.update(**kwargs)
-        super(ResNetTraining, self).__init__(**self.train_defaults)
+        super(ResNetBottleneckTraining, self).__init__(**self.train_defaults)
 
 
-class ResNetInference(ResNet):
+class ResNetBottleneckInference(ResNetBottleneck):
     inference_defaults = { 'mode': 'TEST' }
 
     def __init__(self, **kwargs):
         self.inference_defaults.update(**kwargs)
-        super(ResNetInference, self).__init__(**self.inference_defaults)
+        super(ResNetBottleneckInference, self).__init__(**self.inference_defaults)
