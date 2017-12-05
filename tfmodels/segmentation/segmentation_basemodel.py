@@ -293,9 +293,17 @@ class SegmentationBaseModel(BaseModel):
         self.summary_scalars_op = tf.summary.merge_all()
 
         ## Images
+        ## https://www.tensorflow.org/api_docs/python/tf/scatter_nd_update
+        self.y_in_mask_ = tf.scatter_nd_update(self.y_in_mask,
+            [[0,0], [0,1], [0,2], [0,3]],
+            [0,1,2,3])
+        self.y_hat_mask_ = tf.scatter_nd_update(self.y_hat_mask,
+            [[0,0], [0,1], [0,2], [0,3]],
+            [0,1,2,3])
+
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
-        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask/self.n_classes, max_outputs=4)
-        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
+        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask_, max_outputs=4)
+        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask_, max_outputs=4)
 
         ## TODO Filters
 
