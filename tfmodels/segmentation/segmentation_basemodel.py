@@ -59,8 +59,6 @@ class SegmentationBaseModel(BaseModel):
         self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
             shape=[None, self.x_dims[0], self.x_dims[1], 1], name='y_in')
         if self.y_in.get_shape().as_list()[-1] != self.n_classes:
-            # self.y_in_mask = tf.cast(tf.identity(self.y_in), tf.float32)
-            self.y_in_mask = tf.cast(self.y_in, tf.float32)
             self.y_in = tf.one_hot(self.y_in, depth=self.n_classes)
             self.y_in = tf.squeeze(self.y_in)
             self.y_in = tf.reshape(self.y_in,
@@ -282,9 +280,6 @@ class SegmentationBaseModel(BaseModel):
                 self._write_scalar_summaries()
 
     def summaries(self):
-
-        print tf.GraphKeys.SUMMARIES
-
         ## Loss scalar
         self.loss_sum = tf.summary.scalar('loss', self.loss)
 
@@ -293,8 +288,14 @@ class SegmentationBaseModel(BaseModel):
         self.summary_scalars_op = tf.summary.merge_all()
 
         ## Images
+        # self.y_in_mask = tf.cast(tf.identity(self.y_in), tf.float32)
+        self.y_in_mask = tf.cast(self.y_in, tf.float32)
+
+        ## spike in single pixels of all classes to enforce y to write well
+        ## TODO
+
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
-        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask/self.n_classes, max_outputs=4)
+        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
         self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
 
         ## TODO Filters
