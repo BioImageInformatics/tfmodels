@@ -18,9 +18,10 @@ image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 100
-batch_size = 8
+batch_size = 32
 # iterations = 500/batch_size
 iterations = 1000
+snapshot_epochs = 5
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
@@ -46,8 +47,8 @@ with tf.Session(config=config) as sess:
         # class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         dataset=dataset,
         global_step=step_start,
-        k_size=5,
-        learning_rate=5e-4,
+        k_size=3,
+        learning_rate=1e-5,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
@@ -94,7 +95,7 @@ with tf.Session(config=config) as sess:
         print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
             epx, model.global_step, time.time()-epoch_start)
 
-        if epx % 20 == 0:
+        if epx % snapshot_epochs == 0:
             model.snapshot()
             tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 

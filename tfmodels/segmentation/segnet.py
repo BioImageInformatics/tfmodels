@@ -61,31 +61,31 @@ class SegNet(SegmentationBaseModel):
 
             ## Unpool instead of deconvolution
             unpool4 = unpool(c4_pool, c4_max, k_size=[1,2,2,1], var_scope='unpool4')
-            d4_0 = nonlin(conv(unpool4, self.deconv_kernels[4], stride=1, var_scope='d4_0', selu=1))
-            d4_1 = nonlin(conv(d4_0, self.deconv_kernels[4], stride=1, var_scope='d4_1', selu=1))
-            d4 = nonlin(conv(d4_1, self.deconv_kernels[3], stride=1, var_scope='d4', selu=1))
+            d4_0 = nonlin(conv(unpool4, self.deconv_kernels[4], k_size=k_size, stride=1, var_scope='d4_0', selu=1))
+            d4_1 = nonlin(conv(d4_0, self.deconv_kernels[4], k_size=k_size, stride=1, var_scope='d4_1', selu=1))
+            d4 = nonlin(conv(d4_1, self.deconv_kernels[3], k_size=k_size, stride=1, var_scope='d4', selu=1))
             d4 = tf.contrib.nn.alpha_dropout(d4, keep_prob=keep_prob)
 
             unpool3 = unpool(d4, c3_max, k_size=[1,2,2,1], var_scope='unpool3')
-            d3_0 = nonlin(conv(unpool3, self.deconv_kernels[3], stride=1, var_scope='d3_0', selu=1))
-            d3_1 = nonlin(conv(d3_0, self.deconv_kernels[3], stride=1, var_scope='d3_1', selu=1))
-            d3 = nonlin(conv(d3_1, self.deconv_kernels[2], stride=1, var_scope='d3', selu=1))
+            d3_0 = nonlin(conv(unpool3, self.deconv_kernels[3], k_size=k_size, stride=1, var_scope='d3_0', selu=1))
+            d3_1 = nonlin(conv(d3_0, self.deconv_kernels[3], k_size=k_size, stride=1, var_scope='d3_1', selu=1))
+            d3 = nonlin(conv(d3_1, self.deconv_kernels[2], k_size=k_size, stride=1, var_scope='d3', selu=1))
 
             unpool2 = unpool(d3, c2_max, k_size=[1,2,2,1], var_scope='unpool2')
-            d2_0 = nonlin(conv(unpool2, self.deconv_kernels[2], stride=1, var_scope='d2_0', selu=1))
-            d2_1 = nonlin(conv(d2_0, self.deconv_kernels[2], stride=1, var_scope='d2_1', selu=1))
-            d2 = nonlin(conv(d2_1, self.deconv_kernels[1], stride=1, var_scope='d2', selu=1))
+            d2_0 = nonlin(conv(unpool2, self.deconv_kernels[2], k_size=k_size, stride=1, var_scope='d2_0', selu=1))
+            d2_1 = nonlin(conv(d2_0, self.deconv_kernels[2], stride=1, k_size=k_size, var_scope='d2_1', selu=1))
+            d2 = nonlin(conv(d2_1, self.deconv_kernels[1], stride=1, k_size=k_size, var_scope='d2', selu=1))
 
             unpool1 = unpool(d2, c1_max, k_size=[1,2,2,1], var_scope='unpool1')
-            d1_0 = nonlin(conv(unpool1, self.deconv_kernels[1], stride=1, var_scope='d1_0', selu=1))
-            d1 = nonlin(conv(d1_0, self.deconv_kernels[0], stride=1, var_scope='d1', selu=1))
+            d1_0 = nonlin(conv(unpool1, self.deconv_kernels[1], k_size=k_size, stride=1, var_scope='d1_0', selu=1))
+            d1 = nonlin(conv(d1_0, self.deconv_kernels[0], k_size=k_size, stride=1, var_scope='d1', selu=1))
 
             unpool0 = unpool(d1, c0_max, k_size=[1,2,2,1], var_scope='unpool0')
-            d0_0 = nonlin(conv(unpool0, self.deconv_kernels[0], stride=1, var_scope='d0_0', selu=1))
-            d0 = nonlin(conv(d0_0, self.deconv_kernels[0], stride=1, var_scope='d0', selu=1))
+            d0_0 = nonlin(conv(unpool0, self.deconv_kernels[0], k_size=k_size, stride=1, var_scope='d0_0', selu=1))
+            d0 = nonlin(conv(d0_0, self.deconv_kernels[0], k_size=k_size, stride=1, var_scope='d0', selu=1))
 
-            y_hat = nonlin(conv(d0, self.n_classes, stride=1, pad='SAME', var_scope='y_hat_0', selu=1))
-            y_hat = conv(y_hat, self.n_classes, stride=1, pad='SAME', var_scope='y_hat')
+            y_hat = nonlin(conv(d0, self.n_classes, k_size=k_size, stride=1, pad='SAME', var_scope='y_hat_0', selu=1))
+            y_hat = conv(y_hat, self.n_classes, k_size=k_size, stride=1, pad='SAME', var_scope='y_hat')
             return y_hat
 
 
