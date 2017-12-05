@@ -12,22 +12,24 @@ config.gpu_options.allow_growth = True
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
-data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
+# data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
+data_home = '/home/chen/env/nathan_tf/data'
 # image_dir = '{}/combo_norm'.format(data_home)
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 100
-batch_size = 8
+batch_size = 16
 # iterations = 500/batch_size
 iterations = 1000
+snapshot_epochs = 5
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128segnet_full/logs/{}'.format(expdate)
-save_dir         = 'pca128segnet_full/snapshots'
-debug_dir        = 'pca128segnet_full/debug'
-snapshot_restore = 'pca128segnet_full/snapshots/segnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca10Xsegnet_full/logs/{}'.format(expdate)
+save_dir         = 'pca10Xsegnet_full/snapshots'
+debug_dir        = 'pca10Xsegnet_full/debug'
+snapshot_restore = 'pca10Xsegnet_full/snapshots/segnet.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -36,9 +38,9 @@ with tf.Session(config=config) as sess:
         image_ext='png',
         capacity=2500,
         min_holding=1000,
-        threads=6,
+        threads=4,
         crop_size=512,
-        ratio=0.25,
+        ratio=0.5,
         augmentation='random')
     dataset.print_info()
 
@@ -47,13 +49,13 @@ with tf.Session(config=config) as sess:
         dataset=dataset,
         global_step=step_start,
         k_size=5,
-        learning_rate=5e-4,
+        learning_rate=1e-5,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
         summary_iters=50,
         summary_image_iters=250,
-        x_dims=[128, 128, 3],)
+        x_dims=[256, 256, 3],)
     model.print_info()
 
     if step_start > 0:
@@ -71,8 +73,8 @@ with tf.Session(config=config) as sess:
     print '\t test_x', test_x.shape
     print '\t test_y', test_y.shape
 
-    tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir, prefix='x_in_', scale='max', stack_axis=0)
-    tfmodels.save_image_stack(test_y, debug_dir, prefix='y__in_', scale=3, stack_axis=0)
+    tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir, prefix='x_in', scale='max', stack_axis=0)
+    tfmodels.save_image_stack(test_y, debug_dir, prefix='y_in', scale=3, stack_axis=0)
     print 'Running initial test'
     tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 
@@ -94,7 +96,7 @@ with tf.Session(config=config) as sess:
         print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
             epx, model.global_step, time.time()-epoch_start)
 
-        if epx % 20 == 0:
+        if epx % snapshot_epochs == 0:
             model.snapshot()
             tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
 
