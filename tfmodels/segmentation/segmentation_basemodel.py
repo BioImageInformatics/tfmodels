@@ -66,6 +66,9 @@ class SegmentationBaseModel(BaseModel):
             self.y_in = tf.reshape(self.y_in,
                 [-1, self.x_dims[0], self.x_dims[1], self.n_classes])
             print 'Converted y_in to one_hot: ', self.y_in.get_shape()
+        else:
+            self.y_in_mask = tf.expand_dims(tf.argmax(self.y_in, -1), -1)
+            self.y_in_mask = tf.cast(self.y_hat_mask, tf.float32)
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
