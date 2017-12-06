@@ -5,7 +5,6 @@ from vgg import VGGTraining, VGGInference
 from fcn8s import FCNTraining, FCNInference
 from resnet import ResNetTraining, ResNetInference
 # from resnet_bottleneck import ResNetBottleneckTraining, ResNetBottleneckInference
-from resnet_module import ResNetModuleTraining, ResNetModuleInference
 
 
 __all__ = ['SegmentationDiscriminator',
@@ -17,6 +16,4 @@ __all__ = ['SegmentationDiscriminator',
            'FCNInference',
            'ResNetTraining',
            'ResNetInference',
-           'ResNetModuleTraining',
-           'ResNetModuleInference',
        ]

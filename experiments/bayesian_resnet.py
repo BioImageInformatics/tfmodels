@@ -43,7 +43,7 @@ with tf.Session(config=config) as sess:
     dataset.print_info()
 
     # model = tfmodels.ResNetTraining(sess=sess,
-    model = tfmodels.ResNetModuleTraining(sess=sess,
+    model = tfmodels.ResNetTraining(sess=sess,
         #class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         dataset=dataset,
         global_step=step_start,
