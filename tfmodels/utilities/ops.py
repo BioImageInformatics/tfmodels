@@ -14,7 +14,7 @@ def selu_initializer(shape):
         input_size = np.prod(shape[:-1])
 
     sqrt_1_input = np.sqrt(1.0/input_size)
-    print '\t\t SELU intializer stddev = {:1.5f}'.format(sqrt_1_input)
+    # print '\t\t SELU intializer stddev = {:1.5f}'.format(sqrt_1_input)
     return tf.random_normal_initializer(mean=0.0, stddev=sqrt_1_input)
 
 def conv_cond_concat(x, y):

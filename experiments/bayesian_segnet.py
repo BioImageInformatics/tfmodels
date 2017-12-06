@@ -80,27 +80,32 @@ with tf.Session(config=config) as sess:
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
 
-    if step_start == 0:
-        print 'Pretraining'
-        model.pretrain()
+    try:
+        if step_start == 0:
+            print 'Pretraining'
+            model.pretrain()
 
-    print 'Starting at step {}'.format(model.global_step)
-    global_step = step_start
-    for epx in xrange(1, epochs):
-        epoch_start = time.time()
-        for itx in xrange(iterations):
-            # global_step += 1
-            model.train_step()
+        print 'Starting at step {}'.format(model.global_step)
+        global_step = step_start
+        for epx in xrange(1, epochs):
+            epoch_start = time.time()
+            for itx in xrange(iterations):
+                # global_step += 1
+                model.train_step()
 
-        print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
-            epx, model.global_step, time.time()-epoch_start)
+            print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
+                epx, model.global_step, time.time()-epoch_start)
 
-        if epx % snapshot_epochs == 0:
-            model.snapshot()
-            tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
-
-
-    print 'Stopping threads'
-    coord.request_stop()
-    coord.join(threads)
-    print 'Done'
+            if epx % snapshot_epochs == 0:
+                model.snapshot()
+                tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
+    except Exception as e:
+        print 'Caught exception'
+        print e.__doc__
+        print e.message
+    finally:
+        model.snapshot()
+        print 'Stopping threads'
+        coord.request_stop()
+        coord.join(threads)
+        print 'Done'
