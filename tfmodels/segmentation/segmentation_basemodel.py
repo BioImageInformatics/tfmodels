@@ -60,8 +60,6 @@ class SegmentationBaseModel(BaseModel):
         self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
             shape=[None, self.x_dims[0], self.x_dims[1], 1], name='y_in')
         if self.y_in.get_shape().as_list()[-1] != self.n_classes:
-            # self.y_in_mask = tf.cast(tf.identity(self.y_in), tf.float32)
-            self.y_in_mask = tf.cast(self.y_in, tf.float32)
             self.y_in = tf.one_hot(self.y_in, depth=self.n_classes)
             self.y_in = tf.squeeze(self.y_in)
             self.y_in = tf.reshape(self.y_in,
