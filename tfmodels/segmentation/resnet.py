@@ -4,7 +4,13 @@ from ..utilities.ops import *
 
 
 """
-More downsampling and deeper
+To build a resnet with 3 stacks of down/upsampling,
+each with 32 kernel residual module repeated 5 times:
+
+kenrels = [32]*3
+modules = 3
+stacks  = 5
+
 """
 class ResNet(SegmentationBaseModel):
     base_defaults={

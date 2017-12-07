@@ -1,0 +1,15 @@
+
+Overall
+-. filter visualizations
+    - built into basemodel, or as a script under utilities/general
+-. Data-derived uncertainty prediction - predict p(sigma|x)
+
+Segmentation
+-. Change resnet model to programatically create the model
+-. Implement real FCN-8s model
+
+
+Generative
+-. Adversarial autoencoder
+-. Supervised autoencoder
+-. Prior factory, like the one from OpenAI InfoGAN code
