@@ -28,6 +28,7 @@ class SegmentationBaseModel(BaseModel):
         'save_dir': None,
         'sess': None,
         'seg_training_op_list': [],
+        'summarize_grads': False,
         'summary_iters': 50,
         'summary_image_iters': 250,
         'summary_op_list': [],
@@ -59,13 +60,15 @@ class SegmentationBaseModel(BaseModel):
         self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
             shape=[None, self.x_dims[0], self.x_dims[1], 1], name='y_in')
         if self.y_in.get_shape().as_list()[-1] != self.n_classes:
-            # self.y_in_mask = tf.cast(tf.identity(self.y_in), tf.float32)
             self.y_in_mask = tf.cast(self.y_in, tf.float32)
             self.y_in = tf.one_hot(self.y_in, depth=self.n_classes)
             self.y_in = tf.squeeze(self.y_in)
             self.y_in = tf.reshape(self.y_in,
                 [-1, self.x_dims[0], self.x_dims[1], self.n_classes])
             print 'Converted y_in to one_hot: ', self.y_in.get_shape()
+        else:
+            self.y_in_mask = tf.expand_dims(tf.argmax(self.y_in, -1), -1)
+            self.y_in_mask = tf.cast(self.y_hat_mask, tf.float32)
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
@@ -285,6 +288,16 @@ class SegmentationBaseModel(BaseModel):
 
         print tf.GraphKeys.SUMMARIES
 
+        ## https://github.com/aymericdamien/ \
+        ## TensorFlow-Examples/blob/master/examples/4_Utils/tensorboard_advanced.py
+        if self.summarize_grads:
+            self.summary_gradient_list = []
+            grads = tf.gradients(self.loss, tf.trainable_variables())
+            grads = list(zip(grads, tf.trainable_variables()))
+            for grad, var in grads:
+                self.summary_gradient_list.append(
+                    tf.summary.histogram(var.name + '/gradient', grad))
+
         ## Loss scalar
         self.loss_sum = tf.summary.scalar('loss', self.loss)
 
@@ -294,21 +307,23 @@ class SegmentationBaseModel(BaseModel):
 
         ## Images
         ## https://www.tensorflow.org/api_docs/python/tf/scatter_nd_update
-        self.y_in_mask_ = tf.scatter_nd_update(self.y_in_mask,
-            [[0,0], [0,1], [0,2], [0,3]],
-            [0,1,2,3])
-        self.y_hat_mask_ = tf.scatter_nd_update(self.y_hat_mask,
-            [[0,0], [0,1], [0,2], [0,3]],
-            [0,1,2,3])
+        # self.y_in_mask_ = tf.Variable(self.y_in_mask)
+        # self.y_in_mask_ = tf.scatter_nd_update(self.y_in_mask,
+        #     [[0,0], [0,1], [0,2], [0,3]],
+        #     [0,1,2,3])
+        # self.y_hat_mask_ = tf.scatter_nd_update(self.y_hat_mask,
+        #     [[0,0], [0,1], [0,2], [0,3]],
+        #     [0,1,2,3])
 
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
-        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask_, max_outputs=4)
-        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask_, max_outputs=4)
+        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
+        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
 
         ## TODO Filters
 
         self.summary_images_op = tf.summary.merge(
             [self.x_in_sum, self.y_in_sum, self.y_hat_sum])
+
 
     ## TODO -- maybe
     def test_step(self, keep_prob=1.0):
