@@ -90,21 +90,21 @@ class ResNet(SegmentationBaseModel):
             print '\t intermediate: ', signal.get_shape()
             signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
 
-            for block in xrange(self.modules-1, 1, -1):
+            for block in xrange(self.modules-1, 0, -1):
                 block_name = 'd{}_residual'.format(block)
+                print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],
                     block=block, stacks=self.stacks, name_scope='d')
                 signal = deconv(signal, self.kernels[block-1], upsample_rate=2, k_size=1,
                     var_scope=block_name)
                 print '\t {}'.format(block_name), signal.get_shape()
 
-            signal = self._residual_block(signal, self.kernels[0], block=1,
+            signal = self._residual_block(signal, self.kernels[0], block=0,
                 stacks=self.stacks, name_scope='d')
             signal = deconv(signal, self.n_classes, upsample_rate=2, k_size=7,
                 var_scope='d0_residual')
 
             y_hat = deconv(signal, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
-            # y_hat = conv(d1_residual, self.n_classes, stride=1, k_size=5, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape()
 
             return y_hat

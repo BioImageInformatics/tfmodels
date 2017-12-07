@@ -19,27 +19,30 @@ image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 200
-batch_size = 64
+batch_size = 128
 # iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 5
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca10Xresnet/logs/{}'.format(expdate)
-save_dir         = 'pca10Xresnet/snapshots'
-debug_dir        = 'pca10Xresnet/debug'
-snapshot_restore = 'pca10Xresnet/snapshots/resnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca5Xresnet/logs/{}'.format(expdate)
+save_dir         = 'pca5Xresnet/snapshots'
+debug_dir        = 'pca5Xresnet/debug'
+snapshot_restore = 'pca5Xresnet/snapshots/resnet.ckpt-{}'.format(step_start)
+
+min_holding = 1500
+threads = 8
 
 with tf.Session(config=config) as sess:
     dataset = tfmodels.ImageComboDataSet(batch_size=batch_size,
         image_dir=image_dir,
         image_ext='png',
-        capacity=5000,
-        min_holding=500,
-        threads=4,
+        capacity=min_holding + (threads+1)*batch_size,
+        min_holding=min_holding,
+        threads=threads,
         crop_size=512,
-        ratio=0.5,
+        ratio=0.25,
         augmentation='random')
     dataset.print_info()
 
@@ -57,7 +60,7 @@ with tf.Session(config=config) as sess:
         summarize_grads=False,
         summary_iters=100,
         summary_image_iters=500,
-        x_dims=[256, 256, 3],)
+        x_dims=[128, 128, 3],)
     model.print_info()
 
     if step_start > 0:

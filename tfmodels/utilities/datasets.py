@@ -300,6 +300,7 @@ class ImageComboDataSet(DataSet):
 
         ## ----------------- Queue ops to feed ----------------- ##
         self.feature_queue = tf.train.string_input_producer(self.image_names,
+            capacity=self.capacity,
             shuffle=False,
             seed=self.seed)
 
