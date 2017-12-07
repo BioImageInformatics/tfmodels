@@ -14,11 +14,12 @@ config.gpu_options.allow_growth = True
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
 data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
+# data_home = '/home/chen/env/nathan_tf/data'
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 200
-batch_size = 64
+batch_size = 128
 # iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 5
@@ -30,13 +31,16 @@ save_dir         = 'pca5Xresnet/snapshots'
 debug_dir        = 'pca5Xresnet/debug'
 snapshot_restore = 'pca5Xresnet/snapshots/resnet.ckpt-{}'.format(step_start)
 
+min_holding = 1500
+threads = 8
+
 with tf.Session(config=config) as sess:
     dataset = tfmodels.ImageComboDataSet(batch_size=batch_size,
         image_dir=image_dir,
         image_ext='png',
-        capacity=2500,
-        min_holding=1000,
-        threads=4,
+        capacity=min_holding + (threads+1)*batch_size,
+        min_holding=min_holding,
+        threads=threads,
         crop_size=512,
         ratio=0.25,
         augmentation='random')

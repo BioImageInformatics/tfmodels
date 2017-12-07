@@ -12,21 +12,22 @@ config.gpu_options.allow_growth = True
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
-data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
+# data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 # image_dir = '{}/combo_norm'.format(data_home)
-image_dir = '{}/combo'.format(data_home)
+data_home = '/home/chen/env/nathan_tf/data'
+image_dir = '{}/combo_norm'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 50
+epochs = 100
 iterations = 1000
-batch_size = 48
-step_start = 10200
+batch_size = 32
+step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca128vgg_s/logs/{}'.format(expdate)
-save_dir         = 'pca128vgg_s/snapshots'
-debug_dir        = 'pca128vgg_s/debug'
-snapshot_restore = 'pca128vgg_s/snapshots/vgg.ckpt-{}'.format(step_start)
+log_dir          = 'pca256vgg/logs/{}'.format(expdate)
+save_dir         = 'pca256vgg/snapshots'
+debug_dir        = 'pca256vgg/debug'
+snapshot_restore = 'pca256vgg/snapshots/vgg.ckpt-{}'.format(step_start)
 
 with tf.Session(config=config) as sess:
 
@@ -35,17 +36,13 @@ with tf.Session(config=config) as sess:
         image_ext='png',
         capacity=2500,
         min_holding=1000,
-        threads=8,
+        threads=4,
         crop_size=512,
-        ratio=0.25,
+        ratio=0.5,
         augmentation='random')
     dataset.print_info()
 
     model = tfmodels.VGGTraining(sess=sess,
-        adversary=False,
-        adversary_lambda=1,
-        adversary_lr=1e-5,
-        adversary_feature_matching=True,
         class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         conv_kernels=[64, 128, 256, 256],
         dataset=dataset,
@@ -55,11 +52,9 @@ with tf.Session(config=config) as sess:
         learning_rate=1e-4,
         log_dir=log_dir,
         n_classes=4,
-        pretrain_g=1000,
-        pretrain_d=200,
         save_dir=save_dir,
         summary_iters=50,
-        x_dims=[128, 128, 3],)
+        x_dims=[256, 256, 3],)
     model.print_info()
 
     if step_start > 0:

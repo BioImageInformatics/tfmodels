@@ -4,21 +4,19 @@ from ..utilities.ops import *
 
 
 """
-Modular resnet:
+To build a resnet with 3 stacks of down/upsampling,
+each with 32 kernel residual module repeated 5 times:
 
-build a resnet with 5 blocks of down/upsampling
-with 32 kernel, 7-deep residual modules at each down/upsample step
-
-kernels = [32]*5
-modules = 5
-stacks = 7
+kenrels = [32]*3
+modules = 3
+stacks  = 5
 
 """
 class ResNet(SegmentationBaseModel):
     base_defaults={
         'kernels': [64, 64, 64, 128],
         'k_size': 3,
-        'modules': None,
+        'modules': 4,
         'name': 'resnet_module',
         'stacks': 5,
     }
@@ -29,7 +27,7 @@ class ResNet(SegmentationBaseModel):
 
         assert self.n_classes is not None
         ## Check input shape is compatible with the number of downsampling modules
-        self.modules = len(self.kernels)
+        assert self.modules == len(self.kernels)
         start_size = self.x_dims[0]/4 ## start with 2 stride conv and pool
         min_dimension = start_size / np.power(2,self.modules)
         print 'MINIMIUM DIMENSION: ', min_dimension
@@ -61,15 +59,6 @@ class ResNet(SegmentationBaseModel):
         return x_1
 
 
-    # def _decode_block(self, x_1, kernels, k_size, block=0, selu=1, stacks=3, name_scope='d'):
-    #     nonlin = self.nonlin
-    #     deconv_settings = {'n_kernel': kernels, 'upsample_rate': 2, 'k_size': self.k_size, 'selu': 1}
-    #
-    #     for stack in xrange(stacks):
-    #         stack_name='{}_{}_{}_'.format(name_scope, block, stack)
-    #         x_s_1 = nonlin()
-
-
     """
     the _residual_block() method takes the input and builds the normal residual chain
     the output shape matches the input shape
@@ -94,6 +83,7 @@ class ResNet(SegmentationBaseModel):
 
             for block in xrange(self.modules-1):
                 block_name = 'r{}_residual'.format(block)
+                print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],
                     block=block, stacks=self.stacks, name_scope='r')
                 signal = conv(signal, self.kernels[block+1], stride=2, k_size=1,
@@ -101,52 +91,26 @@ class ResNet(SegmentationBaseModel):
                 print '\t {}'.format(block_name), signal.get_shape()
 
             signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
+            signal = self._residual_block(signal, self.kernels[-1], block=self.modules-1,
+                stacks=self.stacks, name_scope='r')
+            print '\t intermediate: ', signal.get_shape()
+            signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
 
-            for block in xrange(self.modules, 0, -1):
+            for block in xrange(self.modules-1, 0, -1):
                 block_name = 'd{}_residual'.format(block)
+                print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],
                     block=block, stacks=self.stacks, name_scope='d')
                 signal = deconv(signal, self.kernels[block-1], upsample_rate=2, k_size=1,
                     var_scope=block_name)
                 print '\t {}'.format(block_name), signal.get_shape()
 
-            # r0 = self._residual_block(p0_pool, self.kernels[0], block=0, stacks=self.stacks, name_scope='r')
-            # # r0 = tf.contrib.nn.alpha_dropout(r0, keep_prob=keep_prob)
-            # r0_residual = conv(r0, self.kernels[1], stride=2, k_size=1, var_scope='r0_residual')
-            # print '\t r0_residual', r0_residual.get_shape()
-            #
-            # r1 = self._residual_block(r0_residual, self.kernels[1], block=1, stacks=self.stacks, name_scope='r')
-            # # r1 = tf.contrib.nn.alpha_dropout(r1, keep_prob=keep_prob)
-            # r1_residual = conv(r1, self.kernels[2], stride=2, k_size=1, var_scope='r1_residual')
-            # print '\t r1_residual', r1_residual.get_shape()
-            #
-            # r2 = self._residual_block(r1_residual, self.kernels[2], block=2, stacks=self.stacks, name_scope='r')
-            # # r2 = tf.contrib.nn.alpha_dropout(r2, keep_prob=keep_prob)
-            # r2_residual = conv(r2, self.kernels[3], stride=2, k_size=1, var_scope='r2_residual')
-            # print '\t r2_residual', r2_residual.get_shape()
-            #
-            # r3 = self._residual_block(r2_residual, self.kernels[3], block=3, stacks=self.stacks, name_scope='r')
-            # r3 = tf.contrib.nn.alpha_dropout(r3, keep_prob=keep_prob)
-            # r3_residual = deconv(r3, self.kernels[3], upsample_rate=2, k_size=1, var_scope='r3_residual')
-            # print '\t r3_residual', r3_residual.get_shape()
-            #
-            # d3 = self._residual_block(r3_residual, self.kernels[3], block=3, stacks=self.stacks, name_scope='d')
-            # d3 = tf.contrib.nn.alpha_dropout(d3, keep_prob=keep_prob)
-            # d3_residual = deconv(d3, self.kernels[2], upsample_rate=2, k_size=1, var_scope='d3_residual')
-            # print '\t d3_residual', d3_residual.get_shape()
-            #
-            # d2 = self._residual_block(d3_residual, self.kernels[2], block=2, stacks=self.stacks, name_scope='d')
-            # # d2 = tf.contrib.nn.alpha_dropout(d2, keep_prob=keep_prob)
-            # d2_residual = deconv(d2, self.kernels[1], upsample_rate=2, k_size=1, var_scope='d2_residual')
-            # print '\t d2_residual', d2_residual.get_shape()
-            #
-            # d1 = self._residual_block(d2_residual, self.kernels[1], block=1, stacks=self.stacks, name_scope='d')
-            # # d1 = tf.contrib.nn.alpha_dropout(d1, keep_prob=keep_prob)
-            # d1_residual = deconv(d1, self.n_classes, upsample_rate=2, k_size=7, var_scope='d1_residual')
-            # print '\t d1_residual', d1_residual.get_shape()
+            signal = self._residual_block(signal, self.kernels[0], block=0,
+                stacks=self.stacks, name_scope='d')
+            signal = deconv(signal, self.n_classes, upsample_rate=2, k_size=7,
+                var_scope='d0_residual')
 
             y_hat = deconv(signal, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
-            # y_hat = conv(d1_residual, self.n_classes, stride=1, k_size=5, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape()
 
             return y_hat
