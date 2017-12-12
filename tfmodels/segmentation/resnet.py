@@ -11,7 +11,7 @@ class ResNet(SegmentationBaseModel):
         'kernels': [64, 64, 64, 128],
         'k_size': 3,
         'modules': 4,
-        'name': 'resnet_module',
+        'name': 'resnet',
         'stacks': 5,
     }
 
