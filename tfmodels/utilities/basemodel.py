@@ -2,6 +2,19 @@ import tensorflow as tf
 import numpy as np
 import datetime, os
 
+"""
+BaseModel serves as a template for downstream models:
+
+input -->> tensor operations -->> loss/output
+
+It holds shared operations such as
+    - snapshot
+    - restore
+    - get update list
+    - tensorflow boilerplate code
+    - printing model settings to terminal, or to file
+
+"""
 class BaseModel(object):
     ## Defaults
     base_defaults={

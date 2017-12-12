@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import cv2
 import sys, datetime, os, time
 
 from tensorflow.examples.tutorials.mnist import input_data
@@ -35,9 +36,9 @@ p(y=1 | x=positive) **(prove it)
 without explicitly stating which element is the "positive" one.
 """
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 200
-iterations = 500
-snapshot_epochs = 5
+epochs = 5
+iterations = 100
+snapshot_epochs = 10
 step_start = 0
 
 batch_size = 128
@@ -50,16 +51,18 @@ debug_dir        = 'bagged/debug'
 snapshot_restore = 'bagged/snapshots/resnet.ckpt-{}'.format(step_start)
 
 training_dataset = tfmodels.BaggedMNIST(
+    as_images      = False,
     batch_size     = batch_size,
     samples        = samples,
-    positive_class = 1,
+    positive_class = [0,1,2],
     data           = mnist_data.train,
     mode           = 'Train'
     )
 testing_dataset = tfmodels.BaggedMNIST(
+    as_images      = False,
     batch_size     = batch_size,
     samples        = samples,
-    positive_class = 1,
+    positive_class = [0,1,2],
     data           = mnist_data.test,
     mode           = 'Test'
     )
@@ -67,11 +70,14 @@ testing_dataset = tfmodels.BaggedMNIST(
 with tf.Session(config=config) as sess:
     model = tfmodels.ImageBagModel(
         dataset         = training_dataset,
+        encoder_type    = 'DENSE',
         log_dir         = log_dir,
         save_dir        = save_dir,
         sess            = sess,
-        # summarize_grads = True,
-        # summarize_vars  = True,
+        # x_dim           = [28, 28, 1],
+        x_dim           = [28*28],
+        summarize_grads = True,
+        summarize_vars  = True,
         )
     model.print_info()
 
@@ -81,13 +87,31 @@ with tf.Session(config=config) as sess:
             model.train_step()
 
         ## Test bags
+        accuracy = model.test(testing_dataset)
 
         ## Test encoder network to discriminate individual examples
-        print 'Testing individual obs:',
         test_x, test_y = testing_dataset.normal_batch(batch_size=128)
         test_y_hat = sess.run(model.z_individual, feed_dict={
             model.x_individual: test_x })
-        print 'test_y_hat:', test_y_hat.shape
-        test_accuracy = np.mean(np.argmax(test_y,axis=1) == np.argmax(test_y_hat,axis=1))
+        i_accuracy = np.mean(np.argmax(test_y,axis=1) == np.argmax(test_y_hat,axis=1))
 
-        print 'Epoch [{:05d}]; x_i acc: [{:03.2f}]'.format(epoch, test_accuracy)
+        print 'Epoch [{:05d}]; x_i acc: [{:03.3f}]; bag acc: [{:03.3f}]'.format(
+            epoch, i_accuracy, accuracy)
+
+        if epoch % snapshot_epochs == 0:
+            model.snapshot()
+
+
+    ## Save positive and negative classified examples:
+    test_x, test_y = testing_dataset.normal_batch(batch_size=128)
+    test_y_hat = sess.run(model.z_individual, feed_dict={
+        model.x_individual: test_x })
+    test_y_argmax = np.argmax(test_y_hat, axis=1)
+    for idx, y in enumerate(test_y_argmax):
+        img = test_x[idx,:].reshape(28,28)
+        if y == 1:
+            filename = debug_dir+'/pos_{:03d}.jpg'.format(idx)
+        else:
+            filename = debug_dir+'/neg_{:03d}.jpg'.format(idx)
+
+        cv2.imwrite(filename, img*255)

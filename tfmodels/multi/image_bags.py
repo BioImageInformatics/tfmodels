@@ -74,9 +74,9 @@ class FCEncoder(BaseEncoder):
             print 'Setting up FCEncoder model'
             print '\t x_in: ', x_in.get_shape()
             nonlin = self.nonlin
-            h0 = nonlin(linear(x_in, self.hidden_dim[0], selu=1, var_scope='e_h0'))
-            h1 = nonlin(linear(h0, self.hidden_dim[1], selu=1, var_scope='e_h1'))
-            self.zed_x = linear(h1, self.z_dim, selu=1, var_scope='zed')
+            h0 = nonlin(linear(x_in, self.hidden_dim[0], var_scope='e_h0'))
+            h1 = nonlin(linear(h0, self.hidden_dim[1], var_scope='e_h1'))
+            self.zed_x = linear(h1, self.z_dim, var_scope='zed')
 
             ## Reduce mean
             self.zed_x_bar = tf.reduce_mean(self.zed_x, axis=0)
@@ -87,15 +87,15 @@ class FCEncoder(BaseEncoder):
                 return self.zed_x_bar
 
 
-
 """
 Take normal [batch_size, --dimensions--]
 encode them, then squash the batch by taking a mean
 """
 class ConvEncoder(BaseEncoder):
     conv_encoder_defaults = {
-        'hidden_dim': [64, 128],
-        'name': 'ConvEncoder'
+        'kernels': [64, 128],
+        'hidden_dim': [512],
+        'name': 'ConvEncoder',
         }
 
     def __init__(self, name='convolutional_encoder', **kwargs):
@@ -113,11 +113,14 @@ class ConvEncoder(BaseEncoder):
             print '\t x_in: ', x_in.get_shape()
             nonlin = tf.nn.selu
 
-            h0 = nonlin(conv(x_in, self.hidden_dim[0], k_size=5, stride=2, var_scope='e_h0'))
-            h0_p = tf.nn.max_pool(h0, [1,2,2,1], [1,2,2,1])
-            h1 = nonlin(conv(h0_p, self.hidden_dim[1], k_size=3, stride=2, var_scope='e_h1'))
-            h1_flat = tf.contrib.layers.flatten(h1)
-            self.zed_x = linear(h1_flat, self.z_dim, var_scope='zed')
+            c0 = nonlin(conv(x_in, self.kernels[0], k_size=5, stride=2, var_scope='c0'))
+            c0_p = tf.nn.max_pool(c0, [1,2,2,1], [1,2,2,1], padding='VALID')
+            c1 = nonlin(conv(c0_p, self.kernels[1], k_size=3, stride=2, var_scope='c1'))
+            c1_flat = tf.contrib.layers.flatten(c1)
+
+            h0 = nonlin(linear(c1_flat, self.hidden_dim[0], var_scope='h0'))
+
+            self.zed_x = linear(h0, self.z_dim, var_scope='zed')
 
             ## Reduce mean
             self.zed_x_bar = tf.reduce_mean(self.zed_x, axis=0)
@@ -128,16 +131,17 @@ class ConvEncoder(BaseEncoder):
                 return self.zed_x_bar
 
 
-
 class ImageBagModel(BaseModel):
     image_bag_default = {
+        'encoder_type': 'CONV', ## CONV or DENSE
         'learning_rate': 1e-4,
         'n_classes': 2,
         'name': 'deepsets',
+        'no_classifier': True,
         'sess': None,
         'summarize_grads': False,
         'summarize_vars': False,
-        'x_dim': [28*28, 1],
+        'x_dim': [28*28],
         'z_dim': 32
         }
 
@@ -149,14 +153,25 @@ class ImageBagModel(BaseModel):
         assert self.sess is not None
 
         ## first two dimensions of x_in should be None
-        self.x_individual = tf.placeholder('float', shape=[None, self.x_dim[0]], name='x_individual')
-        self.x_in = tf.placeholder('float', shape=[None, None, self.x_dim[0]])
+        if self.encoder_type == 'CONV':
+            assert len(self.x_dim) == 3
+            self.x_individual = tf.placeholder('float', shape=[None]+self.x_dim, name='x_individual')
+            self.x_in = tf.placeholder('float', shape=[None, None]+self.x_dim)
+            encoder_class = ConvEncoder
+        elif self.encoder_type == 'DENSE':
+            self.x_individual = tf.placeholder('float', shape=[None, self.x_dim[0]], name='x_individual')
+            self.x_in = tf.placeholder('float', shape=[None, None, self.x_dim[0]])
+            encoder_class = FCEncoder
+
         self.y_in = tf.placeholder('float', shape=[None, self.n_classes], name='y_in')
 
         ## use n_classes to get a discriminiator trained to detect positive x_i
-        self.encoder = FCEncoder(z_dim=self.n_classes)
-        ## use z_dim to use an external classifier over collected z_hat
-        # self.encoder = FCEncoder(z_dim=self.z_dim)
+
+        if self.no_classifier:
+            self.encoder = encoder_class(z_dim=self.n_classes)
+        else:
+            self.encoder = encoder_class(z_dim=self.z_dim)
+
         self.encoder.print_info()
 
         self.y_hat = self.model(self.x_in)
@@ -174,6 +189,7 @@ class ImageBagModel(BaseModel):
         self._tf_ops()
         self.sess.run(tf.global_variables_initializer())
 
+
     ## still want model to return, but save hooks to intermediate ops as class attr.
     def model(self, x_in, keep_prob=0.5, reuse=False):
         print '\t Setting up Classification model'
@@ -189,17 +205,17 @@ class ImageBagModel(BaseModel):
 
             print '\t x_in:', x_in.get_shape()
             self.encode_map_fn = lambda x: self.encoder.model(x, reuse=True)
-            self.z_hat = tf.map_fn(self.encode_map_fn, x_in, infer_shape=True, name='z_hat')
+            self.z_hat = tf.map_fn(self.encode_map_fn, x_in, infer_shape=False, name='z_hat')
             print '\t z_hat:', self.z_hat.get_shape() ## batch_size, dimensions
 
-            ## Classifier
-            # h0 = nonlin(linear(z_hat, 2, selu=1, var_scope='h0'))
-            # h1 = nonlin(linear(h0, 256, selu=1, var_scope='h1'))
-            #
-            # y_hat = linear(self.z_hat, self.n_classes, selu=1, var_scope='y_hat')
-
             ## Use the output of z_hat directly; requires z_dim=self.n_classes
-            y_hat = self.z_hat
+            if self.no_classifier:
+                y_hat = tf.identity(self.z_hat, name='y_hat')
+            ## Classifier
+            else:
+                h0 = nonlin(linear(z_hat, 2, selu=1, var_scope='h0'))
+                h1 = nonlin(linear(h0, 256, selu=1, var_scope='h1'))
+                y_hat = linear(self.z_hat, self.n_classes, selu=1, var_scope='y_hat')
 
         return y_hat
 
@@ -227,6 +243,16 @@ class ImageBagModel(BaseModel):
 
         self.summary_writer.add_summary(summary_str, self.global_step)
 
+    def test(self, test_dataset):
+        batch_x, batch_y = next(test_dataset.iterator)
+        feed_dict = {self.x_in: batch_x, self.y_in: batch_y}
+        summary_str, accuracy = self.sess.run(
+            [self.test_summary_op, self.accuracy],
+            feed_dict=feed_dict)
+
+        self.summary_writer.add_summary(summary_str, self.global_step)
+
+        return accuracy
 
     def _summary_ops(self):
         with tf.variable_scope('summary'):
@@ -254,3 +280,8 @@ class ImageBagModel(BaseModel):
             self.z_hat_summary = tf.summary.histogram('z_hat', self.z_hat)
 
             self.summary_op = tf.summary.merge_all()
+
+            self.test_accuracy_sum = tf.summary.scalar('accuracy_test', self.accuracy)
+            self.test_loss_sum = tf.summary.scalar('loss_test', self.loss)
+            self.test_summary_op = tf.summary.merge([self.test_accuracy_sum,
+                self.test_loss_sum])

@@ -70,21 +70,35 @@ output x sorted by y, as dictionaries
 
 """
 Collect examples of positive class, and all others
+
+Support a list of positive labels
 """
 def collect_mnist(mnist, positive_class=0):
-    mnist_out = {}
+    if not isinstance(positive_class, (list, tuple)):
+        positive_class = [positive_class]
+    ## Gather x
+    positive_x = []
+    negative_x = []
     for y in range(0, 10):
-        # train_x = mnist.train.images[mnist.train.labels==y, :]
-        # test_x = mnist.test.images[mnist.test.labels==y, :]
-        x_out = mnist.images[mnist.labels==y, :]
-        # mnist_out[y] = np.vstack([train_x, test_x])
-        mnist_out[y] = x_out
+        if y in positive_class:
+            positive_x.append(mnist.images[mnist.labels==y, :])
+        else:
+            negative_x.append(mnist.images[mnist.labels==y, :])
+        # x_out = mnist.images[mnist.labels==y, :]
+        # # mnist_out[y] = np.vstack([train_x, test_x])
+        # mnist_out[y] = x_out
 
-    positive_x = mnist_out[positive_class]
-    negative_x = [mnist_out[c] for c in range(10) if c != positive_class]
+    # positive_x = mnist_out[positive_class]
+    # negative_x = [mnist_out[c] for c in range(10) if c != positive_class]
+    positive_x = np.vstack(positive_x)
     negative_x = np.vstack(negative_x)
 
+    # np.random.shuffle(positive_x)
+    # np.random.shuffle(negative_x)
+
     return negative_x, positive_x
+
+
 
 """ Using TF's built in MNIST dataset
 https://stackoverflow.com/questions/43231958/filling-queue-from-python-iterator
@@ -138,7 +152,7 @@ class BaggedMNIST(object):
         'batch_size': 64,
         'name': 'MNISTDataSet',
         'onehot': True,
-        'positive_class': 0,
+        'positive_class': [0],
         'positive_freq': 0.5,
         'samples': 10,
         'data': None, ## One of mnist.train or mnist.test
@@ -187,6 +201,7 @@ class BaggedMNIST(object):
         if self.as_images:
             batch_x = [x.reshape(28, 28) for x in batch_x]
             batch_x = [np.expand_dims(x, 0) for x in batch_x]
+            batch_x = [np.expand_dims(x, -1) for x in batch_x]
             batch_x = np.concatenate(batch_x, 0)
 
         return np.expand_dims(batch_x, 0)
@@ -223,8 +238,16 @@ class BaggedMNIST(object):
                 idx = self.choice_negative()
                 batch_x.append(self.negative_x[idx, :])
 
-        batch_x = np.concatenate(batch_x, 0)
+        if self.as_images:
+            batch_x = [x.reshape(28, 28) for x in batch_x]
+            batch_x = [np.expand_dims(x, 0) for x in batch_x]
+            batch_x = [np.expand_dims(x, -1) for x in batch_x]
+            batch_x = np.concatenate(batch_x, 0)
+        else:
+            batch_x = np.concatenate(batch_x, 0)
+
         batch_x = batch_x * 2 - 1
+
 
         if self.onehot:
             batch_y = np_onehot(batch_y, 2)

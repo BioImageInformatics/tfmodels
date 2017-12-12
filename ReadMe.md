@@ -19,7 +19,6 @@ In addition to semantic segmentation models, the library also contains base meth
 
 **Note** the default activation (set in `tfmodels/utilities/basemodel.py`) is SeLU. Accordingly, the inputs should be scaled to `[-1.0, 1.0]` in the dataset loading functions, and we should use `tf.contrib.nn.alpha_dropout` (TensorFlow 1.4.1).
 
-
 ## Versioning
 ```
 Python 2.7 ## Python 3.5 migration planned
@@ -49,7 +48,6 @@ Requesting assistance with the input pipeline:
 Best practice for having image-mask pairs, then shuffling them and reading with queues. Temporarily, I saved them as a `(h,w,4)` file where the first 3 channels are the image and the 4th channel is the mask. Then, an `ImageComboDataSet` reads the RGBA-like images, and splits the mask from data as a preprocessing step. This solution is unsatisfactory in the long run.
 
 Planned improvement to move towards the new `Dataset` API in TensorFlow. (https://www.tensorflow.org/programmers_guide/datasets)
-
 
 #### License
 Please provide citation if you use this library for your research.
