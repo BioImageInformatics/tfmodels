@@ -54,15 +54,15 @@ we process x --> z with a learnable, nonlinear function
 in this setting, x --> z amounts to learning a binary classifier for "is positive"
 for each x.
 """
-
-class LinearEncoder(BaseEncoder):
-    linear_encoder_defaults = {
+class FCEncoder(BaseEncoder):
+    fc_encoder_defaults = {
         'hidden_dim': [512, 512],
+        'name': 'FCEncoder'
         }
 
     def __init__(self, name='linear_encoder', **kwargs):
-        self.linear_encoder_defaults.update(**kwargs)
-        super(LinearEncoder, self).__init__(**self.linear_encoder_defaults)
+        self.fc_encoder_defaults.update(**kwargs)
+        super(FCEncoder, self).__init__(**self.fc_encoder_defaults)
 
         self.name = name
 
@@ -71,7 +71,7 @@ class LinearEncoder(BaseEncoder):
             if reuse:
                 scope.reuse_variables()
 
-            print 'Setting up LinearEncoder model'
+            print 'Setting up FCEncoder model'
             print '\t x_in: ', x_in.get_shape()
             nonlin = self.nonlin
             h0 = nonlin(linear(x_in, self.hidden_dim[0], selu=1, var_scope='e_h0'))
@@ -86,18 +86,21 @@ class LinearEncoder(BaseEncoder):
             else:
                 return self.zed_x_bar
 
+
+
 """
 Take normal [batch_size, --dimensions--]
 encode them, then squash the batch by taking a mean
 """
 class ConvEncoder(BaseEncoder):
-    linear_encoder_defaults = {
+    conv_encoder_defaults = {
         'hidden_dim': [64, 128],
+        'name': 'ConvEncoder'
         }
 
     def __init__(self, name='convolutional_encoder', **kwargs):
-        self.linear_encoder_defaults.update(**kwargs)
-        super(ConvEncoder, self).__init__(**self.linear_encoder_defaults)
+        self.conv_encoder_defaults.update(**kwargs)
+        super(ConvEncoder, self).__init__(**self.conv_encoder_defaults)
 
         self.name = name
 
@@ -126,7 +129,6 @@ class ConvEncoder(BaseEncoder):
 
 
 
-
 class ImageBagModel(BaseModel):
     image_bag_default = {
         'learning_rate': 1e-4,
@@ -152,9 +154,9 @@ class ImageBagModel(BaseModel):
         self.y_in = tf.placeholder('float', shape=[None, self.n_classes], name='y_in')
 
         ## use n_classes to get a discriminiator trained to detect positive x_i
-        self.encoder = LinearEncoder(z_dim=self.n_classes)
+        self.encoder = FCEncoder(z_dim=self.n_classes)
         ## use z_dim to use an external classifier over collected z_hat
-        # self.encoder = LinearEncoder(z_dim=self.z_dim)
+        # self.encoder = FCEncoder(z_dim=self.z_dim)
         self.encoder.print_info()
 
         self.y_hat = self.model(self.x_in)
@@ -183,7 +185,7 @@ class ImageBagModel(BaseModel):
             nonlin = self.nonlin
 
             ## Initialize the encoder
-            self.z_individual, self.y_individual = self.encoder.model(self.x_individual, return_z=True)
+            dummy_z, self.z_individual = self.encoder.model(self.x_individual, return_z=True)
 
             print '\t x_in:', x_in.get_shape()
             self.encode_map_fn = lambda x: self.encoder.model(x, reuse=True)

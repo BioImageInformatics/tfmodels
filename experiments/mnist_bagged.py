@@ -14,6 +14,26 @@ config.gpu_options.allow_growth = True
 mnist_data_path = '/Users/nathaning/Envs/tensorflow/MNIST_data'
 mnist_data = input_data.read_data_sets(mnist_data_path)
 
+"""
+Bagged MNIST is a toy dataset using the MNIST digits data.
+We have images of digits: {0,1,2,3,4,5,6,7,8,9}
+First we choose one, or some combination, to be the "positive" class.
+
+For training we draw **sets** of digits. Each set is labelled "positive" if
+it contains a "positive" class element.
+
+e.g. if positive = 0
+x = [1,2,3,5,2,3,0], y = 1
+x = [1,2,3,5,2,3,9], y = 0
+
+Training proceeds to predict positive bags.
+
+What we recover is a classifier that maximizes the expected value of
+
+p(y=1 | x=positive) **(prove it)
+
+without explicitly stating which element is the "positive" one.
+"""
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 200
 iterations = 500
@@ -65,7 +85,7 @@ with tf.Session(config=config) as sess:
         ## Test encoder network to discriminate individual examples
         print 'Testing individual obs:',
         test_x, test_y = testing_dataset.normal_batch(batch_size=128)
-        test_y_hat = sess.run(model.y_individual, feed_dict={
+        test_y_hat = sess.run(model.z_individual, feed_dict={
             model.x_individual: test_x })
         print 'test_y_hat:', test_y_hat.shape
         test_accuracy = np.mean(np.argmax(test_y,axis=1) == np.argmax(test_y_hat,axis=1))
