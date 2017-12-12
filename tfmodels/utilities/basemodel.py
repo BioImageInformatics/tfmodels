@@ -6,12 +6,13 @@ class BaseModel(object):
     ## Defaults
     base_defaults={
         'sess': None,
+        'global_step': 0,
         'log_dir': None,
         'save_dir': None,
         'name': 'base',
         'training_op_list': [],
         'summary_op_list': [],
-        'snapshot_name': 'snapshot' }
+        }
 
     def __init__(self, **kwargs):
         self.base_defaults.update(**kwargs)
@@ -34,7 +35,7 @@ class BaseModel(object):
     def inference(self, x_in, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
-    def loss_op(self):
+    def _loss_op(self):
         raise Exception(NotImplementedError)
 
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):

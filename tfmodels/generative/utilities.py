@@ -2,11 +2,18 @@ import numpy as np
 
 
 """
+Accepts numpy arrays
+
 Stack --> square
 [N, h, w, c]
+
+TODO add support for non-square images
 """
 def vis_square(images, ht=None, pad=2):
     assert ht
+
+    if len(images.shape) == 3:
+        images = np.expand_dims(images, -1)
 
     if pad:
         ht += pad*2
@@ -14,6 +21,7 @@ def vis_square(images, ht=None, pad=2):
         images = np.pad(images, padtuple, mode='constant',
             constant_values=0.0)
 
+    ## TODO add support non-perfect squares
     n_side_sq = images.shape[0]
     img_size = images.shape[1]
     n_side = int(np.sqrt(n_side_sq))

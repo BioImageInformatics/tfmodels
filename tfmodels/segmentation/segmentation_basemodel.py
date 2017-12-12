@@ -6,16 +6,17 @@ from ..utilities.basemodel import BaseModel
 from discriminator import SegmentationDiscriminator
 
 class SegmentationBaseModel(BaseModel):
-    ## Defaults
+    ## Defaults. arXiv links correspond to inspirational materials
     segmentation_defaults={
-        'adversary': False,
+        'adversary': False, ## https://arxiv.org/abs/1611.08408
         'adversary_lr': 1e-4,
         'adversary_lambda': 1,
-        'adversary_feature_matching': False,
-        'class_weights': None,
+        'adversary_feature_matching': False, ## https://arxiv.org/abs/1606.03498
+        'class_weights': None, ## https://arxiv.org/abs/1511.00561
         'conv_kernels': [32, 64, 128, 256],
         'dataset': None,
         'deconv_kernels': [32, 64],
+        'epistemic': False, ## https://arxiv.org/abs/1703.04977
         'global_step': 0,
         'k_size': 3,
         'learning_rate': 1e-3,
@@ -104,13 +105,7 @@ class SegmentationBaseModel(BaseModel):
         self.summaries()
 
         ## ------------------- TensorFlow helpers ------------------- ##
-        self.summary_writer = tf.summary.FileWriter(self.log_dir,
-            graph=self.sess.graph, flush_secs=30)
-        ## Append a model name to the save path
-        self.snapshot_path = os.path.join(self.save_dir,
-            '{}.ckpt'.format(self.name))
-        # self.make_saver() ## In progress (SAVE1)
-        self.saver = tf.train.Saver(max_to_keep=5)
+        self._tf_ops()
         self.sess.run(tf.global_variables_initializer())
 
         self._print_info_to_file(filename=os.path.join(self.save_dir,
@@ -182,6 +177,23 @@ class SegmentationBaseModel(BaseModel):
         raise Exception(NotImplementedError)
 
 
+    ## define self.seg_loss
+    def _class_weighted_loss(self):
+        pass
+
+    ## define self.seg_loss
+    def _epistemic_uncertainty(self):
+        pass
+
+    ## define self.loss
+    def _adversarial_feature_matching_loss(self):
+        pass
+
+    ## define self.loss
+    def _adversarial_loss(self):
+        pass
+
+    ## TODO split into sub-categories
     def make_training_ops(self):
         with tf.name_scope('segmentation_losses'):
             if self.class_weights:
@@ -285,8 +297,6 @@ class SegmentationBaseModel(BaseModel):
                 self._write_scalar_summaries()
 
     def summaries(self):
-
-        print tf.GraphKeys.SUMMARIES
 
         ## https://github.com/aymericdamien/ \
         ## TensorFlow-Examples/blob/master/examples/4_Utils/tensorboard_advanced.py

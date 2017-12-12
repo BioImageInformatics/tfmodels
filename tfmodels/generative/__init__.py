@@ -2,5 +2,6 @@ from gan import GAN
 from vae import VAE
 
 from utilities import (
-    dream_manifold
+    dream_manifold,
+    vis_square
 )

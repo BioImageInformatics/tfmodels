@@ -1,5 +1,6 @@
 from datasets import (
-    IteratorDataSet,
+    MNISTDataSet,
+    BaggedMNIST,
     ImageMaskDataSet,
     ImageComboDataSet,
     ImageFeeder
@@ -24,10 +25,11 @@ from general import (
 )
 
 __all__ = [
-    'IteratorDataSet',
     'ImageMaskDataSet',
     'ImageComboDataSet',
     'ImageFeeder',
+    'MNISTDataSet',
+    'BaggedMNIST',
     'save_image_stack',
     'bayesian_inference',
     'write_image_mask_combos',

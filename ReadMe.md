@@ -18,8 +18,6 @@ The libaray also contains base methods for training generative models including 
 
 **Note** the default activation (set in `tfmodels/utilities/basemodel.py`) is SeLU. Accordingly, the input is scaled to `[-1.0, 1.0]` in the dataset loading functions, and we should use `tf.contrib.nn.alpha_dropout`.
 
-**This repo supplants my previous segmentation repo**
-
 
 ## Versioning
 ```
@@ -30,9 +28,15 @@ cv2
 ```
 
 ## Getting started
-Example scripts for dataset interface, training and testing segmentation models, and training a GAN are provided under `experiments/`.
+Example scripts for dataset interface, training and testing various models are provided under `experiments/`.
 
-Some helpful utilities are included under `utilities/general.py`
+
+## Modules
+- `multi`: multi-instance classification and applications
+- `generative`: generative models like VAE's and GAN's
+- `segmentation`: special case of conditional generative models.
+- `utilities`: useful classes and functions
+
 
 ### Bugs
 Requesting assistance with the input pipeline:
@@ -40,7 +44,7 @@ Requesting assistance with the input pipeline:
 Best practice for having image-mask pairs, then shuffling them and reading with queues. Temporarily, I saved them as a `(h,w,4)` file where the first 3 channels are the image and the 4th channel is the mask. Then, an `ImageComboDataSet` reads the RGBA-like images, and splits the mask from data as a preprocessing step. This solution is unsatisfactory in the long run.
 
 #### License
-Please cite if you use this library for your research.
+Please provide citation if you use this library for your research.
 
 <!-- Copyright 2017 Nathan Ing
 
