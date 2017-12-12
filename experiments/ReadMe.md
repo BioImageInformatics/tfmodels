@@ -14,15 +14,14 @@ Multiple-instance, or bagged label, problems come up quite often.
 The script `mnist_bagged.py` trains a classifier on the bagged MNIST toy dataset.
 We pick a "positive" class (or classes), and train on sets of images that either do or do not contain one or more positive examples.
 
-For instance, we choose [0,1,2] to be positive class:
+For instance, we choose [0,1,2] to be positive:
 
 
-**Positive bag** | **Negative bag**
+**Positive bag** (contains 0,1,2) | **Negative bag** (no 0,1 or 2)
 :--: | :--:
 <img src="../assets/img_6_1.jpg" width="256"> | <img src="../assets/img_7_0.jpg" width="256">
 
-
-Setting the encoder function to return a binary positive / negative label results in a classifier that determines individual instances, x_i, belonging to the positive set.
+Setting the encoder function to return a binary positive / negative label results in a classifier that determines individual instances, x_i, belonging to the positive set. After only 500 iterations of training batch size 128, and a simple feed-forward model we get good results:
 
 **Classified Positive** | **Classified Negative**
 :--: | :--:

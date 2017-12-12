@@ -36,12 +36,12 @@ p(y=1 | x=positive) **(prove it)
 without explicitly stating which element is the "positive" one.
 """
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 5
-iterations = 100
-snapshot_epochs = 10
+epochs = 10
+iterations = 200
+snapshot_epochs = 5
 step_start = 0
 
-batch_size = 128
+batch_size = 32
 samples = 20
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
@@ -103,6 +103,7 @@ with tf.Session(config=config) as sess:
 
 
     ## Save positive and negative classified examples:
+    print 'Printing test x_i'
     test_x, test_y = testing_dataset.normal_batch(batch_size=128)
     test_y_hat = sess.run(model.z_individual, feed_dict={
         model.x_individual: test_x })
