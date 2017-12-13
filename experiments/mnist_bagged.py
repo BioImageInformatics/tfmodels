@@ -36,13 +36,14 @@ p(y=1 | x=positive) **(prove it)
 without explicitly stating which element is the "positive" one.
 """
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 10
-iterations = 200
+epochs = 20
+iterations = 500
 snapshot_epochs = 5
 step_start = 0
 
-batch_size = 32
+batch_size = 92
 samples = 20
+positive_class = [3,6]
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'bagged/logs/{}'.format(expdate)
@@ -54,7 +55,7 @@ training_dataset = tfmodels.BaggedMNIST(
     as_images      = False,
     batch_size     = batch_size,
     samples        = samples,
-    positive_class = [0,1,2],
+    positive_class = positive_class,
     data           = mnist_data.train,
     mode           = 'Train'
     )
@@ -62,7 +63,7 @@ testing_dataset = tfmodels.BaggedMNIST(
     as_images      = False,
     batch_size     = batch_size,
     samples        = samples,
-    positive_class = [0,1,2],
+    positive_class = positive_class,
     data           = mnist_data.test,
     mode           = 'Test'
     )

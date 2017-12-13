@@ -175,6 +175,7 @@ class BaggedMNIST(object):
         self._count_examples()
         self.iterator = self.iterator_fn()
 
+        
     def _count_examples(self):
         self.negative_count = self.negative_x.shape[0]
         self.positive_count = self.positive_x.shape[0]
@@ -206,6 +207,7 @@ class BaggedMNIST(object):
 
         return np.expand_dims(batch_x, 0)
 
+
     def iterator_fn(self):
         while True:
             batch_y = np.random.binomial(1, self.positive_freq, self.batch_size)
@@ -220,11 +222,13 @@ class BaggedMNIST(object):
 
             yield batch_x, batch_y
 
+
     def choice_positive(self, n=1):
         return np.random.choice(range(self.positive_count), n)
 
     def choice_negative(self, n=1):
         return np.random.choice(range(self.negative_count), n)
+
 
     ## Return a batch labelled positive-non-positive
     def normal_batch(self, batch_size):
@@ -248,11 +252,11 @@ class BaggedMNIST(object):
 
         batch_x = batch_x * 2 - 1
 
-
         if self.onehot:
             batch_y = np_onehot(batch_y, 2)
 
         return batch_x, batch_y
+
 
     def print_info(self):
         print '---------------------- {} ---------------------- '.format(self.name)

@@ -74,8 +74,8 @@ class FCEncoder(BaseEncoder):
             print 'Setting up FCEncoder model'
             print '\t x_in: ', x_in.get_shape()
             nonlin = self.nonlin
-            h0 = nonlin(linear(x_in, self.hidden_dim[0], var_scope='e_h0'))
-            h1 = nonlin(linear(h0, self.hidden_dim[1], var_scope='e_h1'))
+            h0 = nonlin(linear(x_in, self.hidden_dim[0], var_scope='d0'))
+            h1 = nonlin(linear(h0, self.hidden_dim[1], var_scope='d1'))
             self.zed_x = linear(h1, self.z_dim, var_scope='zed')
 
             ## Reduce mean
@@ -203,7 +203,6 @@ class ImageBagModel(BaseModel):
             ## Initialize the encoder
             dummy_z, self.z_individual = self.encoder.model(self.x_individual, return_z=True)
 
-            print '\t x_in:', x_in.get_shape()
             self.encode_map_fn = lambda x: self.encoder.model(x, reuse=True)
             self.z_hat = tf.map_fn(self.encode_map_fn, x_in, infer_shape=False, name='z_hat')
             print '\t z_hat:', self.z_hat.get_shape() ## batch_size, dimensions
@@ -270,7 +269,7 @@ class ImageBagModel(BaseModel):
                 variables = tf.trainable_variables()
                 for variable in variables:
                     self.summary_variable_list.append(
-                        tf.summary.histogram(var.name + '/variable', variable))
+                        tf.summary.histogram(variable.name + '/variable', variable))
 
             self.loss_sum = tf.summary.scalar('loss', self.loss)
             self.accuracy_sum = tf.summary.scalar('accuracy', self.accuracy)
