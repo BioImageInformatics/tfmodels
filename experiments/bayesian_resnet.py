@@ -19,7 +19,7 @@ image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 100
-batch_size = 48
+batch_size = 72
 # iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 10
@@ -52,11 +52,12 @@ with tf.Session(config=config) as sess:
         dataset=dataset,
         global_step=step_start,
         k_size=3,
+        kernels=[64, 64, 64, 128, 128],
         learning_rate=1e-4,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
-        stacks=3,
+        stacks=7,
         summarize_grads=False,
         summary_iters=100,
         summary_image_iters=500,

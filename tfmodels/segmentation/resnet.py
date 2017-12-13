@@ -17,15 +17,21 @@ class ResNet(SegmentationBaseModel):
 
     def __init__(self, **kwargs):
         self.base_defaults.update(**kwargs)
-        super(ResNet, self).__init__(**self.base_defaults)
 
-        assert self.n_classes is not None
-        ## Check input shape is compatible with the number of downsampling modules
-        assert self.modules == len(self.kernels)
+        ## not sure sure it's good to do this first
+        for key, val in self.base_defaults.items():
+            setattr(self, key, val)
+
+        self.modules = len(self.kernels)
+        print 'Requesting {} resnet blocks'.format(self.modules)
         start_size = self.x_dims[0]/4 ## start with 2 stride conv and pool
         min_dimension = start_size / np.power(2,self.modules)
         print 'MINIMIUM DIMENSION: ', min_dimension
         assert min_dimension >= 1
+
+        super(ResNet, self).__init__(**self.base_defaults)
+
+        ## Check input shape is compatible with the number of downsampling modules
 
     """
     Accept x_1

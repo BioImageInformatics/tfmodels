@@ -52,7 +52,7 @@ class SegmentationBaseModel(BaseModel):
 
 
     def _training_mode(self):
-        print 'Setting up {} in test mode'.format(self.name)
+        print 'Setting up {} in training mode'.format(self.name)
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
