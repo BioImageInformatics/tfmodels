@@ -175,7 +175,7 @@ class BaggedMNIST(object):
         self._count_examples()
         self.iterator = self.iterator_fn()
 
-        
+
     def _count_examples(self):
         self.negative_count = self.negative_x.shape[0]
         self.positive_count = self.positive_x.shape[0]
@@ -215,7 +215,7 @@ class BaggedMNIST(object):
             batch_x = np.concatenate(batch_x, 0)
 
             ## Move to [-1, 1] for SELU
-            batch_x = batch_x * (2) - 1
+            # batch_x = batch_x * (2) - 1
 
             if self.onehot:
                 batch_y = np_onehot(batch_y, 2)
@@ -250,7 +250,7 @@ class BaggedMNIST(object):
         else:
             batch_x = np.concatenate(batch_x, 0)
 
-        batch_x = batch_x * 2 - 1
+        # batch_x = batch_x * 2 - 1
 
         if self.onehot:
             batch_y = np_onehot(batch_y, 2)
