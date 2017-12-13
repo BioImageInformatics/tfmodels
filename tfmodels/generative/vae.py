@@ -14,7 +14,7 @@ from ..utilities.ops import (
 
 ''' Variational Autoencoder
 
-Kingma and Welling, 2013
+for MNIST
 
 '''
 # class Discriminator(BaseDiscriminator):
@@ -86,14 +86,14 @@ Kingma and Welling, 2013
 
 
 class Encoder(BaseEncoder):
-    vae_discriminator_defaults = {
+    vae_encoder_defaults = {
         'enc_kernels': [32, 64, 128],
         'z_dim': 64,
     }
 
     def __init__(self, **kwargs):
-        self.vae_discriminator_defaults.update(**kwargs)
-        super(Encoder, self).__init__(**self.vae_discriminator_defaults)
+        self.vae_encoder_defaults.update(**kwargs)
+        super(Encoder, self).__init__(**self.vae_encoder_defaults)
 
     def model(self, x_in, keep_prob=0.5, reuse=False):
         with tf.variable_scope(self.name) as scope:

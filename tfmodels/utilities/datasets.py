@@ -6,6 +6,14 @@ from openslide import OpenSlide
 
 from tensorflow.examples.tutorials.mnist import input_data
 
+
+## https://stackoverflow.com/questions/29831489/numpy-1-hot-array
+def np_onehot(a, depth):
+    b = np.zeros((a.shape[0], depth))
+    b[np.arange(a.shape[0]), a] = 1
+
+    return b
+
 def weight_variable(shape, name=None):
     initial = tf.truncated_normal(shape, stddev=0.01)
     return tf.Variable(initial, name=name)
@@ -43,17 +51,63 @@ def load_images(paths, batchsize, crop_size):
     #     tensor.min(), tensor.max(), tensor.dtype)
     return tensor
 
-""" Using TF's built in MNIST dataset
 
+"""
+input paired x, y matrices:
+random_mnist.*.images ~ [obs, dims]
+random_mnist.*.labels ~ [obs, 10] ## one-hot
+
+output x sorted by y, as dictionaries
+"""
+# def collect_mnist(mnist):
+#     mnist_out = {}
+#     for y in range(0, 10):
+#         train_x = mnist.train.images[mnist.train.labels==y, :]
+#         test_x = mnist.train.images[mnist.test.labels==y, :]
+#         mnist_out{y} = np.vstack([train_x, test_x])
+#
+#     return mnist_out
+
+"""
+Collect examples of positive class, and all others
+
+Support a list of positive labels
+"""
+def collect_mnist(mnist, positive_class=0):
+    if not isinstance(positive_class, (list, tuple)):
+        positive_class = [positive_class]
+    ## Gather x
+    positive_x = []
+    negative_x = []
+    for y in range(0, 10):
+        if y in positive_class:
+            positive_x.append(mnist.images[mnist.labels==y, :])
+        else:
+            negative_x.append(mnist.images[mnist.labels==y, :])
+        # x_out = mnist.images[mnist.labels==y, :]
+        # # mnist_out[y] = np.vstack([train_x, test_x])
+        # mnist_out[y] = x_out
+
+    # positive_x = mnist_out[positive_class]
+    # negative_x = [mnist_out[c] for c in range(10) if c != positive_class]
+    positive_x = np.vstack(positive_x)
+    negative_x = np.vstack(negative_x)
+
+    # np.random.shuffle(positive_x)
+    # np.random.shuffle(negative_x)
+
+    return negative_x, positive_x
+
+
+
+""" Using TF's built in MNIST dataset
 https://stackoverflow.com/questions/43231958/filling-queue-from-python-iterator
 """
-class IteratorDataSet(object):
+class MNISTDataSet(object):
     mnist_dataset_defaults = {
         'batch_size': 64,
-        'capacity': 256,
         'mode': 'TRAIN',
-        'name': 'IteratorDataSet',
-        'n_classes': 10,
+        'name': 'MNISTDataSet',
         'source_dir': None,
     }
 
@@ -66,39 +120,14 @@ class IteratorDataSet(object):
         self.data = input_data.read_data_sets(self.source_dir)
         self.iterator = self.iterator_fn()
 
-        # self.queue = tf.FIFOQueue(
-        #     capacity=self.capacity,
-        #     dtypes=[tf.float32] )
-        #
-        # ## A bit different from below. The equeue_op pulls data from the iterator
-        # ## It doesn't need shape??
-        # self.batch_x = tf.placeholder(tf.float32, [None, 28, 28, 1])
-        # self.enqueue_op = self.queue.enqueue(self.batch_x)
-        # # self.enqueue_op = tf.Print(self.enqueue_op, ['enqueue'])
-        # self.image_op = self.queue.dequeue()
-        # # self.image_op = tf.Print(self.image_op, ['dequeue'])
-
-
     def iterator_fn(self):
         while True:
             batch_x, batch_y = self.data.train.next_batch(self.batch_size)
             batch_x = np.reshape(batch_x, [self.batch_size, 28, 28, 1])
+
+            ## move to [-1, 1] for SELU
+            batch_x = batch_x * (2) - 1
             yield batch_x
-
-
-    # def enqueue_thread(self):
-    #     with self.coord.stop_on_exception():
-    #         while not self.coord.should_stop():
-    #             self.sess.run(self.enqueue_op,
-    #                 feed_dict={self.batch_x: list(next(self.iterator))})
-    #
-    #
-    # def start_enqueue(self):
-    #     print 'Setting up threads'
-    #     for i in range(self.threads):
-    #         threading.Thread(target=self.enqueue_thread).start()
-
-
 
     def print_info(self):
         print '---------------------- {} ---------------------- '.format(self.name)
@@ -107,14 +136,140 @@ class IteratorDataSet(object):
         print '---------------------- {} ---------------------- '.format(self.name)
 
 
+## TODO
+"""
+Produces batches like:
+x = [batch_size, samples, [dimensions]], y = [batch_size]
 
-'''
+where y is 0 or 1 for a batch containing the positive class
+
+batches containing the positive class may have a variable number of
+positive examples
+"""
+class BaggedMNIST(object):
+    bag_mnist_defaults = {
+        'as_images': False,
+        'batch_size': 64,
+        'name': 'MNISTDataSet',
+        'onehot': True,
+        'positive_class': [0],
+        'positive_freq': 0.5,
+        'samples': 10,
+        'data': None, ## One of mnist.train or mnist.test
+        'mode': 'Train',
+        # 'source_dir': None,
+    }
+
+    def __init__(self, **kwargs):
+        print 'Initializing Bagged MNIST dataset'
+        self.bag_mnist_defaults.update(**kwargs)
+        for key, value in self.bag_mnist_defaults.items():
+            setattr(self, key, value)
+
+        ## load without onehot for ez
+        # self.data = input_data.read_data_sets(self.source_dir)
+
+        print 'Using positive class:', self.positive_class
+        self.negative_x, self.positive_x = collect_mnist(self.data,
+            positive_class=self.positive_class)
+        self._count_examples()
+        self.iterator = self.iterator_fn()
+
+
+    def _count_examples(self):
+        self.negative_count = self.negative_x.shape[0]
+        self.positive_count = self.positive_x.shape[0]
+
+        print 'Got negative examples', self.negative_count
+        print 'Got positive examples', self.positive_count
+
+
+    def _get_x(self, y):
+        ## positive
+        if y:
+            ## portion of samples to be positive:
+            portion = np.random.binomial(self.samples-1, 0.25)
+            negative_portion = self.samples-portion
+            positive_x = self.positive_x[np.random.choice(self.positive_count, portion), :]
+            filler_x = self.negative_x[np.random.choice(self.negative_count, negative_portion), :]
+
+            batch_x = np.vstack([positive_x, filler_x])
+            np.random.shuffle(batch_x)
+        if not y:
+            indices = np.random.choice(self.negative_count, self.samples)
+            batch_x = self.negative_x[indices, :]
+
+        if self.as_images:
+            batch_x = [x.reshape(28, 28) for x in batch_x]
+            batch_x = [np.expand_dims(x, 0) for x in batch_x]
+            batch_x = [np.expand_dims(x, -1) for x in batch_x]
+            batch_x = np.concatenate(batch_x, 0)
+
+        return np.expand_dims(batch_x, 0)
+
+
+    def iterator_fn(self):
+        while True:
+            batch_y = np.random.binomial(1, self.positive_freq, self.batch_size)
+            batch_x = [self._get_x(y) for y in batch_y]
+            batch_x = np.concatenate(batch_x, 0)
+
+            ## Move to [-1, 1] for SELU
+            # batch_x = batch_x * (2) - 1
+
+            if self.onehot:
+                batch_y = np_onehot(batch_y, 2)
+
+            yield batch_x, batch_y
+
+
+    def choice_positive(self, n=1):
+        return np.random.choice(range(self.positive_count), n)
+
+    def choice_negative(self, n=1):
+        return np.random.choice(range(self.negative_count), n)
+
+
+    ## Return a batch labelled positive-non-positive
+    def normal_batch(self, batch_size):
+        batch_y = np.random.binomial(1, 0.5, batch_size)
+        batch_x = []
+        for y in batch_y:
+            if y:
+                idx = self.choice_positive()
+                batch_x.append(self.positive_x[idx, :])
+            else:
+                idx = self.choice_negative()
+                batch_x.append(self.negative_x[idx, :])
+
+        if self.as_images:
+            batch_x = [x.reshape(28, 28) for x in batch_x]
+            batch_x = [np.expand_dims(x, 0) for x in batch_x]
+            batch_x = [np.expand_dims(x, -1) for x in batch_x]
+            batch_x = np.concatenate(batch_x, 0)
+        else:
+            batch_x = np.concatenate(batch_x, 0)
+
+        # batch_x = batch_x * 2 - 1
+
+        if self.onehot:
+            batch_y = np_onehot(batch_y, 2)
+
+        return batch_x, batch_y
+
+
+    def print_info(self):
+        print '---------------------- {} ---------------------- '.format(self.name)
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t', key, value
+        print '---------------------- {} ---------------------- '.format(self.name)
+
+"""
 Implements a threaded queue for reading images from disk given filenames
 Since this is for segmentation, we have to also read masks in the same order
 
 Assume the images and masks are named similarly and are in different folders
-'''
-
+"""
 class DataSet(object):
     defaults = {
         'capacity': 5000,
@@ -147,7 +302,7 @@ class DataSet(object):
         raise Exception(NotImplementedError)
 
 
-'''
+"""
 It does not work with asynchronous loading.
 The two file readers in different streams WILL become desynced,
 resulting in mismatches.
@@ -158,7 +313,7 @@ Alternatively, the image-mask file names should be married together from the
 very beginning.
 
 I don't know how to do simple string concat + split in TF ops, so....
-'''
+"""
 class ImageMaskDataSet(DataSet):
     defaults = {
         'batch_size': 16,
@@ -172,7 +327,7 @@ class ImageMaskDataSet(DataSet):
         'ratio': 1.0,
         'capacity': 5000,
         'seed': 5555,
-        'threads': 4,
+        'threads': 1,
         'input_size': 1200,
         'min_holding': 1250,
         'dstype': 'ImageMask',
@@ -183,6 +338,9 @@ class ImageMaskDataSet(DataSet):
         super(ImageMaskDataSet, self).__init__(**self.defaults)
         assert self.image_dir is not None
         assert self.mask_dir is not None
+
+        ## Not intended behavior
+        assert self.threads == 1
 
         ## ----------------- Load Image Lists ------------------- ##
         image_list = sorted(glob.glob(os.path.join(self.image_dir, '*.'+self.image_ext) ))
@@ -273,7 +431,9 @@ class ImageMaskDataSet(DataSet):
         return image, mask
 
 
-
+"""
+Pre-concatenated image-mask: [h,w,4]
+"""
 class ImageComboDataSet(DataSet):
     defaults = {
         'augmentation': 'random',
@@ -359,10 +519,9 @@ class ImageComboDataSet(DataSet):
         return image, mask
 
 
-
-
-'''
-'''
+"""
+Only images, unlabelled
+"""
 class ImageFeeder(DataSet):
     defaults = {
         'augmentation': None,
@@ -445,10 +604,9 @@ class ImageFeeder(DataSet):
 
 
 
-
 ## TODO
 class SVSDataSet(DataSet):
-    defaults = {
+    svs_defaults = {
         'batch_size': 16,
         'crop_size': 256,
         'svs_path': None,
@@ -458,8 +616,8 @@ class SVSDataSet(DataSet):
         'min_holding': 1250,
         'dstype': 'ImageMask' }
     def __init__(self, **kwargs):
-        self.defaults.update(**kwargs)
-        super(SVSDataSet, self).__init__(**self.defaults)
+        self.svs_defaults.update(**kwargs)
+        super(SVSDataSet, self).__init__(**self.svs_defaults)
 
         assert self.svs_path is not None and os.path.exists(self.svs_path)
 

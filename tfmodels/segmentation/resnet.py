@@ -4,7 +4,13 @@ from ..utilities.ops import *
 
 
 """
-More downsampling and deeper
+To build a resnet with 3 stacks of down/upsampling,
+each with 32 kernel residual module repeated 5 times:
+
+kenrels = [32]*3
+modules = 3
+stacks  = 5
+
 """
 class ResNet(SegmentationBaseModel):
     base_defaults={
@@ -105,15 +111,22 @@ class ResNet(SegmentationBaseModel):
                     var_scope=block_name)
                 print '\t {}'.format(block_name), signal.get_shape()
 
-            signal = self._residual_block(signal, self.kernels[0], block=0,
+            d0 = self._residual_block(signal, self.kernels[0], block=0,
                 stacks=self.stacks, name_scope='d')
-            signal = deconv(signal, self.n_classes, upsample_rate=2, k_size=7,
+            y_branch = deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
                 var_scope='d0_residual')
 
-            y_hat = deconv(signal, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
+
+            y_hat = deconv(y_branch, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape()
 
-            return y_hat
+            ## New logic at the end of model building
+            if self.epistemic:
+                sigma_branch = deconv(d0, 1, upsample_rate=2, k_size=3, var_scope='sigma')
+                return y_hat, sigma_branch
+            else:
+                return y_hat
+
 
 
 

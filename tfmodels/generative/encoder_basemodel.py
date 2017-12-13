@@ -14,12 +14,6 @@ class BaseEncoder(BaseModel):
         self.discriminator_defaults.update(**kwargs)
         super(BaseEncoder, self).__init__(**self.discriminator_defaults)
 
-        # assert self.real is not None
-        # assert self.fake is not None
-
-        ## Set up discriminator and inputs
-
-
     """ return q(z|x) """
     def model(self, x_in, keep_prob=0.5, reuse=False):
         raise Exception(NotImplementedError)

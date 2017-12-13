@@ -1,0 +1,23 @@
+
+Overall
+-. filter visualizations
+    - built into basemodel, or as a script under utilities/general
+x. option to log gradients
+-. option to log weights distributions -- and subsets
+
+
+Segmentation
+x. Change resnet model to programatically create the model
+-. Epistemic uncertainty mode in SegmentationBaseModel
+-. Implement real FCN-8s model
+
+
+Generative
+-. Adversarial autoencoder
+-. Supervised autoencoder
+-. Prior factory, like the one from OpenAI InfoGAN code
+
+
+Multi
+-. Multi instance classification model
+-. Bayesian inference mode
