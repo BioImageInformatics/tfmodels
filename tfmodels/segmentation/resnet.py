@@ -113,11 +113,11 @@ class ResNet(SegmentationBaseModel):
 
             d0 = self._residual_block(signal, self.kernels[0], block=0,
                 stacks=self.stacks, name_scope='d')
-            y_branch = deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
+            d0_residual = deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
                 var_scope='d0_residual')
 
 
-            y_hat = deconv(y_branch, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
+            y_hat = deconv(d0_residual, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape()
 
             ## New logic at the end of model building

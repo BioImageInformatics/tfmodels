@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
 import os, glob
+import datetime
 
 
-''' Save a 4D stack of images
-'''
+""" Save a 4D stack of images
+"""
 def save_image_stack(stack, writeto,
     prefix='img', ext='jpg', onehot=False, scale='max',
     stack_axis=0):
@@ -52,7 +53,6 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5):
 """
 In case images and masks exist as separate files, this script will fuse them
 into a 4-channel (RGBA-like) image.
-
 """
 def write_image_mask_combos(img_src_dir=None,
     img_src_ext='jpg',
@@ -91,3 +91,21 @@ def test_bayesian_inference(model, test_x_list, output_dir, keep_prob=0.5, sampl
             scale='max', ext='png', stack_axis=-1)
         save_image_stack(y_bar_var, output_dir, prefix='y_var_{:04d}'.format(test_idx),
             scale='max', ext='png', stack_axis=-1)
+
+
+"""
+Convenience function to initialize an experiment
+"""
+def init_experiment(exp_name, recreate=False, root_dir='.', subdirs=None):
+    if subdirs is None:
+        subdirs = ['logs', 'snapshots', 'debug', 'inference']
+
+    exp_root = os.path.join(root_dir, exp_name)
+    if not os.path.exists(exp_root, 'dir'):
+        os.mkdirs(exp_root)
+
+
+    elif os.path.exists(exp_root, 'dir') and recreate:
+        print 'Deleting {}'.format(exp_root)
+        shutil.rmdtree(exp_root)
+        print 'Remaking {}'.format(exp_root)

@@ -154,6 +154,7 @@ class BaggedMNIST(object):
         'onehot': True,
         'positive_class': [0],
         'positive_freq': 0.5,
+        'positive_rate': 0.1, ## Rate of positive class in each positive bag
         'samples': 10,
         'data': None, ## One of mnist.train or mnist.test
         'mode': 'Train',
@@ -188,7 +189,7 @@ class BaggedMNIST(object):
         ## positive
         if y:
             ## portion of samples to be positive:
-            portion = np.random.binomial(self.samples-1, 0.25)
+            portion = np.random.binomial(self.samples-1, self.positive_rate)
             negative_portion = self.samples-portion
             positive_x = self.positive_x[np.random.choice(self.positive_count, portion), :]
             filler_x = self.negative_x[np.random.choice(self.negative_count, negative_portion), :]

@@ -12,11 +12,11 @@ from ..utilities.ops import (
     conv_cond_concat
 )
 
-''' Variational Autoencoder
+""" Variational Autoencoder
 
 for MNIST
 
-'''
+"""
 # class Discriminator(BaseDiscriminator):
 #     vae_discriminator_defaults = {
 #         'dis_kernels': [32, 64, 128]

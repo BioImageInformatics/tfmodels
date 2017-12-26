@@ -104,13 +104,14 @@ class ConvEncoder(BaseEncoder):
 
         self.name = name
 
-    def model(self, x_in, keep_prob=0.5, reuse=False, return_z=False):
+    def model(self, x_in, keep_prob=0.5, reuse=False, return_mode='z_bar_x'):
+        print 'Setting up Encoder model'
+        print '\t x_in: ', x_in.get_shape()
         with tf.variable_scope(self.name) as scope:
             if reuse:
+                print '\t Reusing variables'
                 scope.reuse_variables()
 
-            print 'Setting up ConvEncoder model'
-            print '\t x_in: ', x_in.get_shape()
             nonlin = tf.nn.selu
 
             c0 = nonlin(conv(x_in, self.kernels[0], k_size=5, stride=2, var_scope='c0'))
@@ -120,15 +121,32 @@ class ConvEncoder(BaseEncoder):
 
             h0 = nonlin(linear(c1_flat, self.hidden_dim[0], var_scope='h0'))
 
-            self.zed_x = linear(h0, self.z_dim, var_scope='zed')
+            ## Split head into z_i|x_i and y_i|x_i
+            z_i = linear(h0, self.z_dim, var_scope='z_i')
+
+            ## Predict y from z
+            y_i0 = nonlin(linear(z_i, self.z_dim, var_scope='y_i0'))
+            y_i = linear(y_i0, self.n_classes, var_scope='y_i')
 
             ## Reduce mean
-            self.zed_x_bar = tf.reduce_mean(self.zed_x, axis=0)
+            z_bar_x = tf.reduce_mean(z_i, axis=0)
+            y_bar_x = tf.reduce_mean(y_i, axis=0)
 
-            if return_z:
-                return self.zed_x_bar, self.zed_x
-            else:
-                return self.zed_x_bar
+            print '\t Encoder heads:'
+            print '\t z_i', z_i.get_shape()
+            print '\t y_i', y_i.get_shape()
+            print '\t z_bar_x', z_bar_x.get_shape()
+            print '\t y_bar_x', y_bar_x.get_shape()
+
+            ## super weird
+            if return_mode == 'z_bar_x':
+                return z_bar_x
+            elif return_mode == 'y_bar_x':
+                return y_bar_x
+            elif return_mode == 'z_i':
+                return z_i
+            elif return_mode == 'y_i':
+                return y_i
 
 
 class ImageBagModel(BaseModel):
@@ -158,10 +176,10 @@ class ImageBagModel(BaseModel):
             self.x_individual = tf.placeholder('float', shape=[None]+self.x_dim, name='x_individual')
             self.x_in = tf.placeholder('float', shape=[None, None]+self.x_dim)
             encoder_class = ConvEncoder
-        elif self.encoder_type == 'DENSE':
-            self.x_individual = tf.placeholder('float', shape=[None, self.x_dim[0]], name='x_individual')
-            self.x_in = tf.placeholder('float', shape=[None, None, self.x_dim[0]])
-            encoder_class = FCEncoder
+        # elif self.encoder_type == 'DENSE':
+        #     self.x_individual = tf.placeholder('float', shape=[None, self.x_dim[0]], name='x_individual')
+        #     self.x_in = tf.placeholder('float', shape=[None, None, self.x_dim[0]])
+        #     encoder_class = FCEncoder
 
         self.y_in = tf.placeholder('float', shape=[None, self.n_classes], name='y_in')
 
@@ -174,7 +192,7 @@ class ImageBagModel(BaseModel):
 
         self.encoder.print_info()
 
-        self.y_hat = self.model(self.x_in)
+        self.model(self.x_in)
 
         ## ------------------- Loss ops
         self._loss_op()
@@ -201,29 +219,18 @@ class ImageBagModel(BaseModel):
             nonlin = self.nonlin
 
             ## Initialize the encoder
-            dummy_z, self.z_individual = self.encoder.model(self.x_individual, return_z=True)
+            self.y_individual = self.encoder.model(self.x_individual, return_mode='y_i')
 
-            self.encode_map_fn = lambda x: self.encoder.model(x, reuse=True)
-            self.z_hat = tf.map_fn(self.encode_map_fn, x_in, infer_shape=False, name='z_hat')
-            print '\t z_hat:', self.z_hat.get_shape() ## batch_size, dimensions
-
-            ## Use the output of z_hat directly; requires z_dim=self.n_classes
-            if self.no_classifier:
-                y_hat = tf.identity(self.z_hat, name='y_hat')
-            ## Classifier
-            else:
-                h0 = nonlin(linear(z_hat, 2, selu=1, var_scope='h0'))
-                h1 = nonlin(linear(h0, 256, selu=1, var_scope='h1'))
-                y_hat = linear(self.z_hat, self.n_classes, selu=1, var_scope='y_hat')
-
-        return y_hat
+            self.y_bar_x_map_fn = lambda x: self.encoder.model(x, reuse=True, return_mode='y_bar_x')
+            self.y_bar = tf.map_fn(self.y_bar_x_map_fn, x_in, infer_shape=False, name='y_bar')
+            print '\t y_bar:', self.y_bar.get_shape() ## batch_size, dimensions
 
 
     def _loss_op(self):
         self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            logits=self.y_hat, labels=self.y_in), name='loss')
+            logits=self.y_bar, labels=self.y_in), name='loss')
         self.y_in_argmax = tf.argmax(self.y_in, axis=1)
-        self.y_hat_argmax = tf.argmax(self.y_hat, axis=1)
+        self.y_hat_argmax = tf.argmax(self.y_bar, axis=1)
 
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(
             self.y_in_argmax, self.y_hat_argmax), tf.float32))
@@ -254,7 +261,7 @@ class ImageBagModel(BaseModel):
         return accuracy
 
     def _summary_ops(self):
-        with tf.variable_scope('summary'):
+        with tf.variable_scope('gradient_summary'):
             if self.summarize_grads:
                 self.summary_gradient_list = []
                 grads = tf.gradients(self.loss, tf.trainable_variables())
@@ -264,6 +271,7 @@ class ImageBagModel(BaseModel):
                     self.summary_gradient_list.append(
                         tf.summary.histogram(var.name + '/gradient', grad))
 
+        with tf.variable_scope('variable_summary'):
             if self.summarize_vars:
                 self.summary_variable_list = []
                 variables = tf.trainable_variables()
@@ -271,15 +279,17 @@ class ImageBagModel(BaseModel):
                     self.summary_variable_list.append(
                         tf.summary.histogram(variable.name + '/variable', variable))
 
+        with tf.variable_scope('loss_scalars'):
             self.loss_sum = tf.summary.scalar('loss', self.loss)
             self.accuracy_sum = tf.summary.scalar('accuracy', self.accuracy)
 
-            self.y_hat_summary = tf.summary.histogram('y_hat', tf.nn.sigmoid(self.y_hat))
+        with tf.variable_scope('endpoints'):
+            self.y_hat_summary = tf.summary.histogram('y_bar', tf.nn.sigmoid(self.y_bar))
             self.y_in_summary = tf.summary.histogram('y_in', self.y_in)
-            self.z_hat_summary = tf.summary.histogram('z_hat', self.z_hat)
 
             self.summary_op = tf.summary.merge_all()
 
+        with tf.variable_scope('tests'):
             self.test_accuracy_sum = tf.summary.scalar('accuracy_test', self.accuracy)
             self.test_loss_sum = tf.summary.scalar('loss_test', self.loss)
             self.test_summary_op = tf.summary.merge([self.test_accuracy_sum,

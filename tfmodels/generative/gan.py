@@ -12,13 +12,13 @@ from ..utilities.ops import (
     conv_cond_concat
 )
 
-''' Generative Adversarial Network
+""" Generative Adversarial Network
 
 1. Define the disciminator and generator according to the template models
 2. implement the loss functions and regularizers
 3. ???
 
-'''
+"""
 class Discriminator(BaseDiscriminator):
     gan_discriminator_defaults = {
         'dis_kernels': [32, 64, 128]

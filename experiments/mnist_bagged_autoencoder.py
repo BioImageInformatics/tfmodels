@@ -12,7 +12,8 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 # config.log_device_placement = True
 
-mnist_data_path = '/Users/nathaning/Envs/tensorflow/MNIST_data'
+# mnist_data_path = '/Users/nathaning/Envs/tensorflow/MNIST_data'
+mnist_data_path = '/home/nathan/envs/tensorflow/MNIST_data'
 mnist_data = input_data.read_data_sets(mnist_data_path)
 
 """
@@ -37,13 +38,13 @@ without explicitly stating which element is the "positive" one.
 """
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 20
-iterations = 500
+iterations = 100
 snapshot_epochs = 5
 step_start = 0
 
-batch_size = 64
-samples = 10
-positive_class = [0]
+batch_size = 32
+samples = 128
+positive_class = [0,1]
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'bagged_ae/logs/{}'.format(expdate)
@@ -56,6 +57,7 @@ training_dataset = tfmodels.BaggedMNIST(
     batch_size     = batch_size,
     samples        = samples,
     positive_class = positive_class,
+    positive_rate  = 0.1,
     data           = mnist_data.train,
     mode           = 'Train'
     )
@@ -64,6 +66,7 @@ testing_dataset = tfmodels.BaggedMNIST(
     batch_size     = batch_size,
     samples        = samples,
     positive_class = positive_class,
+    positive_rate  = 0.1,
     data           = mnist_data.test,
     mode           = 'Test'
     )
@@ -81,7 +84,9 @@ with tf.Session(config=config) as sess:
     model.print_info()
 
     print 'Starting training'
+    # try:
     for epoch in xrange(1, epochs):
+
         for _ in xrange(iterations):
             model.train_step()
 
@@ -90,7 +95,8 @@ with tf.Session(config=config) as sess:
 
         ## Test encoder network to discriminate individual examples
         test_x, test_y = testing_dataset.normal_batch(batch_size=128)
-        test_y_hat = sess.run(model.z_individual, feed_dict={
+        print 'Normal batch:', test_x.shape
+        test_y_hat = sess.run(model.y_individual, feed_dict={
             model.x_individual: test_x })
         i_accuracy = np.mean(np.argmax(test_y,axis=1) == np.argmax(test_y_hat,axis=1))
 
@@ -99,12 +105,18 @@ with tf.Session(config=config) as sess:
 
         if epoch % snapshot_epochs == 0:
             model.snapshot()
+    # except Exception as e:
+    #     print 'Caught exception or quit'
+    #     print e.__doc__
+    #     print e.message
+    # finally:
+    #     model.snapshot()
 
 
     ## Save positive and negative classified examples:
     print 'Printing test x_i'
     test_x, test_y = testing_dataset.normal_batch(batch_size=128)
-    test_y_hat = sess.run(model.z_individual, feed_dict={
+    test_y_hat = sess.run(model.y_individual, feed_dict={
         model.x_individual: test_x })
     test_y_argmax = np.argmax(test_y_hat, axis=1)
     for idx, y in enumerate(test_y_argmax):

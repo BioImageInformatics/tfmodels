@@ -35,4 +35,10 @@ __all__ = [
     'save_image_stack',
     'test_bayesian_inference',
     'write_image_mask_combos',
+    'batch_norm',
+    'conv',
+    'conv_cond_concat',
+    'deconv',
+    'linear',
+    'lrelu',
 ]

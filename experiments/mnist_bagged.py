@@ -12,7 +12,8 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 # config.log_device_placement = True
 
-mnist_data_path = '/Users/nathaning/Envs/tensorflow/MNIST_data'
+# mnist_data_path = '/Users/nathaning/Envs/tensorflow/MNIST_data'
+mnist_data_path = '/home/nathan/envs/tensorflow/MNIST_data'
 mnist_data = input_data.read_data_sets(mnist_data_path)
 
 """
@@ -41,29 +42,31 @@ iterations = 500
 snapshot_epochs = 5
 step_start = 0
 
-batch_size = 92
-samples = 20
-positive_class = [3,6]
+batch_size = 32
+samples = 256
+positive_class = [0,1]
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'bagged/logs/{}'.format(expdate)
 save_dir         = 'bagged/snapshots'
 debug_dir        = 'bagged/debug'
-snapshot_restore = 'bagged/snapshots/resnet.ckpt-{}'.format(step_start)
+snapshot_restore = 'bagged/snapshots/deepset.ckpt-{}'.format(step_start)
 
 training_dataset = tfmodels.BaggedMNIST(
-    as_images      = False,
+    as_images      = True,
     batch_size     = batch_size,
     samples        = samples,
     positive_class = positive_class,
+    positive_rate  = 0.1,
     data           = mnist_data.train,
     mode           = 'Train'
     )
 testing_dataset = tfmodels.BaggedMNIST(
-    as_images      = False,
+    as_images      = True,
     batch_size     = batch_size,
     samples        = samples,
     positive_class = positive_class,
+    positive_rate  = 0.1,
     data           = mnist_data.test,
     mode           = 'Test'
     )
@@ -71,12 +74,11 @@ testing_dataset = tfmodels.BaggedMNIST(
 with tf.Session(config=config) as sess:
     model = tfmodels.ImageBagModel(
         dataset         = training_dataset,
-        encoder_type    = 'DENSE',
+        encoder_type    = 'CONV',
         log_dir         = log_dir,
         save_dir        = save_dir,
         sess            = sess,
-        # x_dim           = [28, 28, 1],
-        x_dim           = [28*28],
+        x_dim           = [28, 28, 1],
         summarize_grads = True,
         summarize_vars  = True,
         )
@@ -92,7 +94,7 @@ with tf.Session(config=config) as sess:
 
         ## Test encoder network to discriminate individual examples
         test_x, test_y = testing_dataset.normal_batch(batch_size=128)
-        test_y_hat = sess.run(model.z_individual, feed_dict={
+        test_y_hat = sess.run(model.y_individual, feed_dict={
             model.x_individual: test_x })
         i_accuracy = np.mean(np.argmax(test_y,axis=1) == np.argmax(test_y_hat,axis=1))
 
@@ -106,7 +108,7 @@ with tf.Session(config=config) as sess:
     ## Save positive and negative classified examples:
     print 'Printing test x_i'
     test_x, test_y = testing_dataset.normal_batch(batch_size=128)
-    test_y_hat = sess.run(model.z_individual, feed_dict={
+    test_y_hat = sess.run(model.y_individual, feed_dict={
         model.x_individual: test_x })
     test_y_argmax = np.argmax(test_y_hat, axis=1)
     for idx, y in enumerate(test_y_argmax):

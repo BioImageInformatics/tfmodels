@@ -56,11 +56,11 @@ class Encoder(BaseEncoder):
 
             h0 = nonlin(linear(c1_flat, self.hidden_dim[0], var_scope='h0'))
 
-            ## Split head into z_i|x_i and y_i|x_i
             z_i = linear(h0, self.z_dim, var_scope='z_i')
 
-            ## Predict y from z
+            ## Predict y from z -- or split network heads
             y_i0 = nonlin(linear(z_i, self.z_dim, var_scope='y_i0'))
+            # y_i0 = nonlin(linear(h0, self.z_dim, var_scope='y_i0'))
             y_i = linear(y_i0, self.n_classes, var_scope='y_i')
 
             ## Reduce mean
@@ -187,20 +187,22 @@ class ImageBagAutoencoder(BaseModel):
 
             ## Initialize the encoder
             self.y_individual = self.encoder.model(self.x_individual, return_mode='y_i')
+            print '\t y_individual', self.y_individual.get_shape()
+
+            ## Get average y for each sample set
+            self.y_bar_map_fn = lambda x: self.encoder.model(x, return_mode='y_bar_x', reuse=True)
+            self.y_bar_x = tf.map_fn(self.y_bar_map_fn, x_in, infer_shape=True, name='y_bar_x', parallel_iterations=4)
+            print '\t y_bar_x:', self.y_bar_x.get_shape()
 
             ## Get latent codes for all x_i
             self.z_i_map_fn = lambda x: self.encoder.model(x, return_mode='z_i', reuse=True)
-            self.z_i_x = tf.map_fn(self.z_i_map_fn, x_in, infer_shape=True, name='z_i_x')
+            self.z_i_x = tf.map_fn(self.z_i_map_fn, x_in, infer_shape=True, name='z_i_x', parallel_iterations=4)
             print '\t z_i_x:', self.z_i_x.get_shape()
-
-            self.y_bar_map_fn = lambda x: self.encoder.model(x, return_mode='y_bar_x', reuse=True)
-            self.y_bar_x = tf.map_fn(self.y_bar_map_fn, x_in, infer_shape=True, name='y_bar_x')
-            print '\t y_bar_x:', self.y_bar_x.get_shape()
 
             ## Initialize the generator
             self.x_i_hat = self.generator.model(self.z_individual)
             self.x_hat_map_fn = lambda z: self.generator.model(z, reuse=True)
-            self.x_hat_logit = tf.map_fn(self.x_hat_map_fn, self.z_i_x, infer_shape=True, name='x_hat_logit')
+            self.x_hat_logit = tf.map_fn(self.x_hat_map_fn, self.z_i_x, infer_shape=True, name='x_hat_logit', parallel_iterations=4)
             print '\t x_hat_logit:', self.x_hat_logit.get_shape()
 
             batch_size = tf.shape(x_in)[0]
@@ -225,14 +227,14 @@ class ImageBagAutoencoder(BaseModel):
             self.y_in_argmax, self.y_hat_argmax), tf.float32))
 
         ## Reconstruction loss and accuracy
-        self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+        # self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+        #     logits=self.x_hat_logit,
+        #     labels=self.x_in), axis=[2,3,4])
+        # print 'recon_loss', self.recon_loss.get_shape()
+        # self.recon_loss = tf.reduce_mean(self.recon_loss, axis=1)
+        self.recon_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
             logits=self.x_hat_logit,
-            labels=self.x_in), axis=[2,3,4])
-        # self.recon_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-        #     logits=self.x_hat_all,
-        #     labels=self.x_in_all))
-        print 'recon_loss', self.recon_loss.get_shape()
-        self.recon_loss = tf.reduce_mean(self.recon_loss, axis=1)
+            labels=self.x_in), axis=[1,2,3,4])
         print 'recon_loss', self.recon_loss.get_shape()
 
         self.loss = tf.reduce_mean(self.y_loss + self.recon_loss)
@@ -240,15 +242,20 @@ class ImageBagAutoencoder(BaseModel):
 
     def _training_ops(self):
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        self.train_op = self.optimizer.minimize(self.loss)
+        # self.train_op = [self.optimizer.minimize(self.loss)]
+
+        self.recon_train_op = self.optimizer.minimize(self.recon_loss)
+        self.y_train_op = self.optimizer.minimize(self.y_loss)
+        self.train_op = [self.recon_train_op, self.y_train_op]
+
 
 
     def train_step(self):
         self.global_step += 1
         batch_x, batch_y = next(self.dataset.iterator)
         feed_dict = {self.x_in: batch_x, self.y_in: batch_y}
-        summary_str = self.sess.run([self.train_op, self.summary_op],
-            feed_dict=feed_dict)[-1]
+        summary_str = self.sess.run([self.summary_op]+self.train_op,
+            feed_dict=feed_dict)[-0]
 
         self.summary_writer.add_summary(summary_str, self.global_step)
 
@@ -266,7 +273,7 @@ class ImageBagAutoencoder(BaseModel):
 
 
     def _summary_ops(self):
-        with tf.variable_scope('summary'):
+        with tf.variable_scope('gradients_summary'):
             if self.summarize_grads:
                 self.summary_gradient_list = []
                 grads = tf.gradients(self.loss, tf.trainable_variables())
@@ -276,6 +283,7 @@ class ImageBagAutoencoder(BaseModel):
                     self.summary_gradient_list.append(
                         tf.summary.histogram(var.name + '/gradient', grad))
 
+        with tf.variable_scope('variables_summary'):
             if self.summarize_vars:
                 self.summary_variable_list = []
                 variables = tf.trainable_variables()
@@ -283,22 +291,26 @@ class ImageBagAutoencoder(BaseModel):
                     self.summary_variable_list.append(
                         tf.summary.histogram(variable.name + '/variable', variable))
 
+        with tf.variable_scope('losses'):
             # self.loss_sum = tf.summary.scalar('y_loss', self.y_loss)
             # self.rec_loss_sum = tf.summary.scalar('rec_loss', self.recon_loss)
             self.loss_sum = tf.summary.scalar('y_loss', tf.reduce_mean(self.y_loss))
             self.rec_loss_sum = tf.summary.scalar('rec_loss', tf.reduce_mean(self.recon_loss))
             self.accuracy_sum = tf.summary.scalar('accuracy', self.accuracy)
 
+        with tf.variable_scope('endpoints'):
             self.y_hat_summary = tf.summary.histogram('y_bar_x', tf.nn.sigmoid(self.y_bar_x))
             self.y_in_summary = tf.summary.histogram('y_in', self.y_in)
             self.z_i_x_summary = tf.summary.histogram('z_i_x', self.z_i_x)
 
+        with tf.variable_scope('images'):
             self.x_in_summary = tf.summary.image('x_in', self.x_in_all)
             self.x_hat_summary = tf.summary.image('x_hat', tf.nn.sigmoid(self.x_hat_all))
 
-            self.summary_op = tf.summary.merge_all()
+        self.summary_op = tf.summary.merge_all()
 
+        with tf.variable_scope('test'):
             self.test_accuracy_sum = tf.summary.scalar('accuracy_test', self.accuracy)
-            self.test_loss_sum = tf.summary.scalar('loss_test', self.y_loss)
+            self.test_loss_sum = tf.summary.scalar('loss_test', tf.reduce_mean(self.y_loss))
             self.test_summary_op = tf.summary.merge([self.test_accuracy_sum,
                 self.test_loss_sum])

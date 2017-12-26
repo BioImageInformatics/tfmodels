@@ -6,6 +6,8 @@ class BaseGenerator(BaseModel):
         'gen_kernels': [128, 64, 64, 32],
         'name': 'generator',
         'x_dims': [256, 256, 3],
+        'project_shape': None,
+        'resize_shape': None,
         # 'z_in': None
     }
 
@@ -13,12 +15,18 @@ class BaseGenerator(BaseModel):
         self.generator_defaults.update(**kwargs)
         super(BaseGenerator, self).__init__(**self.generator_defaults)
 
-        self.n_upsamples = len(self.gen_kernels)
-
-        ## calculate the reshape size
-        lo_res_size = self.x_dims[0]//(2**self.n_upsamples)
-        self.project_shape = (lo_res_size**2) * self.gen_kernels[0]
-        self.resize_shape = [-1, lo_res_size, lo_res_size, self.gen_kernels[0]]
+        if self.project_shape is None:
+            self.n_upsamples = len(self.gen_kernels)
+            print 'Calculating projection factor for {} upsamples'.format(self.n_upsamples)
+            ## calculate the reshape size
+            lo_res_size = self.x_dims[0]//(2**self.n_upsamples)
+            self.project_shape = (lo_res_size**2) * self.gen_kernels[0]
+            self.resize_shape = [-1, lo_res_size, lo_res_size, self.gen_kernels[0]]
+        else:
+            assert self.project_shape is not None
+            assert self.resize_shape is not None
+            print 'Using projection shape: {}'.format(self.project_shape)
+            print 'Using resize shape: {}'.format(self.resize_shape)
 
 
     """ generator.model()
