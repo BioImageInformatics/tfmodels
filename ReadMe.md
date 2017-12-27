@@ -1,23 +1,24 @@
 # Tensorflow CNN's
-This library contains base methods for training various models in tensorflow using the following interface:
+This library contains base methods for training various models in [TensorFlow](https://github.com/tensorflow/tensorflow) using the following interface:
 
- ```
- import tfmodels
- dataset = tfmodels.ImageMaskDataSet(...)
- model = tfmodels.VGGTraining(datset, ...)
- for _ in ...:
-   model.train()
+```
+import tfmodels
+dataset = tfmodels.ImageMaskDataSet(...)
+model = tfmodels.VGGTraining(datset, ...)
+for _ in xrange(iterations):
+ model.train()
 
- model.snapshot()
+model.test()
+model.snapshot()
 
- result = model.inference(images)
- ```
+result = model.inference(images)
+```
 
-To implement a new model, copy-paste one of the existing models and re-implement the `model()` method.
+To implement a new `segmentation` model, copy-paste `segmentation/TEMPLATE.py` and fill in the `__init__` and `model` methods.
 
 In addition to semantic segmentation models, the library also contains base methods for training generative models including Generative Adversarial Networks and Variational Autoencoders, and for multiple-instance classifiers.
 
-**Note** the default activation (set in `tfmodels/utilities/basemodel.py`) is SeLU. Accordingly, the inputs should be scaled to `[-1.0, 1.0]` in the dataset loading functions, and we should use `tf.contrib.nn.alpha_dropout` (TensorFlow 1.4.1).
+**Note** the default activation (set in `tfmodels/utilities/basemodel.py`) is [SeLU](https://arxiv.org/abs/1706.02515). Accordingly, the inputs should be scaled to `[-1.0, 1.0]` in the dataset loading functions, and we should use `tf.contrib.nn.alpha_dropout` (TensorFlow 1.4.1).
 
 ## Versioning
 ```
@@ -29,7 +30,7 @@ opencv 3
 
 ## Getting started
 Example scripts for data set interface, training and testing various models are provided under `experiments/`.
-- N-class semantic segmentation
+- N-class semantic segmentation with various architectures (your data)
 - Generative Adversarial Networks (MNIST)
 - Variational Autoencoders (MNIST)
 - Multi-instance / bagged labels (MNIST)
