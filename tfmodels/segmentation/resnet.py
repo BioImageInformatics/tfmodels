@@ -16,7 +16,7 @@ class ResNet(SegmentationBaseModel):
     base_defaults={
         'kernels': [64, 64, 64, 128],
         'k_size': 3,
-        'modules': 4,
+        # 'modules': 4,
         'name': 'resnet',
         'stacks': 5,
     }
@@ -76,7 +76,7 @@ class ResNet(SegmentationBaseModel):
         print 'Resnet Model'
         k_size = self.k_size
         nonlin = self.nonlin
-        print 'Non-linearity:', nonlin
+        # print 'Non-linearity:', nonlin
 
         with tf.variable_scope(self.name) as scope:
             if reuse:
@@ -85,31 +85,35 @@ class ResNet(SegmentationBaseModel):
 
             p0 = nonlin(conv(x_in, self.kernels[0], stride=2, k_size=7, var_scope='p0', selu=1))
             signal = tf.nn.max_pool(p0, [1,2,2,1], [1,2,2,1], padding='VALID', name='pool_p0')
-            print '\t signal', signal.get_shape()
+            # print '\t signal', signal.get_shape()
 
             for block in xrange(self.modules-1):
                 block_name = 'r{}_residual'.format(block)
-                print 'Block name', block_name
+                # print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],
                     block=block, stacks=self.stacks, name_scope='r')
+                # signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
                 signal = conv(signal, self.kernels[block+1], stride=2, k_size=1,
                     var_scope=block_name)
-                print '\t {}'.format(block_name), signal.get_shape()
+                signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
+                # print '\t {}'.format(block_name), signal.get_shape()
 
             signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
             signal = self._residual_block(signal, self.kernels[-1], block=self.modules-1,
                 stacks=self.stacks, name_scope='r')
-            print '\t intermediate: ', signal.get_shape()
+            # print '\t intermediate: ', signal.get_shape()
             signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
 
             for block in xrange(self.modules-1, 0, -1):
                 block_name = 'd{}_residual'.format(block)
-                print 'Block name', block_name
+                # print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],
                     block=block, stacks=self.stacks, name_scope='d')
+                # signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
                 signal = deconv(signal, self.kernels[block-1], upsample_rate=2, k_size=1,
                     var_scope=block_name)
-                print '\t {}'.format(block_name), signal.get_shape()
+                signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
+                # print '\t {}'.format(block_name), signal.get_shape()
 
             d0 = self._residual_block(signal, self.kernels[0], block=0,
                 stacks=self.stacks, name_scope='d')

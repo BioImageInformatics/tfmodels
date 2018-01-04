@@ -15,53 +15,53 @@ config.gpu_options.allow_growth = True
 
 data_home = '/home/nathan/histo-seg/semantic-pca/data/train_combo'
 # data_home = '/home/chen/env/nathan_tf/data'
-# image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 300
 batch_size = 64
 # iterations = 500/batch_size
 iterations = 1000
-snapshot_epochs = 50
+snapshot_epochs = 10
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca5Xresnet_20180103/logs/{}'.format(expdate)
-save_dir         = 'pca5Xresnet_20180103/snapshots'
-debug_dir        = 'pca5Xresnet_20180103/debug'
-snapshot_restore = 'pca5Xresnet_20171229/snapshots/resnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca5Xdensenet_20180103/logs/{}'.format(expdate)
+save_dir         = 'pca5Xdensenet_20180103/snapshots'
+debug_dir        = 'pca5Xdensenet_20180103/debug'
+snapshot_restore = 'pca5Xdensenet_20180103/snapshots/resnet.ckpt-{}'.format(step_start)
 
-min_holding = 500
-threads = 8
+min_holding = 1000
+threads = 6
 
 with tf.Session(config=config) as sess:
-    dataset = tfmodels.ImageComboDataSet(batch_size=batch_size,
-        image_dir=data_home,
-        image_ext='png',
-        capacity=min_holding + (threads+1)*batch_size,
-        min_holding=min_holding,
-        threads=threads,
-        crop_size=1024,
-        ratio=0.25,
-        augmentation='random')
+    dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
+        image_dir= data_home,
+        image_ext= 'png',
+        capacity= min_holding + (threads+1)*batch_size,
+        min_holding= min_holding,
+        threads= threads,
+        crop_size= 512,
+        ratio= 0.25,
+        augmentation= 'random')
     dataset.print_info()
 
     # model = tfmodels.ResNetTraining(sess=sess,
-    model = tfmodels.ResNetTraining(sess=sess,
+    model = tfmodels.DenseNetTraining(sess=sess,
         #class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
         dataset=dataset,
-        global_step=step_start,
-        k_size=3,
-        kernels=[32, 32, 64],
-        learning_rate=1e-4,
-        log_dir=log_dir,
-        n_classes=4,
-        save_dir=save_dir,
-        stacks=7,
-        summarize_grads=False,
-        summary_iters=20,
-        summary_image_iters=500,
-        x_dims=[256, 256, 3],)
+        global_step= step_start,
+        k_size= 3,
+        dense_stacks= [4, 4, 4, 4, 4],
+        growth_rate= 32,
+        learning_rate= 1e-4,
+        log_dir= log_dir,
+        n_classes= 4,
+        save_dir= save_dir,
+        summarize_grads= False,
+        summarize_vars=  False,
+        summary_iters= 20,
+        summary_image_iters= 250,
+        x_dims= [128, 128, 3],)
     model.print_info()
 
     if step_start > 0:
@@ -96,7 +96,7 @@ with tf.Session(config=config) as sess:
 
         print 'Starting at step {}'.format(model.global_step)
         global_step = step_start
-        for epx in xrange(1, epochs+1):
+        for epx in xrange(1, epochs):
             epoch_start = time.time()
             for itx in xrange(iterations):
                 # global_step += 1

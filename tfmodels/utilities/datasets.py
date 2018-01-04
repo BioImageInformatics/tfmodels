@@ -496,9 +496,9 @@ class ImageComboDataSet(DataSet):
 
                 # image = tf.multiply(image, 2/255.0)-1
                 image = tf.image.random_brightness(image, max_delta=0.1)
-                image = tf.image.random_contrast(image, lower=0.75, upper=0.9)
+                # image = tf.image.random_contrast(image, lower=0.7, upper=1.0)
                 image = tf.image.random_hue(image, max_delta=0.1)
-                image = tf.image.random_saturation(image, lower=0.75, upper=0.85)
+                # image = tf.image.random_saturation(image, lower=0.7, upper=1.0)
             else:
                 image, mask = tf.split(image_mask, [3,1], axis=-1)
 
