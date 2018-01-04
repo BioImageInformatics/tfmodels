@@ -16,7 +16,7 @@ class SegmentationBaseModel(BaseModel):
         'conv_kernels': [32, 64, 128, 256],
         'dataset': None,
         'deconv_kernels': [32, 64],
-        'epistemic': False, ## https://arxiv.org/abs/1703.04977
+        'aleatoric': False, ## https://arxiv.org/abs/1703.04977
         'global_step': 0,
         'k_size': 3,
         'learning_rate': 1e-3,
@@ -75,8 +75,12 @@ class SegmentationBaseModel(BaseModel):
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
         self.training = tf.placeholder_with_default(True, shape=[], name='training')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
-            training=self.training)
+        if self.aleatoric:
+            self.y_hat, self.sigma = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
+                training=self.training)
+        else:
+            self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
+                training=self.training)
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
         self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
         self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
@@ -177,41 +181,135 @@ class SegmentationBaseModel(BaseModel):
         raise Exception(NotImplementedError)
 
 
-    ## define self.seg_loss
     def _class_weighted_loss(self):
-        pass
+        ## https://github.com/tensorflow/tensorflow/issues/10021
+        sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), -1)
+        print '\t segmentation losses sample_weights:', sample_weights
+        seg_loss = tf.losses.softmax_cross_entropy(onehot_labels=self.y_in,
+            logits=self.y_hat, weights=sample_weights)
+        print '\t segmentation losses seg_loss:', seg_loss
+        return seg_loss
+
 
     ## define self.seg_loss
-    def _epistemic_uncertainty(self):
-        pass
+    def _segmentation_loss(self):
+        if self.class_weights:
+            self.seg_loss = self._class_weighted_loss()
+        else:
+            self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
+                labels=self.y_in, logits=self.y_hat)
+            self.seg_loss = tf.reduce_mean(self.seg_loss)
+
+
+    ## define self.seg_loss
+    def _heteroscedastic_aleatoric_loss(self):
+        assert self.sigma is not None, 'Model does not have attribute sigma. Define sigma in model()'
+
+        T = 25
+        print 'Setting up heteroscedastic aleatoric loss:'
+        ## Make a summary for sigma
+        self.sigma_summary = tf.summary.histogram('sigma', self.sigma)
+        self.summary_op_list.append(self.sigma_summary)
+
+        with tf.variable_scope('aleatoric') as scope:
+            ## (batch_size, h*w, n_classes)
+            sigma_v = tf.reshape(self.sigma, [-1, np.prod(self.x_dims[:2]), 1])
+            dist = tf.distributions.Normal(loc=0.0, scale=sigma_v, name='dist')
+            y_hat_v = tf.reshape(self.y_hat, [-1, np.prod(self.x_dims[:2]), self.n_classes])
+            y_in_v = tf.reshape(self.y_in, [-1, np.prod(self.x_dims[:2]), self.n_classes])
+
+            print '\t sigma_v', sigma_v.get_shape()
+            print '\t y_hat_v', y_hat_v.get_shape()
+            print '\t y_in_v', y_in_v.get_shape()
+
+            def _corrupt_with_noise(yhat, dist):
+                ## sample is the same shape as the sigma output
+                ## LOL
+                epsilon = tf.transpose(dist.sample(self.n_classes), perm=[1,2,0,3])
+                epsilon = tf.squeeze(epsilon)
+                return yhat + epsilon
+
+            def loss_fn(yhat):
+                y_hat_eps = _corrupt_with_noise(yhat, dist)
+                print '\t y_hat_eps', y_hat_eps.get_shape()
+
+                loss = tf.nn.softmax_cross_entropy_with_logits(labels=y_in_v, logits=y_hat_eps)
+                print '\t loss', loss.get_shape()
+
+                # y_hat_c = tf.reduce_sum(y_hat_eps * y_in_v, axis=-1, keep_dims=True)
+                # print 'y_hat_c', y_hat_c.get_shape()
+                #
+                # y_hat_c = tf.tile(y_hat_c, [1, 1, self.n_classes])
+                # print 'y_hat_c', y_hat_c.get_shape()
+
+                # return tf.reduce_logsumexp(y_hat_eps - y_hat_c, 1, name='delta')
+                return loss
+
+            y_hat_tile = tf.tile(tf.expand_dims(y_hat_v, 0), [T,1,1,1], name='y_hat_tile')
+            print 'y_hat_tile', y_hat_tile.get_shape()
+
+            loss_fn_map = lambda x: loss_fn(x)
+            losses = tf.map_fn(loss_fn_map, y_hat_tile)
+            print 'losses', losses.get_shape()
+
+            ## Sum over classes
+            # loss = tf.reduce_sum(losses, axis=-1)
+            # print 'loss', loss.get_shape()
+
+            ## Average over pixels
+            # loss = tf.reduce_mean(loss, axis=-1)
+
+            ## Average over batch, pixels and T
+            self.seg_loss = tf.reduce_mean(losses)
+
 
     ## define self.loss
     def _adversarial_feature_matching_loss(self):
-        pass
+        ## Feature matching style -- I have it set to always to _adversarial_loss()
+        ## and then add this to the end of it
+        print 'Setting up adversarial feature matching'
+        features_fake = self.discriminator.fake_features
+        features_real = self.discriminator.real_features
+
+        self.adv_feature_loss = tf.losses.mean_squared_error(
+            labels=features_real, predictions=features_fake )
+
+        self.adv_feature_loss_sum = tf.summary.scalar(
+            'adv_feature_loss', self.adv_feature_loss)
+        self.summary_op_list.append(self.adv_feature_loss_sum)
+
+        ## Combined segmentation and adversarial terms
+        ## Replace the old self.loss
+        self.loss = self.seg_loss + \
+            self.adversary_lambda * self.adv_feature_loss + \
+            self.adversary_lambda * self.adv_loss
+
 
     ## define self.loss
     def _adversarial_loss(self):
-        pass
+        ## Straight up maximize p(real | g(z))
+        p_real_fake = self.discriminator.p_real_fake
+        real_target = tf.ones_like(p_real_fake)
+        self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=real_target, logits=p_real_fake)
+        self.adv_loss = tf.reduce_mean(self.adv_loss)
 
-    ## TODO split into sub-categories
+        self.adv_loss_sum = tf.summary.scalar('adv_loss', self.adv_loss)
+        self.summary_op_list.append(self.adv_loss_sum)
+
+        self.loss = self.seg_loss + \
+            self.adversary_lambda * self.adv_loss
+
+
     def make_training_ops(self):
         with tf.name_scope('segmentation_losses'):
-            if self.class_weights:
-                ## https://github.com/tensorflow/tensorflow/issues/10021
-                sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), -1)
-                print '\t segmentation losses sample_weights:', sample_weights
-                self.seg_loss = tf.losses.softmax_cross_entropy(onehot_labels=self.y_in,
-                    logits=self.y_hat, weights=sample_weights)
-                print '\t segmentation losses seg_loss:', self.seg_loss
-
-                # self.seg_loss = class_weighted_pixelwise_crossentropy(
-                #     labels=self.y_in, logits=self.y_hat, weights=self.class_weights)
-                # self.seg_loss = tf.reduce_mean(self.seg_loss)
-                # print '\t segmentation losses seg_loss:', self.seg_loss
+            ## Logic to define the correct version of segmentation loss
+            ## BUG if aleatoric is requested, the constructor will ignore
+            ##  the request for weighted classes
+            if self.aleatoric:
+                self._heteroscedastic_aleatoric_loss()
             else:
-                self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
-                    labels=self.y_in, logits=self.y_hat)
-                self.seg_loss = tf.reduce_mean(self.seg_loss)
+                self._segmentation_loss()
 
             ## Unused except in pretraining or specificially requested
             self.seg_training_op = self.optimizer.minimize(
@@ -220,48 +318,17 @@ class SegmentationBaseModel(BaseModel):
             self.seg_loss_sum = tf.summary.scalar('seg_loss', self.seg_loss)
             self.summary_op_list.append(self.seg_loss_sum)
 
+            ## Make self.loss operation with combinations of different losses
             if self.adversary:
                 ## Train the generator w.r.t. the current discriminator
                 ## The discriminator itself is updated elsewhere
-                p_real_fake = self.discriminator.p_real_fake
-                real_target = tf.ones_like(p_real_fake)
-                self.adv_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=real_target, logits=p_real_fake)
-                self.adv_loss = tf.reduce_mean(self.adv_loss)
-
-                self.adv_loss_sum = tf.summary.scalar('adv_loss', self.adv_loss)
-                self.summary_op_list.append(self.adv_loss_sum)
-
-                ## Combined segmentation and adversarial terms
-                self.loss = self.seg_loss + \
-                    self.adversary_lambda * self.adv_loss
+                self._adversarial_loss()
 
                 ## Alternative feature matching term
                 if self.adversary_feature_matching:
-                    print 'Setting up adversarial feature matching'
-                    features_fake = self.discriminator.fake_features
-                    features_real = self.discriminator.real_features
-
-                    self.adv_feature_loss = tf.losses.mean_squared_error(
-                        labels=features_real, predictions=features_fake )
-
-                    self.adv_feature_loss_sum = tf.summary.scalar(
-                        'adv_feature_loss', self.adv_feature_loss)
-                    self.summary_op_list.append(self.adv_feature_loss_sum)
-
-                    ## Combined segmentation and adversarial terms
-                    self.loss = self.seg_loss + \
-                        self.adversary_lambda * self.adv_feature_loss + \
-                        self.adversary_lambda * self.adv_loss
-
-                    ## Separate ops for the two losses
-                    # self.adv_feature_training_op = self.optimizer.minimize(
-                    #     self.adv_feature_loss, var_list=self.var_list)
-                    # self.training_op_list.append(self.adv_feature_training_op)
-                    # self.loss = self.seg_loss
-
-                # self.training_op_list.append(self.discriminator.train_op)
+                    self._adversarial_feature_matching_loss()
             else:
+                ## No special
                 self.loss = self.seg_loss
 
             self.train_op = self.optimizer.minimize(
@@ -296,8 +363,8 @@ class SegmentationBaseModel(BaseModel):
             if self.global_step % self.summary_image_iters == 0:
                 self._write_scalar_summaries()
 
-    def summaries(self):
 
+    def summaries(self):
         ## https://github.com/aymericdamien/ \
         ## TensorFlow-Examples/blob/master/examples/4_Utils/tensorboard_advanced.py
         if self.summarize_grads:
@@ -350,9 +417,9 @@ class SegmentationBaseModel(BaseModel):
             self._write_image_summaries()
 
     def _write_scalar_summaries(self):
-        print '[{:07d}] writing scalar summaries'.format(self.global_step)
-        summary_str = self.sess.run(self.summary_scalars_op)
+        summary_str, seg_loss_ = self.sess.run([self.summary_scalars_op, self.seg_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
+        print '[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, seg_loss_)
 
     def _write_image_summaries(self):
         print '[{:07d}] writing image summaries'.format(self.global_step)

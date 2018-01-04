@@ -96,8 +96,8 @@ class BaseModel(object):
         print '------------------------ {} ---------------------- '.format(self.name)
         print '|\t\t TIMESTAMP: {}'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
         for key, value in sorted(self.__dict__.items()):
-            # if '_op' in key:
-            #     continue
+            if '_op' in key:
+                continue
 
             if 'list' in key:
                 print '|\t{}:'.format(key)
@@ -113,8 +113,8 @@ class BaseModel(object):
             f.write('---------------------- {} ----------------------\n'.format(self.name))
             f.write('|\t\t TIMESTAMP: {}\n'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")))
             for key, value in sorted(self.__dict__.items()):
-                # if '_op' in key:
-                #     continue
+                if '_op' in key:
+                    continue
 
                 if 'list' in key:
                     f.write('|\t{}:\n'.format(key))

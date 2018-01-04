@@ -18,11 +18,11 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/_data_origin'
 image_dir = '{}/combo'.format(data_home)
 
 ## ------------------ Hyperparameters --------------------- ##
-epochs = 100
-batch_size = 72
+epochs = 200
+batch_size = 128
 # iterations = 500/batch_size
 iterations = 1000
-snapshot_epochs = 10
+snapshot_epochs = 5
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
@@ -52,12 +52,11 @@ with tf.Session(config=config) as sess:
         dataset=dataset,
         global_step=step_start,
         k_size=3,
-        kernels=[64, 64, 64, 128, 128],
         learning_rate=1e-4,
         log_dir=log_dir,
         n_classes=4,
         save_dir=save_dir,
-        stacks=7,
+        stacks=5,
         summarize_grads=False,
         summary_iters=100,
         summary_image_iters=500,

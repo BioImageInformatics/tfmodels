@@ -8,7 +8,7 @@ x. option to log gradients
 
 Segmentation
 x. Change resnet model to programatically create the model
--. Epistemic uncertainty mode in SegmentationBaseModel
+-. aleatoric uncertainty mode in SegmentationBaseModel
 -. Implement real FCN-8s model
 
 

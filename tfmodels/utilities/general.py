@@ -54,28 +54,33 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5):
 In case images and masks exist as separate files, this script will fuse them
 into a 4-channel (RGBA-like) image.
 """
-def write_image_mask_combos(img_src_dir=None,
+def write_image_mask_combos(img_src_dir,
+    mask_src_dir,
+    save_dir,
     img_src_ext='jpg',
-    mask_src_dir=None,
     mask_src_ext='png',
-    save_dir=None,
-    save_ext='png'):
+    save_ext='png',
+    adjust_label=False):
 
     img_list = sorted(glob.glob(os.path.join(
         img_src_dir, '*.'+img_src_ext )))
     mask_list = sorted(glob.glob(os.path.join(
         mask_src_dir, '*.'+mask_src_ext )))
 
+    ## TODO add check for name equality
     for img, mask in zip(img_list, mask_list):
         outname = img.replace(img_src_dir, save_dir).replace(img_src_ext, save_ext)
         img_ = cv2.imread(img, -1)
-        mask_ = cv2.imread(mask, -1)
+        mask_ = cv2.imread(mask, 0)
         mask_ = np.expand_dims(mask_, -1)
+
+        if adjust_label:
+            mask_ /= adjust_label
 
         img_mask = np.concatenate([img_, mask_], axis=-1)
 
         success = cv2.imwrite(outname, img_mask)
-        print img_mask.shape, img_mask.dtype, outname
+        print img_mask.shape, img_mask.dtype, outname, np.unique(mask_)
 
 
 """

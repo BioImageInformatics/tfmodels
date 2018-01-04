@@ -16,7 +16,6 @@ class ResNet(SegmentationBaseModel):
     base_defaults={
         'kernels': [64, 64, 64, 128],
         'k_size': 3,
-        'modules': 4,
         'name': 'resnet',
         'stacks': 5,
     }
@@ -113,17 +112,17 @@ class ResNet(SegmentationBaseModel):
 
             d0 = self._residual_block(signal, self.kernels[0], block=0,
                 stacks=self.stacks, name_scope='d')
-            d0_residual = deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
-                var_scope='d0_residual')
+            d0_residual = nonlin(deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
+                var_scope='d0_residual'))
 
 
             y_hat = deconv(d0_residual, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape()
 
             ## New logic at the end of model building
-            if self.epistemic:
-                sigma_branch = deconv(d0, 1, upsample_rate=2, k_size=3, var_scope='sigma')
-                return y_hat, sigma_branch
+            if self.aleatoric:
+                sigma = deconv(d0_residual, 1, upsample_rate=2, k_size=3, var_scope='sigma')
+                return y_hat, sigma
             else:
                 return y_hat
 
