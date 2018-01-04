@@ -18,20 +18,20 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/train_combo'
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 300
-batch_size = 32
+batch_size = 64
 # iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 10
 step_start = 0
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca5X_densenet/logs/{}'.format(expdate)
-save_dir         = 'pca5X_densenet/snapshots'
-debug_dir        = 'pca5X_densenet/debug'
-snapshot_restore = 'pca5X_densenet/snapshots/resnet.ckpt-{}'.format(step_start)
+log_dir          = 'pca5Xdensenet_20180103/logs/{}'.format(expdate)
+save_dir         = 'pca5Xdensenet_20180103/snapshots'
+debug_dir        = 'pca5Xdensenet_20180103/debug'
+snapshot_restore = 'pca5Xdensenet_20180103/snapshots/resnet.ckpt-{}'.format(step_start)
 
-min_holding = 500
-threads = 4
+min_holding = 1000
+threads = 6
 
 with tf.Session(config=config) as sess:
     dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
@@ -51,16 +51,16 @@ with tf.Session(config=config) as sess:
         dataset=dataset,
         global_step= step_start,
         k_size= 3,
-        dense_stacks= [4, 4, 4, 8, 16],
-        growth_rate= 16,
-        learning_rate= 1e-5,
+        dense_stacks= [4, 4, 4, 4, 4],
+        growth_rate= 32,
+        learning_rate= 1e-4,
         log_dir= log_dir,
         n_classes= 4,
         save_dir= save_dir,
-        summarize_grads= True,
-        summarize_vars= True,
-        summary_iters= 10,
-        summary_image_iters= 10,
+        summarize_grads= False,
+        summarize_vars=  False,
+        summary_iters= 20,
+        summary_image_iters= 250,
         x_dims= [128, 128, 3],)
     model.print_info()
 
