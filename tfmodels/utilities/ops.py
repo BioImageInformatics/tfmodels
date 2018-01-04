@@ -1,10 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-""" Ops from:
-
+""" Ops based on:
 https://raw.githubusercontent.com/carpedm20/DCGAN-tensorflow/master/ops.py
-(the most popular DCGAN implementation on github)
 """
 
 def selu_initializer(shape):
@@ -26,7 +24,7 @@ def conv_cond_concat(x, y):
 
 def weight_variable(shape, name='weight',
     initializer=tf.contrib.layers.xavier_initializer(uniform=False),
-    selu=False):
+    selu=True):
 
     if selu:
         initializer = selu_initializer(shape)
@@ -52,27 +50,32 @@ def linear(features, n_output, var_scope='linear', no_bias=False,
             bias = bias_variable(n_output, name='b')
             out = tf.matmul(features, weight) + bias
 
-        print '\t {} dense: {}'.format(var_scope, out.get_shape())
+        print '\t {} dense: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 
-def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv', selu=True):
+def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv', selu=True, no_bias=False):
     ## Check features is 4D
     with tf.variable_scope(var_scope) as scope:
         dim_in = features.get_shape().as_list()[-1]
         weight_shape = [k_size, k_size, dim_in, n_kernel]
         weight = weight_variable(weight_shape, name='w', selu=selu)
-        bias = bias_variable([n_kernel], name='b')
 
         ## WHYY
         out = tf.nn.conv2d(features, weight, strides=[1, stride, stride, 1],
             padding=pad)
-        oH, oW, oC = out.get_shape().as_list()[1:]
-        out = tf.reshape(tf.nn.bias_add(out, bias), [-1, oH, oW, oC])
-        print '\t {} conv: {}'.format(var_scope, out.get_shape())
+
+        if no_bias:
+            pass
+        else:
+            oH, oW, oC = out.get_shape().as_list()[1:]
+            bias = bias_variable([n_kernel], name='b')
+            out = tf.reshape(tf.nn.bias_add(out, bias), [-1, oH, oW, oC])
+
+        print '\t {} conv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 
 def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
-    var_scope='deconv', selu=True):
+    var_scope='deconv', selu=True, no_bias=False):
     with tf.variable_scope(var_scope) as scope:
         dim_h_in, dim_w_in, dim_k_in = features.get_shape().as_list()[1:]
         ## output must be whole numbered
@@ -84,14 +87,18 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME',
 
         weight_shape = [k_size, k_size, n_kernel, dim_k_in]
         weight = weight_variable(weight_shape, name='w', selu=selu)
-        bias = bias_variable([n_kernel], name='b')
 
         ## why
         out = tf.nn.conv2d_transpose(features, weight, output_shape=output_shape,
             strides=[1, upsample_rate, upsample_rate, 1], padding=pad)
-        # out_shape = tf.shape(out)
-        out = tf.reshape(tf.nn.bias_add(out, bias), [-1, out_h, out_w, n_kernel])
-        print '\t {} deconv: {}'.format(var_scope, out.get_shape())
+
+        if no_bias:
+            pass
+        else:
+            bias = bias_variable([n_kernel], name='b')
+            out = tf.reshape(tf.nn.bias_add(out, bias), [-1, out_h, out_w, n_kernel])
+
+        print '\t {} deconv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 
 ## BUG batch norm with trainig
@@ -106,24 +113,25 @@ def lrelu(features, alpha=0.2):
     return tf.maximum(features*alpha, features)
 
 ## https://github.com/tensorflow/tensorflow/issues/2169 // @ThomasWollmann
-def unpool(pool, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
+## I find it functional, but kind of sluggish
+def unpool(features, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
     """
        Unpooling layer after max_pool_with_argmax.
        Args:
-           pool:     max pooled output tensor
+           features:     max pooled output tensor
            ind:      argmax indices
-           k_size:   k_size is the same as for the pool
+           k_size:   k_size is the same as for the features
        Return:
            unpool:   unpooling tensor
     """
     with tf.variable_scope(var_scope) as scope:
-        input_shape = tf.shape(pool)
+        input_shape = tf.shape(features)
         output_shape = [input_shape[0], input_shape[1] * k_size[1], input_shape[2] * k_size[2], input_shape[3]]
 
         flat_input_size = tf.reduce_prod(input_shape)
         flat_output_shape = [output_shape[0], output_shape[1] * output_shape[2] * output_shape[3]]
 
-        pool_ = tf.reshape(pool, [flat_input_size])
+        pool_ = tf.reshape(features, [flat_input_size])
         batch_range = tf.reshape(tf.range(tf.cast(output_shape[0], tf.int64), dtype=ind.dtype),
                                           shape=[input_shape[0], 1, 1, 1])
         b = tf.ones_like(ind) * batch_range
@@ -131,15 +139,15 @@ def unpool(pool, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
         ind_ = tf.reshape(ind, [flat_input_size, 1])
         ind_ = tf.concat([b1, ind_], 1)
 
-        ret = tf.scatter_nd(ind_, pool_, shape=tf.cast(flat_output_shape, tf.int64))
-        ret = tf.reshape(ret, output_shape)
+        out = tf.scatter_nd(ind_, pool_, shape=tf.cast(flat_output_shape, tf.int64))
+        out = tf.reshape(out, output_shape)
 
-        set_input_shape = pool.get_shape()
+        set_input_shape = features.get_shape()
         set_output_shape = [set_input_shape[0], set_input_shape[1] * k_size[1], set_input_shape[2] * k_size[2], set_input_shape[3]]
-        ret.set_shape(set_output_shape)
+        out.set_shape(set_output_shape)
 
-        print '\t {} unpool: {}'.format(var_scope, ret.get_shape())
-        return ret
+        print '\t {} unpool: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        return out
 #
 # def class_weighted_pixelwise_crossentropy(labels, logits, weights=1):
 #     sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.classweights), -1)
