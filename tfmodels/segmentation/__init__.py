@@ -4,6 +4,7 @@ from segnet import SegNetTraining, SegNetInference
 from vgg import VGGTraining, VGGInference
 from fcn8s import FCNTraining, FCNInference
 from resnet import ResNetTraining, ResNetInference
+from densenet import DenseNetTraining, DenseNetInference
 # from resnet_bottleneck import ResNetBottleneckTraining, ResNetBottleneckInference
 
 
@@ -16,4 +17,6 @@ __all__ = ['SegmentationDiscriminator',
            'FCNInference',
            'ResNetTraining',
            'ResNetInference',
+           'DenseNetTraining',
+           'DenseNetInference',
        ]
