@@ -1,31 +1,18 @@
 # Tensorflow CNN's
-This library contains base methods for training various models in [TensorFlow](https://github.com/tensorflow/tensorflow) using the following interface:
+Library aiming to aid with quick experimentation for new CNN architectures and training schemes using basic TensorFlow.
 
-```
-import tfmodels
-dataset = tfmodels.ImageMaskDataSet(...)
-model = tfmodels.VGGTraining(datset, ...)
-for _ in xrange(iterations):
- model.train()
+The focus began as a library for constructing, training, and doing inference with, semantic segmentation CNN's.
+In addition to semantic segmentation models, the library also contains base methods for training generative models on image datasets, including Generative Adversarial Networks and Variational Autoencoders.
+Additionally, there is some support for image classification tasks.
 
-model.test()
-model.snapshot()
-
-result = model.inference(images)
-```
-
-To implement a new `segmentation` model, copy-paste `segmentation/TEMPLATE.py` and fill in the `__init__` and `model` methods.
-
-In addition to semantic segmentation models, the library also contains base methods for training generative models including Generative Adversarial Networks and Variational Autoencoders, and for multiple-instance classifiers.
-
-**Note** the default activation (set in `tfmodels/utilities/basemodel.py`) is [SeLU](https://arxiv.org/abs/1706.02515). Accordingly, the inputs should be scaled to `[-1.0, 1.0]` in the dataset loading functions, and we should use `tf.contrib.nn.alpha_dropout` (TensorFlow 1.4.1).
+**Note** instead of using batch norm everywhere, the default activation (see `tfmodels/utilities/basemodel.py`) is SeLU. Accordingly, the inputs should be scaled to `[-1.0, 1.0]` in the dataset loading functions, and models should use `tf.contrib.nn.alpha_dropout` (TensorFlow 1.4.1).
 
 ## Versioning
 ```
-Python 2.7 ## Python 3.5 migration planned
-TensorFlow 1.4
-numpy
-opencv 3
+Python 2.7.12
+TensorFlow 1.4.1
+numpy 1.13.3
+opencv 3.3.0
 ```
 
 ## Getting started
@@ -37,10 +24,47 @@ Example scripts for data set interface, training and testing various models are 
 
 
 ## Modules
-- `multi`: multi-instance classification and applications
+- `multi`: multi-instance classification
 - `generative`: generative models like VAE's and GAN's
-- `segmentation`: special case of conditional generative models.
+- `segmentation`: special case of fully-supervised conditional generative models.
+  - Fully Convolutional Networks (VGG base)
+  - SegNet (VGG base with guided upsampling)
+  - VGG (without skip connections)
+  - Fully Convolutional ResNets
+  - Fully Convolutional DenseNets
+
+To create a segmentation network, first define a dataset from a directory on disk (see below), then initialize the model and a training loop.
+Each segmentation model comes with two child classes: `*Training` and `*Inference`.
+The difference is the required inputs, and training ops are not instantiated when using the `*Inference` versions (check memory savings/initialization times?).
+The `experiments` directory contains examples for training some of the models.
+
+For example:
+
+```
+import tfmodels
+import tensorflow as tf
+
+## Define training settings, batch_size, data_path, training iterations/epochs, etc.
+
+dataset = tfmodels.ImageComboDataSet(batch_size=batch_size, image_dir=data_path, ...)
+
+with tf.Session() as sess:
+  model = tfmodels.DenseNetTraining(sess=sess, dataset=dataset, ...)
+
+  for iter in xrange(n_iters):
+    model.train_step()
+
+...
+```
+
 - `utilities`: useful classes and functions
+  - Test segmentation models
+  - Datasets
+
+Datasets, I suspect due to some race conditions when multithreading, are a little special.
+In the case we have a fixed number of images, and appropriately matching masks, the `ImageComboDataSet()` class expects a directory with the 3-channel image, and the 1-channel label concatenated together.
+Furthermore, it expects all images in this directory to share the same height and width.
+To ease this burden, there is a helper function, `tfmodels.write_image_mask_combos()` that will combine two directories of images and labels into the necessary 4-channel combination.
 
 
 ### Bugs
@@ -64,5 +88,3 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-This work was supported by the departments of Surgery and Biomedical Sciences at Cedars Sinai Medical Center, Los Angeles, CA

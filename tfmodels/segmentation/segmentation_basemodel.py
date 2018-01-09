@@ -144,6 +144,12 @@ class SegmentationBaseModel(BaseModel):
         self.sess.run(tf.global_variables_initializer())
 
 
+    """ function for approximate bayesian inference via dropout
+
+    if ret_all is true, then we return the mean and variance
+    if ret_all is false, then we return just the mean, similar to returning
+        a single y_hat_
+    """
     def bayesian_inference(self, x_in, samples=25, keep_prob=0.5, ret_all=False):
         assert keep_prob < 1.0
         assert samples > 1
@@ -156,9 +162,9 @@ class SegmentationBaseModel(BaseModel):
 
         if ret_all:
             y_bar_var = np.var(y_hat, axis=0)
-            y_bar_argmax = np.argmax(y_bar_mean, axis=-1)
-            y_bar_argmax = np.expand_dims(y_bar_argmax, 0)
-            return y_bar_mean, y_bar_var, y_bar_argmax
+            # y_bar_argmax = np.argmax(y_bar_mean, axis=-1)
+            # y_bar_argmax = np.expand_dims(y_bar_argmax, 0)
+            return y_bar_mean, y_bar_var
         else:
             return y_bar_mean
 

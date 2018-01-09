@@ -54,20 +54,17 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5):
 In case images and masks exist as separate files, this script will fuse them
 into a 4-channel (RGBA-like) image.
 """
-def write_image_mask_combos(img_src_dir,
-    mask_src_dir,
-    save_dir,
+def write_image_mask_combos(img_src_dir, mask_src_dir, save_dir,
     img_src_ext='jpg',
     mask_src_ext='png',
-    save_ext='png',
-    adjust_label=False):
+    save_ext='png'):
 
     img_list = sorted(glob.glob(os.path.join(
         img_src_dir, '*.'+img_src_ext )))
     mask_list = sorted(glob.glob(os.path.join(
         mask_src_dir, '*.'+mask_src_ext )))
 
-    ## TODO add check for name equality
+    counter = 0
     for img, mask in zip(img_list, mask_list):
         outname = img.replace(img_src_dir, save_dir).replace(img_src_ext, save_ext)
         img_ = cv2.imread(img, -1)
@@ -80,7 +77,8 @@ def write_image_mask_combos(img_src_dir,
         img_mask = np.concatenate([img_, mask_], axis=-1)
 
         success = cv2.imwrite(outname, img_mask)
-        print img_mask.shape, img_mask.dtype, outname, np.unique(mask_)
+        print counter, img_mask.shape, img_mask.dtype, outname
+        counter += 1
 
 
 """
@@ -88,8 +86,11 @@ Convenience function for performing a test
 """
 def test_bayesian_inference(model, test_x_list, output_dir, keep_prob=0.5, samples=50):
     for test_idx, test_img in enumerate(test_x_list):
-        y_bar_mean, y_bar_var, y_bar = model.bayesian_inference(test_img,
+        y_bar_mean, y_bar_var = model.bayesian_inference(test_img,
             samples, keep_prob=keep_prob, ret_all=True)
+        y_bar = np.argmax(y_bar_mean, axis=-1)
+        y_bar = np.expand_dims(y_bar, 0)
+
         save_image_stack(y_bar, output_dir, prefix='y_bar_{:04d}'.format(test_idx),
             scale=3, ext='png', stack_axis=0)
         save_image_stack(y_bar_mean, output_dir, prefix='y_mean_{:04d}'.format(test_idx),
