@@ -50,7 +50,7 @@ class DenseNet(SegmentationBaseModel):
     Given x_0 ~ (batch_size, h, w, k_in)
     Return x_i ~ (batch_size, h, w, k_in + stacks*growth_rate)
     """
-    def _dense_block(self, x_flow, n_layers, concat_input=True, keep_prob=0.2, block_num=0, name_scope='dense'):
+    def _dense_block(self, x_flow, n_layers, concat_input=True, keep_prob=0.8, block_num=0, name_scope='dense'):
         nonlin = self.nonlin
         conv_settings = {'n_kernel': self.growth_rate, 'stride': 1, 'k_size': self.k_size, 'no_bias': 0}
         conv_settings_b = {'n_kernel': self.growth_rate*4, 'stride': 1, 'k_size': 1, 'no_bias': 0}
@@ -63,6 +63,7 @@ class DenseNet(SegmentationBaseModel):
                 layer_name = 'd{}_l{}'.format(block_num, l_i)
                 x_b = nonlin(conv(x_flow, var_scope=layer_name+'b', **conv_settings_b))
                 x_hidden = nonlin(conv(x_b, var_scope=layer_name, **conv_settings))
+                #x_hidden = tf.contrib.nn.alpha_dropout(x_hidden, keep_prob=keep_prob)
                 concat_list.append(x_hidden)
                 x_flow = tf.concat(concat_list, axis=-1, name='concat'+layer_name)
                 print '\t\t CONCAT {}:'.format(block_num, l_i), x_flow.get_shape()
@@ -77,7 +78,7 @@ class DenseNet(SegmentationBaseModel):
 
     ## theta is the compression factor, 0 < theta <= 1
     ## If theta = 1, then k_in = k_out
-    def _transition_down(self, x_in, td_num, theta=0.5, keep_prob=0.2, name_scope='td'):
+    def _transition_down(self, x_in, td_num, theta=0.5, keep_prob=0.8, name_scope='td'):
         nonlin = self.nonlin
         k_out = int(x_in.get_shape().as_list()[-1] * theta)
         print '\t Transition Down with k_out=', k_out
@@ -91,13 +92,14 @@ class DenseNet(SegmentationBaseModel):
         return x_pool
 
 
-    def _transition_up(self, x_in, tu_num, theta=0.5, name_scope='tu'):
+    def _transition_up(self, x_in, tu_num, theta=0.5, keep_prob=0.8, name_scope='tu'):
         k_out = int(x_in.get_shape().as_list()[-1] * theta)
         print '\t Transition Up with k_out=', k_out
         deconv_settings = {'n_kernel': k_out, 'upsample_rate': 2, 'k_size': 3, 'no_bias': 0}
 
         with tf.variable_scope('{}_{}'.format(name_scope, tu_num)):
             x_deconv = deconv(x_in, var_scope='TU', **deconv_settings)
+            x_deconv = tf.contrib.nn.alpha_dropout(x_deconv, keep_prob=keep_prob)
 
         return x_deconv
 
@@ -118,7 +120,7 @@ class DenseNet(SegmentationBaseModel):
             print '\t x_in', x_in.get_shape()
 
             ## First convolution gets the ball rolling with a pretty big filter
-            dense_ = nonlin(conv(x_in, n_kernel=self.growth_rate*2, stride=2, k_size=7, var_scope='conv1'))
+            dense_ = nonlin(conv(x_in, n_kernel=self.growth_rate*2, stride=2, k_size=5, var_scope='conv1'))
             dense_ = tf.nn.max_pool(dense_, [1,2,2,1], [1,2,2,1], padding='VALID', name='c1_pool')
 
             ## Downsampling path
@@ -129,7 +131,7 @@ class DenseNet(SegmentationBaseModel):
                 self.downsample_list.append(dense_)
                 print '\t DENSE: ', dense_.get_shape()
 
-                dense_ = self._transition_down(dense_, i_)
+                dense_ = self._transition_down(dense_, i_, keep_prob=keep_prob)
 
 
             print "DOWNSAMPLING LIST:"
@@ -139,12 +141,13 @@ class DenseNet(SegmentationBaseModel):
             ## bottleneck dense layer
             dense_ = self._dense_block(dense_, self.dense_stacks[-1],
                 keep_prob=keep_prob, block_num=len(self.dense_stacks)-1)
+            dense_ = tf.contrib.nn.alpha_dropout(dense_, keep_prob=keep_prob)
 
             print '\t Bottleneck: ', dense_.get_shape()
 
             ## Upsampling path -- concat skip connections each time
             for i_, n_ in enumerate(reversed(self.dense_stacks[:-1])):
-                dense_ = self._transition_up(dense_, tu_num=i_)
+                dense_ = self._transition_up(dense_, tu_num=i_, keep_prob=keep_prob)
 
                 print '\t Concatenating ', self.downsample_list[-(i_+1)]
                 dense_ = tf.concat([dense_, self.downsample_list[-(i_+1)]],
@@ -157,9 +160,20 @@ class DenseNet(SegmentationBaseModel):
 
             ## Classifier layer
             y_hat_0 = nonlin(deconv(dense_, n_kernel=self.growth_rate*4, k_size=5, pad='SAME', var_scope='y_hat_0'))
-            y_hat = deconv(y_hat_0, n_kernel=self.n_classes, k_size=3, pad='SAME', var_scope='y_hat')
+            y_hat = deconv(y_hat_0, n_kernel=self.n_classes, k_size=5, pad='SAME', var_scope='y_hat')
 
         return y_hat
+
+    ## Overload to fill in the default keep_prob
+    def train_step(self):
+        self.global_step += 1
+        self.sess.run(self.seg_training_op_list, feed_dict={self.keep_prob: 0.5})
+
+        if self.global_step % self.summary_iters == 0:
+            self._write_scalar_summaries()
+
+        if self.global_step % self.summary_image_iters == 0:
+            self._write_image_summaries()
 
 
 class DenseNetTraining(DenseNet):

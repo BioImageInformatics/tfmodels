@@ -36,7 +36,6 @@ class SegmentationBaseModel(BaseModel):
         'x_dims': [256, 256, 3],
      }
 
-
     def __init__(self, **kwargs):
         self.segmentation_defaults.update(**kwargs)
 
@@ -50,7 +49,6 @@ class SegmentationBaseModel(BaseModel):
             self._training_mode()
         elif self.mode=='TEST':
             self._test_mode()
-
 
     def _training_mode(self):
         print 'Setting up {} in training mode'.format(self.name)
@@ -101,7 +99,6 @@ class SegmentationBaseModel(BaseModel):
         self.make_training_ops()
 
         ## ------------------- Gather Summary ops ------------------- ##
-
         self.summaries()
 
         ## ------------------- TensorFlow helpers ------------------- ##
@@ -135,6 +132,7 @@ class SegmentationBaseModel(BaseModel):
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
 
         # self.make_saver() ## In progress (SAVE1)
+        # with tf.device('/cpu:0'):
         self.saver = tf.train.Saver(max_to_keep=5)
 
         self.sess.run(tf.global_variables_initializer())
@@ -187,17 +185,21 @@ class SegmentationBaseModel(BaseModel):
     def _class_weighted_loss(self):
         pass
 
+
     ## define self.seg_loss
     def _epistemic_uncertainty(self):
         pass
+
 
     ## define self.loss
     def _adversarial_feature_matching_loss(self):
         pass
 
+
     ## define self.loss
     def _adversarial_loss(self):
         pass
+
 
     ## TODO split into sub-categories
     def make_training_ops(self):
@@ -302,8 +304,8 @@ class SegmentationBaseModel(BaseModel):
             if self.global_step % self.summary_image_iters == 0:
                 self._write_scalar_summaries()
 
-    def summaries(self):
 
+    def summaries(self):
         ## https://github.com/aymericdamien/ \
         ## TensorFlow-Examples/blob/master/examples/4_Utils/tensorboard_advanced.py
         if self.summarize_grads:
@@ -345,6 +347,7 @@ class SegmentationBaseModel(BaseModel):
     def test_step(self, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
+
     def train_step(self):
         self.global_step += 1
         self.sess.run(self.seg_training_op_list)
@@ -355,10 +358,11 @@ class SegmentationBaseModel(BaseModel):
         if self.global_step % self.summary_image_iters == 0:
             self._write_image_summaries()
 
+
     def _write_scalar_summaries(self):
-        print '[{:07d}] writing scalar summaries'.format(self.global_step)
-        summary_str = self.sess.run(self.summary_scalars_op)
+        summary_str, seg_loss_ = self.sess.run([self.summary_scalars_op, self.seg_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
+        print '[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, seg_loss_)
 
     def _write_image_summaries(self):
         print '[{:07d}] writing image summaries'.format(self.global_step)
