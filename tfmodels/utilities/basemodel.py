@@ -82,6 +82,7 @@ class BaseModel(object):
         raise Exception(NotImplementedError)
 
     def _tf_ops(self):
+        # with tf.device('/cpu:0'):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path

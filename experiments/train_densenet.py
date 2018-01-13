@@ -18,50 +18,53 @@ data_home = '/home/nathan/histo-seg/semantic-pca/data/train_combo'
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 300
-batch_size = 64
+batch_size = 1
 # iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 10
-step_start = 0
+snapshot_steps = 10000
+step_start = 120000
 
 expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca5Xdensenet_20180103/logs/{}'.format(expdate)
-save_dir         = 'pca5Xdensenet_20180103/snapshots'
-debug_dir        = 'pca5Xdensenet_20180103/debug'
-snapshot_restore = 'pca5Xdensenet_20180103/snapshots/densenet.ckpt-{}'.format(step_start)
+log_dir          = 'pca10Xdensenet_20180110/logs/{}'.format(expdate)
+save_dir         = 'pca10Xdensenet_20180110/snapshots'
+debug_dir        = 'pca10Xdensenet_20180110/debug'
+snapshot_restore = 'pca10Xdensenet_20180109/snapshots/densenet.ckpt-{}'.format(step_start)
 
-min_holding = 1000
+min_holding = 700
 threads = 6
 
 with tf.Session(config=config) as sess:
-    dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
-        image_dir= data_home,
-        image_ext= 'png',
-        capacity= min_holding + (threads+1)*batch_size,
-        min_holding= min_holding,
-        threads= threads,
-        crop_size= 512,
-        ratio= 0.25,
-        augmentation= 'random')
+    with tf.device('/cpu:0'):
+        dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
+            image_dir= data_home,
+            image_ext= 'png',
+            capacity= min_holding + (threads+1)*batch_size,
+            min_holding= min_holding,
+            threads= threads,
+            crop_size= 384*2,
+            ratio= 0.5,
+            augmentation= 'random')
     dataset.print_info()
 
+    # with tf.device('/gpu:0'):
     # model = tfmodels.ResNetTraining(sess=sess,
     model = tfmodels.DenseNetTraining(sess=sess,
-        #class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
+        # class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
+        class_weights=[1.58918, 0.87155, 1.166423, 0.875136],
         dataset=dataset,
         global_step= step_start,
         k_size= 3,
         dense_stacks= [4, 4, 4, 4, 4],
-        growth_rate= 32,
-        learning_rate= 1e-4,
+        growth_rate= 48,
+        learning_rate= 1e-8,
         log_dir= log_dir,
         n_classes= 4,
         save_dir= save_dir,
-        summarize_grads= False,
-        summarize_vars=  False,
+        summarize_grads= True,
         summary_iters= 20,
         summary_image_iters= 250,
-        x_dims= [128, 128, 3],)
+        x_dims= [384, 384, 3],)
     model.print_info()
 
     if step_start > 0:
@@ -99,13 +102,13 @@ with tf.Session(config=config) as sess:
         for epx in xrange(1, epochs):
             epoch_start = time.time()
             for itx in xrange(iterations):
-                # global_step += 1
+                global_step += 1
                 model.train_step()
 
             print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
                 epx, model.global_step, time.time()-epoch_start)
 
-            if epx % snapshot_epochs == 0:
+            if model.global_step % snapshot_steps == 0:
                 model.snapshot()
                 tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
     except Exception as e:

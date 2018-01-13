@@ -36,7 +36,6 @@ class SegmentationBaseModel(BaseModel):
         'x_dims': [256, 256, 3],
      }
 
-
     def __init__(self, **kwargs):
         self.segmentation_defaults.update(**kwargs)
 
@@ -50,7 +49,6 @@ class SegmentationBaseModel(BaseModel):
             self._training_mode()
         elif self.mode=='TEST':
             self._test_mode()
-
 
     def _training_mode(self):
         print 'Setting up {} in training mode'.format(self.name)
@@ -105,7 +103,6 @@ class SegmentationBaseModel(BaseModel):
         self.make_training_ops()
 
         ## ------------------- Gather Summary ops ------------------- ##
-
         self.summaries()
 
         ## ------------------- TensorFlow helpers ------------------- ##
@@ -139,6 +136,7 @@ class SegmentationBaseModel(BaseModel):
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
 
         # self.make_saver() ## In progress (SAVE1)
+        # with tf.device('/cpu:0'):
         self.saver = tf.train.Saver(max_to_keep=5)
 
         self.sess.run(tf.global_variables_initializer())
@@ -195,6 +193,7 @@ class SegmentationBaseModel(BaseModel):
             logits=self.y_hat, weights=sample_weights)
         print '\t segmentation losses seg_loss:', seg_loss
         return seg_loss
+
 
 
     ## define self.seg_loss
@@ -269,6 +268,7 @@ class SegmentationBaseModel(BaseModel):
             self.seg_loss = tf.reduce_mean(losses)
 
 
+
     ## define self.loss
     def _adversarial_feature_matching_loss(self):
         ## Feature matching style -- I have it set to always to _adversarial_loss()
@@ -289,6 +289,7 @@ class SegmentationBaseModel(BaseModel):
         self.loss = self.seg_loss + \
             self.adversary_lambda * self.adv_feature_loss + \
             self.adversary_lambda * self.adv_loss
+
 
 
     ## define self.loss
@@ -412,6 +413,7 @@ class SegmentationBaseModel(BaseModel):
     def test_step(self, keep_prob=1.0):
         raise Exception(NotImplementedError)
 
+
     def train_step(self):
         self.global_step += 1
         self.sess.run(self.seg_training_op_list)
@@ -421,6 +423,7 @@ class SegmentationBaseModel(BaseModel):
 
         if self.global_step % self.summary_image_iters == 0:
             self._write_image_summaries()
+
 
     def _write_scalar_summaries(self):
         summary_str, seg_loss_ = self.sess.run([self.summary_scalars_op, self.seg_loss])
