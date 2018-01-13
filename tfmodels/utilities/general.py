@@ -115,3 +115,124 @@ def init_experiment(exp_name, recreate=False, root_dir='.', subdirs=None):
         print 'Deleting {}'.format(exp_root)
         shutil.rmdtree(exp_root)
         print 'Remaking {}'.format(exp_root)
+
+
+"""
+http://warmspringwinds.github.io/tensorflow/tf-slim/2016/12/21/tfrecords-guide/
+
+https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md
+"""
+
+def _bytes_feature(value):
+    return tf.train.Feature(
+        bytes_list = tf.train.BytesList(value=[value]))
+
+def _int64_feature(value):
+    return tf.train.Feature(
+        int64_list=tf.train.Int64List(value=[value]))
+
+def _cut_subimages(img, edge):
+    h, w = img.shape[:2]
+
+    hT = h / float(edge)
+    wT = w / float(edge)
+
+    subimgs = []
+    for ih in np.linspace(0, h-edge, np.ceil(hT), dtype=np.int):
+        for iw in np.linspace(0, w-edge, np.ceil(wT), dtype=np.int):
+            subimgs.append(img[ih:ih+edge, iw:iw+edge])
+
+    return subimgs
+
+def _read_img_mask(imgp, maskp, subimages=None, n_class=None):
+    img = cv2.imread(imgp, -1)[:,:,::-1]
+    mask = cv2.imread(maskp, -1)
+
+    if len(mask.shape) == 3:
+        mask = mask[:,:,0]
+
+    if n_class is not None:
+        if mask.max() > 255/(n_class-1):
+            mask /= 255/(n_class-1) ## Assume that 0 is counted as a class
+
+    ih, iw = img.shape[:2]
+    mh, mw = mask.shape[:2]
+    assert ih == mh
+    assert iw == mw
+
+    if subimages is not None:
+        img = _cut_subimages(img, subimages)
+        mask = _cut_subimages(mask, subimages)
+
+    return img, mask, ih, iw
+
+
+def image_mask_2_tfrecord(img_path, mask_path, record_path, n_class=None, subimages=None, img_ext='jpg', mask_ext='png'):
+    writer = tf.python_io.TFRecordWriter(record_path)
+
+    img_list = sorted(glob.glob(os.path.join(img_path, '*'+img_ext)))
+    mask_list = sorted(glob.glob(os.path.join(mask_path, '*'+mask_ext)))
+
+    assert len(img_list) == len(mask_list)
+
+    count = 0
+    for imgp, maskp in zip(img_list, mask_list):
+        imgbase = os.path.basename(imgp).replace(img_ext, '')
+        maskbase = os.path.basename(maskp).replace(mask_ext, '')
+
+        if imgbase != maskbase:
+            print 'mismatch:', imgbase, maskbase
+            continue
+
+        img, mask, height, width = _read_img_mask(imgp, maskp, subimages=subimages, n_class=n_class)
+
+        if subimages is not None:
+            for img_, mask_ in zip(img, mask):
+                img_raw = img_.tostring()
+                mask_raw = mask_.tostring()
+                example = tf.train.Example(features=tf.train.Features(feature={
+                    'height': _int64_feature(subimages),
+                    'width': _int64_feature(subimages),
+                    'img': _bytes_feature(img_raw),
+                    'mask': _bytes_feature(mask_raw) }))
+                writer.write(example.SerializeToString())
+                count += 1
+                if count % 100 == 0:
+                    print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(record_path, count, len(img_list))
+        else:
+            img_raw = img.tostring()
+            mask_raw = mask.tostring()
+            example = tf.train.Example(features=tf.train.Features(feature={
+                'height': _int64_feature(height),
+                'width': _int64_feature(width),
+                'img': _bytes_feature(img_raw),
+                'mask': _bytes_feature(mask_raw) }))
+            writer.write(example.SerializeToString())
+            count += 1
+            if count % 100 == 0:
+                print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(record_path, count, len(img_list))
+
+
+    writer.close()
+    print 'Finished writing [{}]'.format(record_path)
+
+
+def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=1.0, batch_size=32, prefetch=10000, nthreads=4):
+    with tf.Session() as sess:
+        dataset = TFRecordInput(record_path = record_path,
+            crop_size = crop_size,
+            ratio = image_ratio,
+            batch_size = batch_size,
+            prefetch = prefetch,
+            n_threads = 8,
+            sess = sess )
+
+        pull_times = []
+        print 'Checking 25 batches of {} examples'.format(batch_size)
+        for _ in xrange(iterations):
+            tstart = time.time()
+            img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
+            print img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max()
+            pull_times.append(time.time() - tstart)
+
+    print 'Average time:', np.mean(pull_times)

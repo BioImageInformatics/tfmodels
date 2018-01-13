@@ -13,12 +13,13 @@ config.gpu_options.allow_growth = True
 #image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
 #mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
 
-data_home = '/home/nathan/histo-seg/semantic-pca/data/train_combo'
+# data_home = '/home/nathan/histo-seg/semantic-pca/data/train_combo'
 # data_home = '/home/chen/env/nathan_tf/data'
+record_path = 'gleason_grade.tfrecords'
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 300
-batch_size = 1
+batch_size = 32
 # iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 10
@@ -31,20 +32,30 @@ save_dir         = 'pca10Xdensenet_20180110/snapshots'
 debug_dir        = 'pca10Xdensenet_20180110/debug'
 snapshot_restore = 'pca10Xdensenet_20180109/snapshots/densenet.ckpt-{}'.format(step_start)
 
-min_holding = 700
-threads = 6
+crop_size = 512
+image_ratio = 0.5
+prefetch = 1000
+threads = 8
 
 with tf.Session(config=config) as sess:
     with tf.device('/cpu:0'):
-        dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
-            image_dir= data_home,
-            image_ext= 'png',
-            capacity= min_holding + (threads+1)*batch_size,
-            min_holding= min_holding,
-            threads= threads,
-            crop_size= 384*2,
-            ratio= 0.5,
-            augmentation= 'random')
+        # dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
+        #     image_dir= data_home,
+        #     image_ext= 'png',
+        #     capacity= min_holding + (threads+1)*batch_size,
+        #     min_holding= min_holding,
+        #     threads= threads,
+        #     crop_size= 384*2,
+        #     ratio= 0.5,
+        #     augmentation= 'random')
+
+        dataset = tfmodlels.TFRecordImageMask(record_path = record_path,
+            crop_size = crop_size,
+            ratio = image_ratio,
+            batch_size = batch_size,
+            prefetch = prefetch,
+            n_threads = 8,
+            sess = sess )
     dataset.print_info()
 
     # with tf.device('/gpu:0'):
