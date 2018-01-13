@@ -8,7 +8,8 @@ from densenet import DenseNetTraining, DenseNetInference
 # from resnet_bottleneck import ResNetBottleneckTraining, ResNetBottleneckInference
 
 
-__all__ = ['SegmentationDiscriminator',
+__all__ = ['SegmentationBaseModel',
+           'SegmentationDiscriminator',
            'SegNetTraining',
            'SegNetInference',
            'VGGTraining',

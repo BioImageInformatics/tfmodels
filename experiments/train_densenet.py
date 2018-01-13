@@ -28,7 +28,7 @@ expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 log_dir          = 'pca5Xdensenet_20180103/logs/{}'.format(expdate)
 save_dir         = 'pca5Xdensenet_20180103/snapshots'
 debug_dir        = 'pca5Xdensenet_20180103/debug'
-snapshot_restore = 'pca5Xdensenet_20180103/snapshots/resnet.ckpt-{}'.format(step_start)
+snapshot_restore = 'pca5Xdensenet_20180103/snapshots/densenet.ckpt-{}'.format(step_start)
 
 min_holding = 1000
 threads = 6

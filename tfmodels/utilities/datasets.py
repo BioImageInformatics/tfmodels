@@ -436,7 +436,7 @@ class ImageMaskDataSet(DataSet):
 Pre-concatenated image-mask: [h,w,4]
 """
 class ImageComboDataSet(DataSet):
-    defaults = {
+    image_combo_defaults = {
         'augmentation': 'random',
         'batch_size': 16,
         'crop_size': 256,
@@ -450,9 +450,9 @@ class ImageComboDataSet(DataSet):
     }
 
     def __init__(self, **kwargs):
-        self.defaults.update(kwargs)
+        self.image_combo_defaults.update(kwargs)
         # print self.defaults
-        super(ImageComboDataSet, self).__init__(**self.defaults)
+        super(ImageComboDataSet, self).__init__(**self.image_combo_defaults)
         assert self.image_dir is not None
 
         ## ----------------- Load Image Lists ------------------- ##
