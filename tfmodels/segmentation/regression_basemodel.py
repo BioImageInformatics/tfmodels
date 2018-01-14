@@ -4,22 +4,20 @@ import sys, os
 
 from ..utilities.basemodel import BaseModel
 
-class Segmentation(BaseModel):
+class ImageRegression(BaseModel):
     ## Defaults. arXiv links correspond to inspirational materials
-    segmentation_defaults={
-        'class_weights': None, ## https://arxiv.org/abs/1511.00561
+    regression_defaults={
         'dataset': None,
         'global_step': 0,
         'k_size': 3,
         'learning_rate': 1e-3,
-        'log_dir': None,
         'mode': 'TRAIN',
-        'name': 'Segmentation',
+        'name': 'ImageRegression',
         'nonlin': tf.nn.selu,
-        'n_classes': None,
+        'log_dir': None,
         'save_dir': None,
         'sess': None,
-        'seg_training_op_list': [],
+        'reg_training_op_list': [],
         'summarize_grads': False,
         'summary_iters': 50,
         'summary_image_iters': 250,
@@ -29,9 +27,9 @@ class Segmentation(BaseModel):
      }
 
     def __init__(self, **kwargs):
-        self.segmentation_defaults.update(**kwargs)
+        self.regression_defaults.update(**kwargs)
 
-        super(Segmentation, self).__init__(**self.segmentation_defaults)
+        super(ImageRegression, self).__init__(**self.regression_defaults)
         assert self.sess is not None
 
         if self.mode=='TRAIN':
@@ -47,14 +45,13 @@ class Segmentation(BaseModel):
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
             name='x_in')
         self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
-            shape=[None, self.x_dims[0], self.x_dims[1], self.n_classes], name='y_in')
+            shape=[None, self.x_dims[0], self.x_dims[1], 1], name='y_in')
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False)
 
-        self.y_hat_smax = tf.nn.softmax(self.y_hat)
         print 'Model output y_hat:', self.y_hat.get_shape()
 
         ## ------------------- Training ops ------------------- ##
@@ -88,12 +85,10 @@ class Segmentation(BaseModel):
         self.training = tf.placeholder_with_default(False, shape=[], name='training')
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
             training=self.training)
-        self.y_hat_smax = tf.nn.softmax(self.y_hat)
 
         # self.make_saver() ## In progress (SAVE1)
         # with tf.device('/cpu:0'):
         self.saver = tf.train.Saver(max_to_keep=5)
-
         self.sess.run(tf.global_variables_initializer())
 
 
@@ -102,43 +97,33 @@ class Segmentation(BaseModel):
         return [var for var in t_vars if self.name in var.name]
 
 
-    def _class_weighted_loss(self):
-        ## https://github.com/tensorflow/tensorflow/issues/10021
-        sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), -1)
-        print '\t segmentation losses sample_weights:', sample_weights
-        seg_loss = tf.losses.softmax_cross_entropy(onehot_labels=self.y_in,
-            logits=self.y_hat, weights=sample_weights)
-        print '\t segmentation losses seg_loss:', seg_loss
-        return seg_loss
-
-
-    ## define self.seg_loss
-    def _make_segmentation_loss(self):
-        if self.class_weights:
-            self.seg_loss = self._class_weighted_loss()
-        else:
-            self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
-                labels=self.y_in, logits=self.y_hat)
-            self.seg_loss = tf.reduce_mean(self.seg_loss)
-
+    ## define self.reg_loss
+    def _make_regression_loss(self):
+        # self.reg_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+        #     logits=self.y_hat,
+        #     labels=self.y_in), )
+        # self.reg_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+        #     logits=self.y_hat,
+        #     labels=self.y_in))
+        self.reg_loss = tf.losses.mean_squared_error( self.y_in, self.y_hat, )
 
     def _make_training_ops(self):
-        with tf.name_scope('segmentation_losses'):
-            self._make_segmentation_loss()
+        with tf.name_scope('regression_losses'):
+            self._make_regression_loss()
 
             ## Unused except in pretraining or specificially requested
-            self.seg_training_op = self.optimizer.minimize(
-                self.seg_loss, var_list=self.var_list, name='{}_seg_train'.format(self.name))
+            self.reg_training_op = self.optimizer.minimize(
+                self.reg_loss, var_list=self.var_list, name='{}_reg_train'.format(self.name))
 
-            self.seg_loss_sum = tf.summary.scalar('seg_loss', self.seg_loss)
-            self.summary_op_list.append(self.seg_loss_sum)
+            self.reg_loss_sum = tf.summary.scalar('reg_loss', self.reg_loss)
+            self.summary_op_list.append(self.reg_loss_sum)
 
-            self.loss = self.seg_loss
+            self.loss = self.reg_loss
 
             self.train_op = self.optimizer.minimize(
                 self.loss, var_list=self.var_list, name='{}_train'.format(self.name))
 
-            self.seg_training_op_list.append(self.train_op)
+            self.reg_training_op_list.append(self.train_op)
 
 
     def _make_summaries(self):
@@ -154,19 +139,16 @@ class Segmentation(BaseModel):
 
         ## Loss scalar
         self.loss_sum = tf.summary.scalar('loss', self.loss)
+        self.y_in_hist = tf.summary.histogram('y_in_hist', self.y_in)
+        self.y_hat_hist = tf.summary.histogram('y_hat_hist', self.y_hat)
 
         ## Scalars:
         self.summary_scalars_op = tf.summary.merge_all()
 
         ## Images
-        self.y_in_mask = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
-        self.y_in_mask = tf.expand_dims(self.y_in_mask, axis=-1)
-        self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
-        self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
-
-        self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
-        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
-        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
+        self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=self.summary_image_n)
+        self.y_in_sum = tf.summary.image('y_in', self.y_in, max_outputs=self.summary_image_n)
+        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat, max_outputs=self.summary_image_n)
 
         ## TODO Filters
 
@@ -175,9 +157,9 @@ class Segmentation(BaseModel):
 
 
     def _write_scalar_summaries(self):
-        summary_str, seg_loss_ = self.sess.run([self.summary_scalars_op, self.seg_loss])
+        summary_str, reg_loss_ = self.sess.run([self.summary_scalars_op, self.reg_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
-        print '[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, seg_loss_)
+        print '[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, reg_loss_)
 
 
     def _write_image_summaries(self):
@@ -189,7 +171,7 @@ class Segmentation(BaseModel):
     def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob}
-        y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
+        y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
         # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
         return y_hat_
 
@@ -205,7 +187,7 @@ class Segmentation(BaseModel):
 
     def train_step(self):
         self.global_step += 1
-        self.sess.run(self.seg_training_op_list)
+        self.sess.run(self.reg_training_op_list)
 
         if self.global_step % self.summary_iters == 0:
             self._write_scalar_summaries()

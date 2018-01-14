@@ -23,7 +23,9 @@ from general import (
     write_image_mask_combos,
     test_bayesian_inference,
     image_mask_2_tfrecord,
-    check_tfrecord
+    check_tfrecord,
+    check_tfrecord_dataset,
+    make_experiment
 )
 
 __all__ = [
@@ -44,5 +46,7 @@ __all__ = [
     'write_image_mask_combos',
     'test_bayesian_inference',
     'image_mask_2_tfrecord',
-    'check_tfrecord'
+    'check_tfrecord',
+    'check_tfrecord_dataset',
+    'make_experiment'
 ]

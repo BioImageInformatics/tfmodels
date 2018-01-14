@@ -52,13 +52,13 @@ def load_images(paths, batchsize, crop_size):
     return tensor
 
 
-"""
-input paired x, y matrices:
-random_mnist.*.images ~ [obs, dims]
-random_mnist.*.labels ~ [obs, 10] ## one-hot
-
-output x sorted by y, as dictionaries
-"""
+# """
+# input paired x, y matrices:
+# random_mnist.*.images ~ [obs, dims]
+# random_mnist.*.labels ~ [obs, 10] ## one-hot
+#
+# output x sorted by y, as dictionaries
+# """
 # def collect_mnist(mnist):
 #     mnist_out = {}
 #     for y in range(0, 10):
@@ -314,6 +314,10 @@ class TFRecordImageMask(object):
                 'prefetch': 1000,
                 'n_threads': 4,
                 'sess': None,
+                'as_onehot': True,
+                'n_classes': None,
+                'img_dtype': tf.uint8,
+                'mask_dtype': tf.uint8,
                 'name': 'TFRecordDataset' }
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
@@ -362,8 +366,8 @@ class TFRecordImageMask(object):
 
         img = pf['img']
         mask = pf['mask']
-        img = tf.decode_raw(img, tf.uint8)
-        mask = tf.decode_raw(mask, tf.uint8)
+        img = tf.decode_raw(img, self.img_dtype)
+        mask = tf.decode_raw(mask, self.mask_dtype)
         # img = tf.image.decode_image(img)
         # mask = tf.image.decode_image(mask)
 
@@ -403,7 +407,13 @@ class TFRecordImageMask(object):
         ## Recenter to [-0.5, 0.5] for SELU activations
         # img = tf.cast(img, tf.float32)
         img = tf.multiply(img, 2/255.0) - 1
-        mask = tf.cast(mask, tf.uint8)
+        mask = tf.cast(mask, self.mask_dtype)
+
+        if self.as_onehot:
+            mask = tf.one_hot(mask, depth=self.n_classes)
+            mask = tf.squeeze(mask)
+        # mask = tf.reshape(mask,
+        #     [-1, self.x_dims[0], self.x_dims[1], self.n_classes])
 
         return img, mask
 

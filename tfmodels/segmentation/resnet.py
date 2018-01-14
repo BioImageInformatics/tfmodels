@@ -1,5 +1,5 @@
 import tensorflow as tf
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 
@@ -12,8 +12,8 @@ modules = 3
 stacks  = 5
 
 """
-class ResNet(SegmentationBaseModel):
-    base_defaults={
+class ResNet(Segmentation):
+    resnet_defaults={
         'kernels': [64, 64, 64, 128],
         'k_size': 3,
         'name': 'resnet',
@@ -21,10 +21,10 @@ class ResNet(SegmentationBaseModel):
     }
 
     def __init__(self, **kwargs):
-        self.base_defaults.update(**kwargs)
+        self.resnet_defaults.update(**kwargs)
 
         ## not sure sure it's good to do this first
-        for key, val in self.base_defaults.items():
+        for key, val in self.resnet_defaults.items():
             setattr(self, key, val)
 
         self.modules = len(self.kernels)
@@ -34,7 +34,7 @@ class ResNet(SegmentationBaseModel):
         print 'MINIMIUM DIMENSION: ', min_dimension
         assert min_dimension >= 1
 
-        super(ResNet, self).__init__(**self.base_defaults)
+        super(ResNet, self).__init__(**self.resnet_defaults)
 
         ## Check input shape is compatible with the number of downsampling modules
 

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 
@@ -9,8 +9,8 @@ Fully Convolutional DenseNet: https://arxiv.org/abs/1611.09326
 
 Implementation is loosely based on the above papers.
 """
-class DenseNet(SegmentationBaseModel):
-    base_defaults={
+class DenseNet(Segmentation):
+    densenet_defaults={
         ## Number of layers to use for each dense block
         'dense_stacks': [4, 8, 8, 16],
         ## The parameter k in the paper. Dense blocks end up with L*k kernels
@@ -21,10 +21,10 @@ class DenseNet(SegmentationBaseModel):
     }
 
     def __init__(self, **kwargs):
-        self.base_defaults.update(**kwargs)
+        self.densenet_defaults.update(**kwargs)
 
         ## not sure sure it's good to do this first
-        for key, val in self.base_defaults.items():
+        for key, val in self.densenet_defaults.items():
             setattr(self, key, val)
 
         ## The smallest dimension after all downsampling has to be >= 1
@@ -35,7 +35,7 @@ class DenseNet(SegmentationBaseModel):
         print 'MINIMIUM DIMENSION: ', min_dimension
         assert min_dimension >= 1
 
-        super(DenseNet, self).__init__(**self.base_defaults)
+        super(DenseNet, self).__init__(**self.densenet_defaults)
 
         ## Check input shape is compatible with the number of downsampling modules
 

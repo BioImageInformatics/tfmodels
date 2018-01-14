@@ -40,16 +40,18 @@ The `experiments` directory contains examples for training some of the models.
 
 For example:
 
-```
+```python
 import tfmodels
 import tensorflow as tf
 
-## Define training settings, batch_size, data_path, training iterations/epochs, etc.
+## Define training settings
 
-dataset = tfmodels.ImageComboDataSet(batch_size=batch_size, image_dir=data_path, ...)
+dataset = tfmodels.ImageComboDataSet(
+  batch_size=batch_size, image_dir=data_path, ...)
 
 with tf.Session() as sess:
-  model = tfmodels.DenseNetTraining(sess=sess, dataset=dataset, ...)
+  model = tfmodels.DenseNetTraining(
+    sess=sess, dataset=dataset, ...)
 
   for iter in xrange(n_iters):
     model.train_step()

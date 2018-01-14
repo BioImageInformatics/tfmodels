@@ -1,23 +1,26 @@
 import tensorflow as tf
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 """
 Segmentation VGG style network
 """
-class VGG(SegmentationBaseModel):
+class VGG(Segmentation):
     vgg_defaults={
-        'conv_kernels': [64, 128, 256, 256],
-        'deconv_kernels': [128, 64],
+        'conv_kernels': None,
+        'deconv_kernels': None,
         'k_size': 5,
         'name': 'vgg',
         }
 
     def __init__(self, **kwargs):
         self.vgg_defaults.update(**kwargs)
-        super(VGG, self).__init__(**self.vgg_defaults)
 
-        assert self.n_classes is not None
+        assert vgg_defaults['n_classes'] is not None
+        assert vgg_defaults['conv_kernels'] is not None
+        assert vgg_defaults['deconv_kernels'] is not None
+
+        super(VGG, self).__init__(**self.vgg_defaults)
 
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):

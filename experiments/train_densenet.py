@@ -39,35 +39,24 @@ threads = 8
 
 with tf.Session(config=config) as sess:
     with tf.device('/cpu:0'):
-        # dataset = tfmodels.ImageComboDataSet(batch_size= batch_size,
-        #     image_dir= data_home,
-        #     image_ext= 'png',
-        #     capacity= min_holding + (threads+1)*batch_size,
-        #     min_holding= min_holding,
-        #     threads= threads,
-        #     crop_size= 384*2,
-        #     ratio= 0.5,
-        #     augmentation= 'random')
-
         dataset = tfmodlels.TFRecordImageMask(record_path = record_path,
             crop_size = crop_size,
             ratio = image_ratio,
             batch_size = batch_size,
             prefetch = prefetch,
             n_threads = 8,
+            n_classes = 2,
             sess = sess )
     dataset.print_info()
 
     # with tf.device('/gpu:0'):
     # model = tfmodels.ResNetTraining(sess=sess,
     model = tfmodels.DenseNetTraining(sess=sess,
-        # class_weights=[1.46306, 0.73258, 1.19333, 0.86057],
-        class_weights=[1.58918, 0.87155, 1.166423, 0.875136],
         dataset=dataset,
         global_step= step_start,
         k_size= 3,
-        dense_stacks= [4, 4, 4, 4, 4],
-        growth_rate= 48,
+        dense_stacks= [4, 4, 4],
+        growth_rate= 8,
         learning_rate= 1e-8,
         log_dir= log_dir,
         n_classes= 4,
