@@ -23,6 +23,8 @@ class ImageRegression(BaseModel):
         'summary_image_iters': 250,
         'summary_image_n': 4,
         'summary_op_list': [],
+        'with_test': False,
+        'n_test_batches': 5,
         'x_dims': [256, 256, 3],
      }
 
@@ -47,6 +49,10 @@ class ImageRegression(BaseModel):
         self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
             shape=[None, self.x_dims[0], self.x_dims[1], 1], name='y_in')
 
+        ## Check for a testing dataset
+        if self.dataset.testing_record is not None:
+            self.with_test = True
+
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
@@ -63,6 +69,9 @@ class ImageRegression(BaseModel):
 
         ## ------------------- Gather Summary ops ------------------- ##
         self._make_summaries()
+
+        ## ------------------- Gather Testing ops ------------------- ##
+        self._make_test_ops()
 
         ## ------------------- TensorFlow helpers ------------------- ##
         self._tf_ops()
@@ -138,22 +147,40 @@ class ImageRegression(BaseModel):
                     tf.summary.histogram(var.name + '/gradient', grad))
 
         ## Loss scalar
-        self.loss_sum = tf.summary.scalar('loss', self.loss)
-        self.y_in_hist = tf.summary.histogram('y_in_hist', self.y_in)
-        self.y_hat_hist = tf.summary.histogram('y_hat_hist', self.y_hat)
+        with tf.variable_scope('training_scalars'):
+            self.loss_sum = tf.summary.scalar('loss', self.loss)
+            self.y_in_hist = tf.summary.histogram('y_in_hist', self.y_in)
+            self.y_hat_hist = tf.summary.histogram('y_hat_hist', self.y_hat)
 
-        ## Scalars:
-        self.summary_scalars_op = tf.summary.merge_all()
+            ## Scalars:
+            self.summary_scalars_op = tf.summary.merge_all()
 
         ## Images
-        self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=self.summary_image_n)
-        self.y_in_sum = tf.summary.image('y_in', self.y_in, max_outputs=self.summary_image_n)
-        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat, max_outputs=self.summary_image_n)
-
-        ## TODO Filters
+        with tf.variable_scope('training_images'):
+            self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=self.summary_image_n)
+            self.y_in_sum = tf.summary.image('y_in', self.y_in, max_outputs=self.summary_image_n)
+            self.y_hat_sum = tf.summary.image('y_hat', self.y_hat, max_outputs=self.summary_image_n)
 
         self.summary_images_op = tf.summary.merge(
             [self.x_in_sum, self.y_in_sum, self.y_hat_sum])
+
+
+    def _make_test_ops(self):
+        if self.with_test is None:
+            print 'WARNING no TEST tfrecord dataset; Skipping test mode'
+            return
+
+        with tf.variable_scope('testing_scalars'):
+            self.loss_sum_test = tf.summary.scalar('loss_test', self.loss)
+
+        with tf.variable_scope('testing_images'):
+            self.x_in_sum_test = tf.summary.image('x_in_test', self.x_in, max_outputs=self.summary_image_n)
+            self.y_in_sum_test = tf.summary.image('y_in_test', self.y_in, max_outputs=self.summary_image_n)
+            self.y_hat_sum_test = tf.summary.image('y_hat_test', self.y_hat, max_outputs=self.summary_image_n)
+
+            self.summary_test_ops = tf.summary.merge(
+                [self.loss_sum_test, self.x_in_sum_test,
+                 self.y_in_sum_test, self.y_hat_sum_test])
 
 
     def _write_scalar_summaries(self):
@@ -180,9 +207,11 @@ class ImageRegression(BaseModel):
         raise Exception(NotImplementedError)
 
 
-    ## TODO -- maybe
     def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
+        fd = {self.keep_prob: keep_prob}
+        summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
+        self.summary_writer.add_summary(summary_str, self.global_step)
+        print '#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
 
 
     def train_step(self):
@@ -194,3 +223,15 @@ class ImageRegression(BaseModel):
 
         if self.global_step % self.summary_image_iters == 0:
             self._write_image_summaries()
+
+    """
+    Run a number of testing iterations
+    """
+    def test(self):
+        ## Switch dataset to testing
+        self.dataset._initalize_testing(self.sess)
+
+        for _ in xrange(self.n_test_batches):
+            self.test_step()
+
+        self.dataset._initalize_training(self.sess)

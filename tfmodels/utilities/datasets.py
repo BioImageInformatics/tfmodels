@@ -307,7 +307,8 @@ class DataSet(object):
 
 
 class TFRecordImageMask(object):
-    defaults = {'record_path': None,
+    defaults = {'training_record': None,
+                'testing_record': None,
                 'crop_size': 512,
                 'ratio': 1.0,
                 'batch_size': 32,
@@ -325,10 +326,11 @@ class TFRecordImageMask(object):
         for key,val in self.defaults.items():
             setattr(self, key, val)
 
-        assert self.record_path is not None
+        assert self.training_record is not None
 
         self.initialized = False
 
+        self.record_path = tf.placeholder_with_default(self.training_record, shape=())
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
                         .shuffle(buffer_size=self.batch_size*3)
@@ -342,11 +344,19 @@ class TFRecordImageMask(object):
         self.image_op, self.mask_op = self.iterator.get_next()
 
         if self.sess is not None:
-            self._initalize_iterator(self.sess)
+            self._initalize_training(self.sess)
 
-    def _initalize_iterator(self, sess):
-        sess.run(self.iterator.initializer)
-        self.initialized = True
+    def _initalize_training(self, sess):
+        fd = {self.record_path: self.training_record}
+        sess.run(self.iterator.initializer, feed_dict=fd)
+        self.phase = 'TRAIN'
+        print 'Dataset TRAINING phase'
+
+    def _initalize_testing(self, sess):
+        fd = {self.record_path: self.testing_record}
+        sess.run(self.iterator.initializer, feed_dict=fd)
+        self.phase = 'TEST'
+        print 'Dataset TESTING phase'
 
     def print_info(self):
         print '-------------------- {} ---------------------- '.format(self.name)
