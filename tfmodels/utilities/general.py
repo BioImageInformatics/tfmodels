@@ -69,6 +69,8 @@ def write_image_mask_combos(img_src_dir, mask_src_dir, save_dir,
         outname = img.replace(img_src_dir, save_dir).replace(img_src_ext, save_ext)
         img_ = cv2.imread(img, -1)
         mask_ = cv2.imread(mask, -1)
+        if mask_.shape[-1] == 3:
+            mask_ = mask_[:,:,0]
         mask_ = np.expand_dims(mask_, -1)
 
         img_mask = np.concatenate([img_, mask_], axis=-1)
@@ -80,19 +82,23 @@ def write_image_mask_combos(img_src_dir, mask_src_dir, save_dir,
 
 """
 Convenience function for performing a test
+Take an image as an iterable
+
+Numpy arrays are iterable along the first dimension
 """
-def test_bayesian_inference(model, test_x_list, output_dir, keep_prob=0.5, samples=50):
+def test_bayesian_inference(model, test_x_list, output_dir, prefix='', keep_prob=0.5, samples=50):
     for test_idx, test_img in enumerate(test_x_list):
+        test_img = np.expand_dims(test_img, 0)
         y_bar_mean, y_bar_var = model.bayesian_inference(test_img,
             samples, keep_prob=keep_prob, ret_all=True)
         y_bar = np.argmax(y_bar_mean, axis=-1)
         y_bar = np.expand_dims(y_bar, 0)
 
-        save_image_stack(y_bar, output_dir, prefix='y_bar_{:04d}'.format(test_idx),
+        save_image_stack(y_bar, output_dir, prefix='y_bar_{}_{:04d}'.format(prefix, test_idx),
             scale=3, ext='png', stack_axis=0)
-        save_image_stack(y_bar_mean, output_dir, prefix='y_mean_{:04d}'.format(test_idx),
+        save_image_stack(y_bar_mean, output_dir, prefix='y_mean_{}_{:04d}'.format(prefix, test_idx),
             scale='max', ext='png', stack_axis=-1)
-        save_image_stack(y_bar_var, output_dir, prefix='y_var_{:04d}'.format(test_idx),
+        save_image_stack(y_bar_var, output_dir, prefix='y_var_{}_{:04d}'.format(prefix, test_idx),
             scale='max', ext='png', stack_axis=-1)
 
 
