@@ -1,5 +1,5 @@
 import tensorflow as tf
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 
@@ -12,20 +12,19 @@ modules = 3
 stacks  = 5
 
 """
-class ResNet(SegmentationBaseModel):
-    base_defaults={
+class ResNet(Segmentation):
+    resnet_defaults={
         'kernels': [64, 64, 64, 128],
         'k_size': 3,
-        # 'modules': 4,
         'name': 'resnet',
         'stacks': 5,
     }
 
     def __init__(self, **kwargs):
-        self.base_defaults.update(**kwargs)
+        self.resnet_defaults.update(**kwargs)
 
         ## not sure sure it's good to do this first
-        for key, val in self.base_defaults.items():
+        for key, val in self.resnet_defaults.items():
             setattr(self, key, val)
 
         self.modules = len(self.kernels)
@@ -35,7 +34,7 @@ class ResNet(SegmentationBaseModel):
         print 'MINIMIUM DIMENSION: ', min_dimension
         assert min_dimension >= 1
 
-        super(ResNet, self).__init__(**self.base_defaults)
+        super(ResNet, self).__init__(**self.resnet_defaults)
 
         ## Check input shape is compatible with the number of downsampling modules
 
@@ -117,17 +116,17 @@ class ResNet(SegmentationBaseModel):
 
             d0 = self._residual_block(signal, self.kernels[0], block=0,
                 stacks=self.stacks, name_scope='d')
-            d0_residual = deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
-                var_scope='d0_residual')
+            d0_residual = nonlin(deconv(d0, self.n_classes, upsample_rate=2, k_size=7,
+                var_scope='d0_residual'))
 
 
             y_hat = deconv(d0_residual, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
             print '\t y_hat', y_hat.get_shape()
 
             ## New logic at the end of model building
-            if self.epistemic:
-                sigma_branch = deconv(d0, 1, upsample_rate=2, k_size=3, var_scope='sigma')
-                return y_hat, sigma_branch
+            if self.aleatoric:
+                sigma = deconv(d0_residual, 1, upsample_rate=2, k_size=3, var_scope='sigma')
+                return y_hat, sigma
             else:
                 return y_hat
 

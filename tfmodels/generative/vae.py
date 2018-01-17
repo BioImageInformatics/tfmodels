@@ -251,9 +251,11 @@ class VAE(BaseModel):
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
-            self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.x_hat_logit,
-                labels=self.x_in), axis=[1,2,3])
+            # self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+            #     logits=self.x_hat_logit,
+            #     labels=self.x_in), axis=[1,2,3])
+            self.recon_loss = tf.losses.mean_squared_error( self.x_in, self.x_hat_logit, reduction=None)
+            self.recon_loss = tf.reduce_sum(self.recon_loss, axis=[1,2,3])
             print 'recon_loss', self.recon_loss.get_shape()
 
     def _summary_ops(self):

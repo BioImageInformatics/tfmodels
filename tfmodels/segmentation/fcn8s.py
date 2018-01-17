@@ -1,18 +1,20 @@
 import tensorflow as tf
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
-class FCN(SegmentationBaseModel):
-    base_defaults={
+class FCN(Segmentation):
+    fcn_defaults={
         'k_size': [7,5,3],
+        'conv_kernels': None,
         'name': 'fcn',
         'snapshot_name': 'fcn'}
 
     def __init__(self, **kwargs):
-        self.base_defaults.update(**kwargs)
-        super(FCN, self).__init__(**self.base_defaults)
+        self.fcn_defaults.update(**kwargs)
+        super(FCN, self).__init__(**self.fcn_defaults)
 
         assert self.n_classes is not None
+        assert self.conv_kernels is not None
 
     ## Layer flow copied from:
     ## https://github.com/MarvinTeichmann/tensorflow-fcn/blob/master/fcn8_vgg.py

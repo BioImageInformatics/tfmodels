@@ -1,11 +1,13 @@
+import tensorflow as tf
 import numpy as np
 import cv2
-import os, glob
-import datetime
+import os, glob, sys, shutil
+import datetime, time
+
+from datasets import TFRecordImageMask
 
 
-""" Save a 4D stack of images
-"""
+""" Save a 4D stack of images """
 def save_image_stack(stack, writeto,
     prefix='img', ext='jpg', onehot=False, scale='max',
     stack_axis=0):
@@ -73,6 +75,9 @@ def write_image_mask_combos(img_src_dir, mask_src_dir, save_dir,
             mask_ = mask_[:,:,0]
         mask_ = np.expand_dims(mask_, -1)
 
+        if adjust_label:
+            mask_ /= adjust_label
+
         img_mask = np.concatenate([img_, mask_], axis=-1)
 
         success = cv2.imwrite(outname, img_mask)
@@ -102,9 +107,7 @@ def test_bayesian_inference(model, test_x_list, output_dir, prefix='', keep_prob
             scale='max', ext='png', stack_axis=-1)
 
 
-"""
-Convenience function to initialize an experiment
-"""
+""" Convenience function to initialize an experiment """
 def init_experiment(exp_name, recreate=False, root_dir='.', subdirs=None):
     if subdirs is None:
         subdirs = ['logs', 'snapshots', 'debug', 'inference']
@@ -118,3 +121,175 @@ def init_experiment(exp_name, recreate=False, root_dir='.', subdirs=None):
         print 'Deleting {}'.format(exp_root)
         shutil.rmdtree(exp_root)
         print 'Remaking {}'.format(exp_root)
+
+
+"""
+http://warmspringwinds.github.io/tensorflow/tf-slim/2016/12/21/tfrecords-guide/
+https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md
+"""
+
+def _bytes_feature(value):
+    return tf.train.Feature(
+        bytes_list = tf.train.BytesList(value=[value]))
+
+def _int64_feature(value):
+    return tf.train.Feature(
+        int64_list=tf.train.Int64List(value=[value]))
+
+def _cut_subimages(img, edge):
+    h, w = img.shape[:2]
+
+    hT = h / float(edge)
+    wT = w / float(edge)
+
+    subimgs = []
+    for ih in np.linspace(0, h-edge, np.ceil(hT), dtype=np.int):
+        for iw in np.linspace(0, w-edge, np.ceil(wT), dtype=np.int):
+            subimgs.append(img[ih:ih+edge, iw:iw+edge])
+
+    return subimgs
+
+def _read_img_mask(imgp, maskp, subimages=None, n_classes=None):
+    img = cv2.imread(imgp, -1)[:,:,::-1]
+    mask = cv2.imread(maskp, -1)
+
+    if len(mask.shape) == 3:
+        mask = mask[:,:,0]
+
+    if n_classes is not None:
+        if mask.max() > 255/(n_classes-1):
+            mask /= 255/(n_classes-1) ## Assume that 0 is counted as a class
+
+    ih, iw = img.shape[:2]
+    mh, mw = mask.shape[:2]
+    assert ih == mh
+    assert iw == mw
+
+    if subimages is not None:
+        img = _cut_subimages(img, subimages)
+        mask = _cut_subimages(mask, subimages)
+
+    return img, mask, ih, iw
+
+
+def image_mask_2_tfrecord(img_path, mask_path, record_path, img_process_fn=None,
+    mask_process_fn=None, n_classes=None, subimages=None,
+    img_ext='jpg', mask_ext='png'):
+
+    writer = tf.python_io.TFRecordWriter(record_path)
+
+    img_list = sorted(glob.glob(os.path.join(img_path, '*'+img_ext)))
+    mask_list = sorted(glob.glob(os.path.join(mask_path, '*'+mask_ext)))
+
+    assert len(img_list) == len(mask_list)
+
+    count = 0
+    for imgp, maskp in zip(img_list, mask_list):
+        imgbase = os.path.basename(imgp).replace(img_ext, '')
+        maskbase = os.path.basename(maskp).replace(mask_ext, '')
+
+        if imgbase != maskbase:
+            print 'mismatch:', imgbase, maskbase
+            continue
+
+        img, mask, height, width = _read_img_mask(imgp, maskp,
+            subimages=subimages, n_classes=n_classes)
+
+        if img_process_fn is not None:
+            img = img_process_fn(img)
+
+        if mask_process_fn is not None:
+            mask = mask_process_fn(mask)
+
+        if subimages is not None:
+            for img_, mask_ in zip(img, mask):
+                img_raw = img_.tostring()
+                mask_raw = mask_.tostring()
+                example = tf.train.Example(features=tf.train.Features(feature={
+                    'height': _int64_feature(subimages),
+                    'width': _int64_feature(subimages),
+                    'img': _bytes_feature(img_raw),
+                    'mask': _bytes_feature(mask_raw) }))
+                writer.write(example.SerializeToString())
+                count += 1
+                if count % 100 == 0:
+                    print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(
+                        record_path, count, len(img_list))
+        else:
+            img_raw = img.tostring()
+            mask_raw = mask.tostring()
+            example = tf.train.Example(features=tf.train.Features(feature={
+                'height': _int64_feature(height),
+                'width': _int64_feature(width),
+                'img': _bytes_feature(img_raw),
+                'mask': _bytes_feature(mask_raw) }))
+            writer.write(example.SerializeToString())
+            count += 1
+            if count % 100 == 0:
+                print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(
+                    record_path, count, len(img_list))
+
+
+    writer.close()
+    print 'Finished writing [{}]'.format(record_path)
+
+
+def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=1.0,
+    batch_size=32, prefetch=5000, nthreads=4, as_onehot=True,
+    img_dtype=tf.uint8, mask_dtype=tf.uint8):
+    with tf.Session() as sess:
+        dataset = TFRecordImageMask(record_path = record_path,
+            as_onehot = as_onehot,
+            crop_size = crop_size,
+            ratio = image_ratio,
+            batch_size = batch_size,
+            prefetch = prefetch,
+            n_threads = 8,
+            img_dtype = img_dtype,
+            mask_dtype = mask_dtype,
+            sess = sess )
+
+        pull_times = []
+        print 'Checking 25 batches of {} examples'.format(batch_size)
+        for _ in xrange(iterations):
+            tstart = time.time()
+            img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
+            print img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max()
+            pull_times.append(time.time() - tstart)
+
+    print 'Average time:', np.mean(pull_times)
+
+
+""" Same as above; except use a dataset defined externally. """
+def check_tfrecord_dataset(dataset, iterations=25):
+    pull_times = []
+    print 'Checking average load time for {} batches'.format(iterations)
+    for _ in xrange(iterations):
+        tstart = time.time()
+        img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
+        print img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max()
+        pull_times.append(time.time() - tstart)
+
+    print 'Average time:', np.mean(pull_times)
+
+
+def make_experiment(basedir, remove_old=False):
+    expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    log_dir    = os.path.join(basedir, 'logs/{}'.format(expdate))
+    save_dir   = os.path.join(basedir, 'snapshots')
+    debug_dir  = os.path.join(basedir, 'debug')
+    infer_dir  = os.path.join(basedir, 'inference')
+
+    if os.path.isdir(basedir) and remove_old:
+        print 'Found directory {}; Removing it...'.format(basedir)
+        shutil.rmtree(basedir)
+    elif os.path.isdir(basedir) and not remove_old:
+        print 'Found directory {}; remove_old was False; returning...'.format(basedir)
+        return log_dir, save_dir, debug_dir, infer_dir
+
+    dirlist = [basedir, log_dir, save_dir, debug_dir, infer_dir]
+    for dd in dirlist:
+        print 'Creating {}'.format(dd)
+        os.makedirs(dd)
+
+    return log_dir, save_dir, debug_dir, infer_dir

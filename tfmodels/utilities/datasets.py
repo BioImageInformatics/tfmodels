@@ -52,13 +52,13 @@ def load_images(paths, batchsize, crop_size):
     return tensor
 
 
-"""
-input paired x, y matrices:
-random_mnist.*.images ~ [obs, dims]
-random_mnist.*.labels ~ [obs, 10] ## one-hot
-
-output x sorted by y, as dictionaries
-"""
+# """
+# input paired x, y matrices:
+# random_mnist.*.images ~ [obs, dims]
+# random_mnist.*.labels ~ [obs, 10] ## one-hot
+#
+# output x sorted by y, as dictionaries
+# """
 # def collect_mnist(mnist):
 #     mnist_out = {}
 #     for y in range(0, 10):
@@ -70,10 +70,9 @@ output x sorted by y, as dictionaries
 
 """
 Collect examples of positive class, and all others
-
 Support a list of positive labels
 """
-def collect_mnist(mnist, positive_class=0):
+def _collect_mnist(mnist, positive_class=0):
     if not isinstance(positive_class, (list, tuple)):
         positive_class = [positive_class]
     ## Gather x
@@ -100,7 +99,9 @@ def collect_mnist(mnist, positive_class=0):
 
 
 
-""" Using TF's built in MNIST dataset
+"""
+Using TF's built in MNIST dataset
+
 https://stackoverflow.com/questions/43231958/filling-queue-from-python-iterator
 """
 class MNISTDataSet(object):
@@ -134,6 +135,7 @@ class MNISTDataSet(object):
         for key, value in sorted(self.__dict__.items()):
             print '|\t', key, value
         print '---------------------- {} ---------------------- '.format(self.name)
+
 
 
 ## TODO
@@ -171,7 +173,7 @@ class BaggedMNIST(object):
         # self.data = input_data.read_data_sets(self.source_dir)
 
         print 'Using positive class:', self.positive_class
-        self.negative_x, self.positive_x = collect_mnist(self.data,
+        self.negative_x, self.positive_x = _collect_mnist(self.data,
             positive_class=self.positive_class)
         self._count_examples()
         self.iterator = self.iterator_fn()
@@ -265,6 +267,7 @@ class BaggedMNIST(object):
             print '|\t', key, value
         print '---------------------- {} ---------------------- '.format(self.name)
 
+
 """
 Implements a threaded queue for reading images from disk given filenames
 Since this is for segmentation, we have to also read masks in the same order
@@ -303,140 +306,133 @@ class DataSet(object):
         raise Exception(NotImplementedError)
 
 
-"""
-It does not work with asynchronous loading.
-The two file readers in different streams WILL become desynced,
-resulting in mismatches.
-
-We could have a buffer queue for reading-preprocessing,
-and an outward facing queue for feeding data to the network.
-Alternatively, the image-mask file names should be married together from the
-very beginning.
-
-I don't know how to do simple string concat + split in TF ops, so....
-"""
-class ImageMaskDataSet(DataSet):
-    defaults = {
-        'batch_size': 16,
-        'crop_size': 256,
-        'channels': 3,
-        'image_dir': None,
-        'image_ext': 'jpg',
-        'mask_dir': None,
-        'mask_ext': 'png',
-        'name': 'ImageMask',
-        'ratio': 1.0,
-        'capacity': 5000,
-        'seed': 5555,
-        'threads': 1,
-        'input_size': 1200,
-        'min_holding': 1250,
-        'dstype': 'ImageMask',
-        'augmentation': None }
+class TFRecordImageMask(object):
+    defaults = {'training_record': None,
+                'testing_record': None,
+                'crop_size': 512,
+                'ratio': 1.0,
+                'batch_size': 32,
+                'prefetch': 1000,
+                'n_threads': 4,
+                'sess': None,
+                'as_onehot': True,
+                'n_classes': None,
+                'img_dtype': tf.uint8,
+                'mask_dtype': tf.uint8,
+                'name': 'TFRecordDataset' }
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
-        # print self.defaults
-        super(ImageMaskDataSet, self).__init__(**self.defaults)
-        assert self.image_dir is not None
-        assert self.mask_dir is not None
 
-        ## Not intended behavior
-        assert self.threads == 1
+        for key,val in self.defaults.items():
+            setattr(self, key, val)
 
-        ## ----------------- Load Image Lists ------------------- ##
-        image_list = sorted(glob.glob(os.path.join(self.image_dir, '*.'+self.image_ext) ))
-        mask_list = sorted(glob.glob(os.path.join(self.mask_dir, '*.'+self.mask_ext) ))
+        assert self.training_record is not None
 
-        # for imgname, maskname in zip(image_list, mask_list):
-        #     print imgname, maskname
+        self.initialized = False
 
-        self.image_names = tf.convert_to_tensor(image_list)
-        self.mask_names  = tf.convert_to_tensor(mask_list)
+        self.record_path = tf.placeholder_with_default(self.training_record, shape=())
+        self.dataset = (tf.data.TFRecordDataset(self.record_path)
+                        .repeat()
+                        .shuffle(buffer_size=self.batch_size*3)
+                        # .prefetch(buffer_size=self.prefetch)
+                        .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
+                            num_parallel_calls=self.n_threads)
+                        .prefetch(buffer_size=self.prefetch)
+                        .batch(self.batch_size) )
 
-        ## ----------------- Queue ops to feed ----------------- ##
-        self.feature_queue = tf.train.string_input_producer(self.image_names,
-            shuffle=False,
-            seed=self.seed)
-        self.mask_queue    = tf.train.string_input_producer(self.mask_names,
-            shuffle=False,
-            seed=self.seed)
+        self.iterator = self.dataset.make_initializable_iterator()
+        self.image_op, self.mask_op = self.iterator.get_next()
 
-        ## ----------------- TensorFlow ops ------------------- ##
-        self.image_reader = tf.WholeFileReader()
-        # self.mask_reader = tf.WholeFileReader()
+        if self.sess is not None:
+            self._initalize_training(self.sess)
 
-        image_key, image_file = self.image_reader.read(self.feature_queue)
-        mask_key, mask_file = self.image_reader.read(self.mask_queue)
+    def _initalize_training(self, sess):
+        fd = {self.record_path: self.training_record}
+        sess.run(self.iterator.initializer, feed_dict=fd)
+        self.phase = 'TRAIN'
+        print 'Dataset TRAINING phase'
 
-        image_file = tf.Print(image_file, [image_key, mask_key])
+    def _initalize_testing(self, sess):
+        fd = {self.record_path: self.testing_record}
+        sess.run(self.iterator.initializer, feed_dict=fd)
+        self.phase = 'TEST'
+        print 'Dataset TESTING phase'
 
-        image = tf.image.decode_image(image_file)
-        mask = tf.image.decode_image(mask_file)
+    def print_info(self):
+        print '-------------------- {} ---------------------- '.format(self.name)
+        for key, value in sorted(self.__dict__.items()):
+            print '|\t{}: {}'.format(key, value)
+        print '-------------------- {} ---------------------- '.format(self.name)
 
-        image, mask = self._preprocessing(image, mask)
+    def _decode(self, example):
+        features = {'height': tf.FixedLenFeature((), tf.int64, default_value=0),
+                    'width': tf.FixedLenFeature((), tf.int64, default_value=0),
+                    'img': tf.FixedLenFeature((), tf.string, default_value=''),
+                    'mask': tf.FixedLenFeature((), tf.string, default_value=''), }
+        pf = tf.parse_single_example(example, features)
 
-        self.image_op, self.mask_op = tf.train.batch([image, mask],
-            batch_size = self.batch_size,
-            capacity   = self.capacity,
-            num_threads = self.threads,
-            shapes = [
-                [self.input_size, self.input_size, self.channels],
-                [self.input_size, self.input_size, 1]],
-            name = 'Dataset')
-        print 'self.image_op', self.image_op.get_shape()
-        print 'self.mask_op', self.mask_op.get_shape()
+        height = tf.squeeze(pf['height'])
+        width = tf.squeeze(pf['width'])
 
-        self.mask_op = tf.cast(self.mask_op, tf.uint8)
-        self.image_shape = self.image_op.get_shape()
-        self.mask_shape = self.mask_op.get_shape()
+        img = pf['img']
+        mask = pf['mask']
+        img = tf.decode_raw(img, self.img_dtype)
+        mask = tf.decode_raw(mask, self.mask_dtype)
+        # img = tf.image.decode_image(img)
+        # mask = tf.image.decode_image(mask)
 
+        img = tf.cast(img, tf.float32)
+        mask = tf.cast(mask, tf.float32)
 
-    def _preprocessing(self, image, mask):
-        with tf.name_scope('preprocessing'):
-            # image = tf.divide(image, 255
-            image = tf.cast(image, tf.float32)
-            mask = tf.cast(mask, tf.float32)
-            image_mask = tf.concat([image, mask], -1)
-
-            ## Cropping
-            if self.augmentation == 'random':
-                image_mask = tf.random_crop(image_mask,
-                    [-1, self.crop_size, self.crop_size, 4])
-                image_mask = tf.image.random_flip_left_right(image_mask)
-                image_mask = tf.image.random_flip_up_down(image_mask)
-                image, mask = tf.split(image_mask, [3,1], axis=-1)
-
-                image = tf.image.random_brightness(image, max_delta=0.01)
-                # image = tf.image.random_contrast(image, lower=0.7, upper=0.9)
-                image = tf.image.random_hue(image, max_delta=0.01)
-                image = tf.image.random_saturation(image, lower=0.85, upper=1.0)
-            else:
-                image, mask = tf.split(image_mask, [3,1], axis=-1)
-
-            ## Resize ratio
-            target_h = tf.cast(self.crop_size*self.ratio, tf.int32)
-            target_w = tf.cast(self.crop_size*self.ratio, tf.int32)
-            image = tf.image.resize_images(image, [target_h, target_w])
-            mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
-
-            ## Recenter to [-0.5, 0.5] for SELU activations
-            image = tf.multiply(image, 2/255.0) - 1
-
-        # image = tf.Print(image, ['image', tf.reduce_min(image), tf.reduce_max(image)])
-
-        return image, mask
+        return height, width, img, mask
 
 
-    def get_batch(self, sess):
-        image, mask = sess.run([self.image_op, self.mask_op])
-        return image, mask
+    def _preprocessing(self, example, crop_size, ratio):
+        h, w, img, mask = self._decode(example)
+        img_shape = tf.stack([h, w, -1], axis=0)
+        mask_shape = tf.stack([h, w], axis=0)
+
+        img = tf.reshape(img, img_shape)
+        mask = tf.reshape(mask, mask_shape)
+
+        mask = tf.expand_dims(mask, axis=-1)
+        image_mask = tf.concat([img, mask], axis=-1)
+
+        image_mask = tf.random_crop(image_mask,
+            [crop_size, crop_size, 4])
+        image_mask = tf.image.random_flip_left_right(image_mask)
+        image_mask = tf.image.random_flip_up_down(image_mask)
+        img, mask = tf.split(image_mask, [3,1], axis=-1)
+
+        img = tf.image.random_brightness(img, max_delta=0.1)
+        # img = tf.image.random_contrast(img, lower=0.7, upper=0.9)
+        img = tf.image.random_hue(img, max_delta=0.1)
+        # img = tf.image.random_saturation(img, lower=0.7, upper=0.9)
+
+        target_h = tf.cast(crop_size*ratio, tf.int32)
+        target_w = tf.cast(crop_size*ratio, tf.int32)
+        img = tf.image.resize_images(img, [target_h, target_w])
+        mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
+
+        ## Recenter to [-0.5, 0.5] for SELU activations
+        # img = tf.cast(img, tf.float32)
+        img = tf.multiply(img, 2/255.0) - 1
+        mask = tf.cast(mask, self.mask_dtype)
+
+        if self.as_onehot:
+            mask = tf.one_hot(mask, depth=self.n_classes)
+            mask = tf.squeeze(mask)
+        # mask = tf.reshape(mask,
+        #     [-1, self.x_dims[0], self.x_dims[1], self.n_classes])
+
+        return img, mask
 
 
 """
 Pre-concatenated image-mask: [h,w,4]
 """
 class ImageComboDataSet(DataSet):
-    defaults = {
+    image_combo_defaults = {
         'augmentation': 'random',
         'batch_size': 16,
         'crop_size': 256,
@@ -450,9 +446,9 @@ class ImageComboDataSet(DataSet):
     }
 
     def __init__(self, **kwargs):
-        self.defaults.update(kwargs)
+        self.image_combo_defaults.update(kwargs)
         # print self.defaults
-        super(ImageComboDataSet, self).__init__(**self.defaults)
+        super(ImageComboDataSet, self).__init__(**self.image_combo_defaults)
         assert self.image_dir is not None
 
         ## ----------------- Load Image Lists ------------------- ##

@@ -17,7 +17,7 @@ opencv 3.3.0
 
 ## Getting started
 Example scripts for data set interface, training and testing various models are provided under `experiments/`.
-- N-class semantic segmentation
+- N-class semantic segmentation with various architectures (your data)
 - Generative Adversarial Networks (MNIST)
 - Variational Autoencoders (MNIST)
 - Multi-instance / bagged labels (MNIST)
@@ -40,16 +40,18 @@ The `experiments` directory contains examples for training some of the models.
 
 For example:
 
-```
+```python
 import tfmodels
 import tensorflow as tf
 
-## Define training settings, batch_size, data_path, training iterations/epochs, etc.
+## Define training settings
 
-dataset = tfmodels.ImageComboDataSet(batch_size=batch_size, image_dir=data_path, ...)
+dataset = tfmodels.ImageComboDataSet(
+  batch_size=batch_size, image_dir=data_path, ...)
 
 with tf.Session() as sess:
-  model = tfmodels.DenseNetTraining(sess=sess, dataset=dataset, ...)
+  model = tfmodels.DenseNetTraining(
+    sess=sess, dataset=dataset, ...)
 
   for iter in xrange(n_iters):
     model.train_step()
@@ -77,6 +79,9 @@ Planned improvement to move towards the new `Dataset` API in TensorFlow. (https:
 #### License
 Please provide citation if you use this library for your research.
 
+```
+BIBTEX
+```
 
 Copyright 2017 BioImageInformatics Lab, Cedars-Sinai Medical Center
 

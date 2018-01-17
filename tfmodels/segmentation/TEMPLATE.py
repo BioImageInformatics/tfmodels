@@ -1,20 +1,22 @@
 import tensorflow as tf
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
-class TEMPLATE(SegmentationBaseModel):
-    base_defaults={
-        'conv_kernels': None,
-        'deconv_kernels': None,
+class TEMPLATE(Segmentation):
+    TEMPLATE_defaults={
         'k_size': None,
+        'n_classes': 2,
         'name': 'TEMPLATE',
     }
 
     def __init__(self, **kwargs):
-        self.base_defaults.update(**kwargs)
-        super(TEMPLATE, self).__init__(**self.base_defaults)
+        self.TEMPLATE_defaults.update(**kwargs)
 
-        assert self.n_classes is not None
+        assert TEMPLATE_defaults['k_size'] is not None
+        assert TEMPLATE_defaults['n_classes'] is not None
+
+        super(TEMPLATE, self).__init__(**self.TEMPLATE_defaults)
+
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
         print 'TEMPLATE Model'
@@ -27,12 +29,12 @@ class TEMPLATE(SegmentationBaseModel):
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
 
-            y_hat = x_hat
+            y_hat = tf.identity(x_hat)
 
             return y_hat
 
 
-class TEMPLATETraining(SegNet):
+class TEMPLATETraining(TEMPLATE):
     train_defaults = { 'mode': 'TRAIN' }
 
     def __init__(self, **kwargs):
@@ -40,7 +42,7 @@ class TEMPLATETraining(SegNet):
         super(TEMPLATETraining, self).__init__(**self.train_defaults)
 
 
-class TEMPLATEInference(SegNet):
+class TEMPLATEInference(TEMPLATE):
     inference_defaults = { 'mode': 'TEST' }
 
     def __init__(self, **kwargs):

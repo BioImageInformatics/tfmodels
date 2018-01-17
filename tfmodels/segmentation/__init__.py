@@ -1,4 +1,5 @@
-from segmentation_basemodel import SegmentationBaseModel
+from segmentation_basemodel import Segmentation
+from regression_basemodel import ImageRegression
 from discriminator import SegmentationDiscriminator
 from segnet import SegNetTraining, SegNetInference
 from vgg import VGGTraining, VGGInference
@@ -8,7 +9,9 @@ from densenet import DenseNetTraining, DenseNetInference
 # from resnet_bottleneck import ResNetBottleneckTraining, ResNetBottleneckInference
 
 
-__all__ = ['SegmentationDiscriminator',
+__all__ = ['Segmentation',
+           'ImageRegression',
+           'SegmentationDiscriminator',
            'SegNetTraining',
            'SegNetInference',
            'VGGTraining',
