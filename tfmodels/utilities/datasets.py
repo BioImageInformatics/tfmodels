@@ -305,7 +305,16 @@ class DataSet(object):
     def get_batch(self):
         raise Exception(NotImplementedError)
 
+"""
+TODO:
+https://www.tensorflow.org/programmers_guide/datasets#applying_arbitrary_python_logic_with_tfpy_func
 
+TODO:
+We can have multiple initialized datasets sitting around and feed the initializer
+into the placeholder via feed_dict:
+REF: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md
+
+"""
 class TFRecordImageMask(object):
     defaults = {'training_record': None,
                 'testing_record': None,
@@ -333,7 +342,7 @@ class TFRecordImageMask(object):
         self.record_path = tf.placeholder_with_default(self.training_record, shape=())
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
-                        .shuffle(buffer_size=self.batch_size*3)
+                        .shuffle(buffer_size=self.batch_size*2)
                         # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)

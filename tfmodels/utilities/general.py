@@ -172,6 +172,25 @@ def _read_img_mask(imgp, maskp, subimages=None, n_classes=None):
     return img, mask, ih, iw
 
 
+def estimate_dataset_size(img_path, mask_path, n_classes, n_examples):
+    img_, mask_, ih, iw = _read_img_mask(img_path, mask_path)
+
+    return (img_.nbytes + mask_.nbytes) * n_examples
+
+"""
+TODO (Nathan)
+IN case the dataset is too large to fit into memory, it's probably best to split
+it up into several smaller TFRecord's
+During training we'll have to switch the active dataset with a placeholder
+that feeds initialized datasets
+
+(REF: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md)
+
+1. Estimate the dataset size
+2. Shuffle the file handles
+3. Split it into sizable chunks
+4. Save them
+"""
 def image_mask_2_tfrecord(img_path, mask_path, record_path, img_process_fn=None,
     mask_process_fn=None, n_classes=None, subimages=None,
     img_ext='jpg', mask_ext='png'):
@@ -182,6 +201,7 @@ def image_mask_2_tfrecord(img_path, mask_path, record_path, img_process_fn=None,
     mask_list = sorted(glob.glob(os.path.join(mask_path, '*'+mask_ext)))
 
     assert len(img_list) == len(mask_list)
+    # estimated_size = estimate_dataset_size(img_list[0], mask_list[0], n_classes)
 
     count = 0
     for imgp, maskp in zip(img_list, mask_list):
@@ -234,28 +254,33 @@ def image_mask_2_tfrecord(img_path, mask_path, record_path, img_process_fn=None,
     print 'Finished writing [{}]'.format(record_path)
 
 
-def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=1.0,
-    batch_size=32, prefetch=5000, nthreads=4, as_onehot=True,
+
+def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
+    batch_size=32, prefetch=5000, n_threads=4, as_onehot=True, n_classes=None,
     img_dtype=tf.uint8, mask_dtype=tf.uint8):
     with tf.Session() as sess:
-        dataset = TFRecordImageMask(record_path = record_path,
+        dataset = TFRecordImageMask(
+            training_record = record_path,
             as_onehot = as_onehot,
+            n_classes = n_classes,
             crop_size = crop_size,
             ratio = image_ratio,
             batch_size = batch_size,
             prefetch = prefetch,
-            n_threads = 8,
+            n_threads = n_threads,
             img_dtype = img_dtype,
             mask_dtype = mask_dtype,
             sess = sess )
 
         pull_times = []
         print 'Checking 25 batches of {} examples'.format(batch_size)
-        for _ in xrange(iterations):
+        for k in xrange(iterations):
             tstart = time.time()
             img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
-            print img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max()
             pull_times.append(time.time() - tstart)
+            ps = '{:03d} IMG type [{}] shape [{}]'.format(k, img_.dtype, img_.shape, )
+            ps += 'MASK type [{}] range [{}-{}]'.format(mask_.dtype, mask_.min(), mask_.max())
+            print ps
 
     print 'Average time:', np.mean(pull_times)
 

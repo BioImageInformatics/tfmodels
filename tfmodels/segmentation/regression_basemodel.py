@@ -4,7 +4,7 @@ import sys, os
 
 from ..utilities.basemodel import BaseModel
 
-class ImageRegression(BaseModel):
+class Regression(BaseModel):
     ## Defaults. arXiv links correspond to inspirational materials
     regression_defaults={
         'dataset': None,
@@ -24,14 +24,14 @@ class ImageRegression(BaseModel):
         'summary_image_n': 4,
         'summary_op_list': [],
         'with_test': False,
-        'n_test_batches': 5,
+        'n_test_batches': 10,
         'x_dims': [256, 256, 3],
      }
 
     def __init__(self, **kwargs):
         self.regression_defaults.update(**kwargs)
 
-        super(ImageRegression, self).__init__(**self.regression_defaults)
+        super(Regression, self).__init__(**self.regression_defaults)
         assert self.sess is not None
 
         if self.mode=='TRAIN':
@@ -207,10 +207,10 @@ class ImageRegression(BaseModel):
         raise Exception(NotImplementedError)
 
 
-    def test_step(self, keep_prob=1.0):
+    def test_step(self, step_delta, keep_prob=0.8):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
-        self.summary_writer.add_summary(summary_str, self.global_step)
+        self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
         print '#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
 
 
@@ -224,14 +224,12 @@ class ImageRegression(BaseModel):
         if self.global_step % self.summary_image_iters == 0:
             self._write_image_summaries()
 
-    """
-    Run a number of testing iterations
-    """
+    """ Run a number of testing iterations """
     def test(self):
         ## Switch dataset to testing
         self.dataset._initalize_testing(self.sess)
 
-        for _ in xrange(self.n_test_batches):
-            self.test_step()
+        for step_delta in xrange(self.n_test_batches):
+            self.test_step(step_delta)
 
         self.dataset._initalize_training(self.sess)

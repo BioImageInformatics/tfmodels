@@ -40,14 +40,6 @@ class BaseModel(object):
         return [var for var in t_vars if self.name in var.name]
 
 
-    def inference(self, x_in, keep_prob=1.0):
-        raise Exception(NotImplementedError)
-
-
-    def _loss_op(self):
-        raise Exception(NotImplementedError)
-
-
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
 
@@ -75,15 +67,15 @@ class BaseModel(object):
         print 'Done'
 
 
-    def summaries(self):
-        raise Exception(NotImplementedError)
-
-
-    def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
+    def _count_params(self):
+        self.pcount = 0
+        for vv in self.var_list:
+            self.pcount += np.prod(vv.get_shape().as_list())
 
 
     def _tf_ops(self):
+        self._count_params()
+
         # with tf.device('/cpu:0'):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
@@ -91,10 +83,6 @@ class BaseModel(object):
         self.snapshot_path = os.path.join(self.save_dir, '{}.ckpt'.format(self.name))
         # self.make_saver() ## In progress (SAVE1)
         self.saver = tf.train.Saver(max_to_keep=self.max_to_keep)
-
-
-    def train_step(self, global_step):
-        raise Exception(NotImplementedError)
 
 
     def print_info(self):

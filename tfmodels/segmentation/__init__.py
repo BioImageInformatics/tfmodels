@@ -1,5 +1,5 @@
 from segmentation_basemodel import Segmentation
-from regression_basemodel import ImageRegression
+from regression_basemodel import Regression
 from discriminator import SegmentationDiscriminator
 from segnet import SegNetTraining, SegNetInference
 from vgg import VGGTraining, VGGInference
@@ -10,7 +10,7 @@ from densenet import DenseNetTraining, DenseNetInference
 
 
 __all__ = ['Segmentation',
-           'ImageRegression',
+           'Regression',
            'SegmentationDiscriminator',
            'SegNetTraining',
            'SegNetInference',

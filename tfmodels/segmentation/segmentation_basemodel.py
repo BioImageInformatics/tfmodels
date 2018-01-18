@@ -25,6 +25,8 @@ class Segmentation(BaseModel):
         'summary_image_iters': 250,
         'summary_image_n': 4,
         'summary_op_list': [],
+        'with_test': False,
+        'n_test_batches': 10,
         'x_dims': [256, 256, 3],
      }
 
@@ -48,6 +50,10 @@ class Segmentation(BaseModel):
             name='x_in')
         self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.n_classes], name='y_in')
+
+        ## Check for a testing dataset
+        if self.dataset.testing_record is not None:
+            self.with_test = True
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
@@ -159,19 +165,43 @@ class Segmentation(BaseModel):
         self.summary_scalars_op = tf.summary.merge_all()
 
         ## Images
-        self.y_in_mask = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
-        self.y_in_mask = tf.expand_dims(self.y_in_mask, axis=-1)
-        self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
-        self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
+        with tf.variable_scope('training_images'):
+            self.y_in_mask = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
+            self.y_in_mask = tf.expand_dims(self.y_in_mask, axis=-1)
+            self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
+            self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
 
-        self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
-        self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
-        self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
+            self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=4)
+            self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=4)
+            self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
 
         ## TODO Filters
 
         self.summary_images_op = tf.summary.merge(
             [self.x_in_sum, self.y_in_sum, self.y_hat_sum])
+
+
+    def _make_test_ops(self):
+        if self.with_test is None:
+            print 'WARNING no TEST tfrecord dataset; Skipping test mode'
+            return
+
+        with tf.variable_scope('testing_scalars'):
+            self.loss_sum_test = tf.summary.scalar('loss_test', self.loss)
+
+        with tf.variable_scope('testing_images'):
+            # self.y_in_mask_test = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
+            # self.y_in_mask_test = tf.expand_dims(self.y_in_mask, axis=-1)
+            # self.y_hat_mask_test = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
+            # self.y_hat_mask_test = tf.cast(self.y_hat_mask, tf.float32)
+
+            self.x_in_sum_test = tf.summary.image('x_in_test', self.x_in, max_outputs=self.summary_image_n)
+            self.y_in_sum_test = tf.summary.image('y_in_test', self.y_in_mask, max_outputs=self.summary_image_n)
+            self.y_hat_sum_test = tf.summary.image('y_hat_test', self.y_hat_mask, max_outputs=self.summary_image_n)
+
+            self.summary_test_ops = tf.summary.merge(
+                [self.loss_sum_test, self.x_in_sum_test,
+                 self.y_in_sum_test, self.y_hat_sum_test])
 
 
     def _write_scalar_summaries(self):
@@ -198,9 +228,11 @@ class Segmentation(BaseModel):
         raise Exception(NotImplementedError)
 
 
-    ## TODO -- maybe
-    def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
+    def test_step(self, step_delta, keep_prob=1.0):
+        fd = {self.keep_prob: keep_prob}
+        summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
+        self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
+        print '#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
 
 
     def train_step(self):
@@ -212,3 +244,14 @@ class Segmentation(BaseModel):
 
         if self.global_step % self.summary_image_iters == 0:
             self._write_image_summaries()
+
+
+    """ Run a number of testing iterations """
+    def test(self):
+        ## Switch dataset to testing
+        self.dataset._initalize_testing(self.sess)
+
+        for step_delta in xrange(self.n_test_batches):
+            self.test_step(step_delta)
+
+        self.dataset._initalize_training(self.sess)
