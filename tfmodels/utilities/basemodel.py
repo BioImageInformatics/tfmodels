@@ -69,6 +69,10 @@ class BaseModel(object):
 
     def _count_params(self):
         self.pcount = 0
+        try:
+            assert self.var_list is not None
+        except:
+            self.var_list = [var for var in tf.trainable_variables() if self.name in var.name]
         for vv in self.var_list:
             self.pcount += np.prod(vv.get_shape().as_list())
 

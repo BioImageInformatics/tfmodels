@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import os, glob, cv2
 import threading
-from openslide import OpenSlide
+# from openslide import OpenSlide
 
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -413,10 +413,10 @@ class TFRecordImageMask(object):
         image_mask = tf.image.random_flip_up_down(image_mask)
         img, mask = tf.split(image_mask, [3,1], axis=-1)
 
-        img = tf.image.random_brightness(img, max_delta=0.1)
-        # img = tf.image.random_contrast(img, lower=0.7, upper=0.9)
-        img = tf.image.random_hue(img, max_delta=0.1)
-        # img = tf.image.random_saturation(img, lower=0.7, upper=0.9)
+        img = tf.image.random_brightness(img, max_delta=0.05)
+        img = tf.image.random_contrast(img, lower=0.7, upper=0.9)
+        img = tf.image.random_hue(img, max_delta=0.05)
+        img = tf.image.random_saturation(img, lower=0.7, upper=0.9)
 
         target_h = tf.cast(crop_size*ratio, tf.int32)
         target_w = tf.cast(crop_size*ratio, tf.int32)
@@ -610,25 +610,25 @@ class ImageFeeder(DataSet):
 
 
 
-## TODO
-class SVSDataSet(DataSet):
-    svs_defaults = {
-        'batch_size': 16,
-        'crop_size': 256,
-        'svs_path': None,
-        'ratio': 1.0,
-        'capacity': 5000,
-        'threads': 4,
-        'min_holding': 1250,
-        'dstype': 'ImageMask' }
-    def __init__(self, **kwargs):
-        self.svs_defaults.update(**kwargs)
-        super(SVSDataSet, self).__init__(**self.svs_defaults)
-
-        assert self.svs_path is not None and os.path.exists(self.svs_path)
-
-        self.svs = OpenSlide(self.svs_path)
-
-        ## Compute a foreground mask
-
-        ## Somehow generate tiles from the file from area underneath the mask
+# ## TODO
+# class SVSDataSet(DataSet):
+#     svs_defaults = {
+#         'batch_size': 16,
+#         'crop_size': 256,
+#         'svs_path': None,
+#         'ratio': 1.0,
+#         'capacity': 5000,
+#         'threads': 4,
+#         'min_holding': 1250,
+#         'dstype': 'ImageMask' }
+#     def __init__(self, **kwargs):
+#         self.svs_defaults.update(**kwargs)
+#         super(SVSDataSet, self).__init__(**self.svs_defaults)
+#
+#         assert self.svs_path is not None and os.path.exists(self.svs_path)
+#
+#         self.svs = OpenSlide(self.svs_path)
+#
+#         ## Compute a foreground mask
+#
+#         ## Somehow generate tiles from the file from area underneath the mask

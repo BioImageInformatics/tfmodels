@@ -58,13 +58,16 @@ class Segmentation(BaseModel):
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False)
+        self.training = tf.placeholder_with_default(True, shape=())
+        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
+            training=self.training)
 
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
         print 'Model output y_hat:', self.y_hat.get_shape()
 
         ## ------------------- Training ops ------------------- ##
         self.var_list = self._get_update_list()
+        self.learning_rate = tf.placeholder_with_default(self.learning_rate, shape=(), name='LR')
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
             name='{}_Adam'.format(self.name))
 
@@ -72,6 +75,9 @@ class Segmentation(BaseModel):
 
         ## ------------------- Gather Summary ops ------------------- ##
         self._make_summaries()
+
+        ## ------------------- Gather Testing ops ------------------- ##
+        self._make_test_ops()
 
         ## ------------------- TensorFlow helpers ------------------- ##
         self._tf_ops()
@@ -123,7 +129,7 @@ class Segmentation(BaseModel):
         if self.class_weights:
             self.seg_loss = self._class_weighted_loss()
         else:
-            self.seg_loss = tf.nn.softmax_cross_entropy_with_logits(
+            self.seg_loss = tf.nn.softmax_cross_entropy_with_logits_v2(
                 labels=self.y_in, logits=self.y_hat)
             self.seg_loss = tf.reduce_mean(self.seg_loss)
 
@@ -203,11 +209,12 @@ class Segmentation(BaseModel):
                 [self.loss_sum_test, self.x_in_sum_test,
                  self.y_in_sum_test, self.y_hat_sum_test])
 
-
-    def _write_scalar_summaries(self):
+    def _write_scalar_summaries(self, lr=None):
+        if lr is None: lr='constant'
         summary_str, seg_loss_ = self.sess.run([self.summary_scalars_op, self.seg_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
-        print '[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, seg_loss_)
+        print '[{:07d}] writing scalar summaries (loss={:3.3f}) (lr={:03E})'.format(self.global_step, seg_loss_,
+            lr)
 
 
     def _write_image_summaries(self):
@@ -218,7 +225,8 @@ class Segmentation(BaseModel):
 
     def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
-                     self.keep_prob: keep_prob}
+                     self.keep_prob: keep_prob,
+                     self.training: False}
         y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
         # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
         return y_hat_

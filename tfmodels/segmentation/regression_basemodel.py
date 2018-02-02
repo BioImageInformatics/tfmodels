@@ -56,7 +56,8 @@ class Regression(BaseModel):
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False)
+        self.training = tf.placeholder_with_default(True, shape=[], name='training')
+        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False, training=self.training)
 
         print 'Model output y_hat:', self.y_hat.get_shape()
 
@@ -89,11 +90,9 @@ class Regression(BaseModel):
             name='x_in')
 
         ## ------------------- Model ops ------------------- ##
-        # self.keep_prob = tf.placeholder('float', name='keep_prob')
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
         self.training = tf.placeholder_with_default(False, shape=[], name='training')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
-            training=self.training)
+        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False, training=self.training)
 
         # self.make_saver() ## In progress (SAVE1)
         # with tf.device('/cpu:0'):

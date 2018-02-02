@@ -136,20 +136,20 @@ def _int64_feature(value):
     return tf.train.Feature(
         int64_list=tf.train.Int64List(value=[value]))
 
-def _cut_subimages(img, edge):
+def _cut_subimages(img, subimage_size):
     h, w = img.shape[:2]
 
-    hT = h / float(edge)
-    wT = w / float(edge)
+    hT = h / float(subimage_size)
+    wT = w / float(subimage_size)
 
     subimgs = []
-    for ih in np.linspace(0, h-edge, np.ceil(hT), dtype=np.int):
-        for iw in np.linspace(0, w-edge, np.ceil(wT), dtype=np.int):
-            subimgs.append(img[ih:ih+edge, iw:iw+edge])
+    for ih in np.linspace(0, h-subimage_size, np.ceil(hT), dtype=np.int):
+        for iw in np.linspace(0, w-subimage_size, np.ceil(wT), dtype=np.int):
+            subimgs.append(img[ih:ih+subimage_size, iw:iw+subimage_size])
 
     return subimgs
 
-def _read_img_mask(imgp, maskp, subimages=None, n_classes=None):
+def _read_img_mask(imgp, maskp, subimage_size=None, n_classes=None):
     img = cv2.imread(imgp, -1)[:,:,::-1]
     mask = cv2.imread(maskp, -1)
 
@@ -165,9 +165,9 @@ def _read_img_mask(imgp, maskp, subimages=None, n_classes=None):
     assert ih == mh
     assert iw == mw
 
-    if subimages is not None:
-        img = _cut_subimages(img, subimages)
-        mask = _cut_subimages(mask, subimages)
+    if subimage_size is not None:
+        img = _cut_subimages(img, subimage_size)
+        mask = _cut_subimages(mask, subimage_size)
 
     return img, mask, ih, iw
 
@@ -191,29 +191,46 @@ that feeds initialized datasets
 3. Split it into sizable chunks
 4. Save them
 """
-def image_mask_2_tfrecord(img_path, mask_path, record_path, img_process_fn=None,
-    mask_process_fn=None, n_classes=None, subimages=None,
-    img_ext='jpg', mask_ext='png'):
+def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
+    mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,):
 
     writer = tf.python_io.TFRecordWriter(record_path)
 
-    img_list = sorted(glob.glob(os.path.join(img_path, '*'+img_ext)))
-    mask_list = sorted(glob.glob(os.path.join(mask_path, '*'+mask_ext)))
+    # img_list = sorted(glob.glob(os.path.join(img_path, '*'+img_ext)))
+    # mask_list = sorted(glob.glob(os.path.join(mask_path, '*'+mask_ext)))
+    img_list = sorted(glob.glob(img_patt))
+    mask_list = sorted(glob.glob(mask_patt))
 
-    assert len(img_list) == len(mask_list)
+    if name_transl_fn is None:
+        ## We're relying on our past selves to have not messed up
+        assert len(img_list) == len(mask_list)
+        assert len(img_list) > 0
+    print 'Got {} source images'.format(len(img_list))
     # estimated_size = estimate_dataset_size(img_list[0], mask_list[0], n_classes)
+
+    ## Shuffle and subset
+    tmp_list = zip(img_list, mask_list)
+    np.random.shuffle(tmp_list)
+    # tmp_list = tmp_list[:min(len(tmp_list), 50)]
+    img_list, mask_list = zip(*tmp_list)
 
     count = 0
     for imgp, maskp in zip(img_list, mask_list):
-        imgbase = os.path.basename(imgp).replace(img_ext, '')
-        maskbase = os.path.basename(maskp).replace(mask_ext, '')
+        imgbase = os.path.basename(imgp)
+        ## Overwrite mask_list... this is bad bad bad
+        if name_transl_fn is not None:
+            maskp = name_transl_fn(imgp)
+            assert os.path.exists(maskp)
+        maskbase = os.path.basename(maskp)
 
-        if imgbase != maskbase:
-            print 'mismatch:', imgbase, maskbase
-            continue
+        imgbase = os.path.splitext(imgbase)[0]
+        maskbase = os.path.splitext(maskbase)[0]
+
+        print imgbase, maskbase
+        ## TODO (nathan) check image-masks combos -- names should match
 
         img, mask, height, width = _read_img_mask(imgp, maskp,
-            subimages=subimages, n_classes=n_classes)
+            subimage_size=subimage_size, n_classes=n_classes)
 
         if img_process_fn is not None:
             img = img_process_fn(img)
@@ -221,13 +238,13 @@ def image_mask_2_tfrecord(img_path, mask_path, record_path, img_process_fn=None,
         if mask_process_fn is not None:
             mask = mask_process_fn(mask)
 
-        if subimages is not None:
+        if subimage_size is not None:
             for img_, mask_ in zip(img, mask):
                 img_raw = img_.tostring()
                 mask_raw = mask_.tostring()
                 example = tf.train.Example(features=tf.train.Features(feature={
-                    'height': _int64_feature(subimages),
-                    'width': _int64_feature(subimages),
+                    'height': _int64_feature(subimage_size),
+                    'width': _int64_feature(subimage_size),
                     'img': _bytes_feature(img_raw),
                     'mask': _bytes_feature(mask_raw) }))
                 writer.write(example.SerializeToString())
@@ -279,7 +296,7 @@ def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
             img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
             pull_times.append(time.time() - tstart)
             ps = '{:03d} IMG type [{}] shape [{}]'.format(k, img_.dtype, img_.shape, )
-            ps += 'MASK type [{}] range [{}-{}]'.format(mask_.dtype, mask_.min(), mask_.max())
+            ps += ' MASK type [{}] range [{}-{}] shape [{}]'.format(mask_.dtype, mask_.min(), mask_.max(), mask_.shape)
             print ps
 
     print 'Average time:', np.mean(pull_times)

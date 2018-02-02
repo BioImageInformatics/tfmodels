@@ -10,6 +10,7 @@ import glob
 import cv2
 import numpy as np
 import sys
+import argparse
 
 def main(*args):
     imgdir = args[0][0]
@@ -17,7 +18,7 @@ def main(*args):
 
     print 'Looking for {} classes in dir: {}'.format(class_num, imgdir)
 
-    term = os.path.join(imgdir, '*.png')
+    term = os.path.join(imgdir, '*class.png')
     imgs = glob.glob(term)
     print 'Found {} images'.format(len(imgs))
 
@@ -33,7 +34,7 @@ def main(*args):
         im = cv2.imread(img, -1)
         if im.shape[-1] == 3:
             im = im[:,:,0]
-            
+
         h,w = im.shape[:2]
         ux = np.unique(im)
 
@@ -89,6 +90,9 @@ python get_class_weights.py [path] [nclasses]
 python get_class_weights.py /path/to/png/ 4
 """
 if __name__ == '__main__':
+
+    # parser = argparse.ArgumentParser()
+
     if len(sys.argv) > 3 or len(sys.argv) < 2:
         print "get_class_weights.py takes exactly two arguments"
     else:
