@@ -107,21 +107,6 @@ def test_bayesian_inference(model, test_x_list, output_dir, prefix='', keep_prob
             scale='max', ext='png', stack_axis=-1)
 
 
-""" Convenience function to initialize an experiment """
-def init_experiment(exp_name, recreate=False, root_dir='.', subdirs=None):
-    if subdirs is None:
-        subdirs = ['logs', 'snapshots', 'debug', 'inference']
-
-    exp_root = os.path.join(root_dir, exp_name)
-    if not os.path.exists(exp_root, 'dir'):
-        os.mkdirs(exp_root)
-
-
-    elif os.path.exists(exp_root, 'dir') and recreate:
-        print 'Deleting {}'.format(exp_root)
-        shutil.rmdtree(exp_root)
-        print 'Remaking {}'.format(exp_root)
-
 
 """
 http://warmspringwinds.github.io/tensorflow/tf-slim/2016/12/21/tfrecords-guide/
@@ -315,6 +300,11 @@ def check_tfrecord_dataset(dataset, iterations=25):
     print 'Average time:', np.mean(pull_times)
 
 
+""" Create an experiment directory for organizing logs and snapshots
+
+    log_dir, save_dir, debug_dir, infer_dir = tfmodels.make_experiment(basedir)
+
+"""
 def make_experiment(basedir, remove_old=False):
     expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     log_dir    = os.path.join(basedir, 'logs/{}'.format(expdate))

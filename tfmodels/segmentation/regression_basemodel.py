@@ -23,7 +23,6 @@ class Regression(BaseModel):
         'summary_image_iters': 250,
         'summary_image_n': 4,
         'summary_op_list': [],
-        'with_test': False,
         'n_test_batches': 10,
         'x_dims': [256, 256, 3],
      }
@@ -52,6 +51,8 @@ class Regression(BaseModel):
         ## Check for a testing dataset
         if self.dataset.testing_record is not None:
             self.with_test = True
+        else:
+            self.with_test = False
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
