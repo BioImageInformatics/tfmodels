@@ -11,6 +11,21 @@ We can have multiple initialized datasets sitting around and feed the initialize
 into the placeholder via feed_dict:
 REF: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md
 
+TFRecordDataset(training_record = None,
+    testing_record = None,
+    crop_size = 512,
+    ratio = 1.0,
+    batch_size = 32,
+    prefetch = 1000,
+    n_threads = 4,
+    sess = None,
+    as_onehot = True,
+    n_classes = True,
+    img_dtype = tf.uint8,
+    mask_dtype = tf.uint8,
+    name = 'TFRecordDataset' )
+
+
 """
 class TFRecordImageMask(object):
     defaults = {'training_record': None,
