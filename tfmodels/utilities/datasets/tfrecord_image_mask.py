@@ -40,6 +40,8 @@ class TFRecordImageMask(object):
                 'n_classes': None,
                 'img_dtype': tf.uint8,
                 'mask_dtype': tf.uint8,
+                'img_channels': 3,
+                'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
                 'name': 'TFRecordDataset' }
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
@@ -110,7 +112,7 @@ class TFRecordImageMask(object):
 
     def _preprocessing(self, example, crop_size, ratio):
         h, w, img, mask = self._decode(example)
-        img_shape = tf.stack([h, w, -1], axis=0)
+        img_shape = tf.stack([h, w, self.img_channels], axis=0)
         mask_shape = tf.stack([h, w], axis=0)
 
         img = tf.reshape(img, img_shape)
@@ -120,15 +122,23 @@ class TFRecordImageMask(object):
         image_mask = tf.concat([img, mask], axis=-1)
 
         image_mask = tf.random_crop(image_mask,
-            [crop_size, crop_size, 4])
+            [crop_size, crop_size, self.img_channels + 1])
         image_mask = tf.image.random_flip_left_right(image_mask)
         image_mask = tf.image.random_flip_up_down(image_mask)
-        img, mask = tf.split(image_mask, [3,1], axis=-1)
+        img, mask = tf.split(image_mask, [self.img_channels,1], axis=-1)
 
-        img = tf.image.random_brightness(img, max_delta=0.05)
-        img = tf.image.random_contrast(img, lower=0.7, upper=0.9)
-        img = tf.image.random_hue(img, max_delta=0.05)
-        img = tf.image.random_saturation(img, lower=0.7, upper=0.9)
+        for px in self.preprocess:
+            if px == 'brightness':
+                img = tf.image.random_brightness(img, max_delta=0.05)
+
+            elif px == 'contrast':
+                img = tf.image.random_contrast(img, lower=0.7, upper=0.9)
+
+            elif px == 'hue':
+                img = tf.image.random_hue(img, max_delta=0.05)
+
+            elif px == 'saturation':
+                img = tf.image.random_saturation(img, lower=0.7, upper=0.9)
 
         target_h = tf.cast(crop_size*ratio, tf.int32)
         target_w = tf.cast(crop_size*ratio, tf.int32)

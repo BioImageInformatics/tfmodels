@@ -134,16 +134,15 @@ def _cut_subimages(img, subimage_size):
 
     return subimgs
 
-def _read_img_mask(imgp, maskp, subimage_size=None, n_classes=None):
-    img = cv2.imread(imgp, -1)[:,:,::-1]
+def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subimage_size=None):
+    img = cv2.imread(imgp, -1)
     mask = cv2.imread(maskp, -1)
 
-    if len(mask.shape) == 3:
-        mask = mask[:,:,0]
+    if img_process_fn is not None:
+        img = img_process_fn(img)
 
-    if n_classes is not None:
-        if mask.max() > 255/(n_classes-1):
-            mask /= 255/(n_classes-1) ## Assume that 0 is counted as a class
+    if mask_process_fn is not None:
+        mask = mask_process_fn(mask)
 
     ih, iw = img.shape[:2]
     mh, mw = mask.shape[:2]
@@ -205,23 +204,19 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
         ## Overwrite mask_list... this is bad bad bad
         if name_transl_fn is not None:
             maskp = name_transl_fn(imgp)
-            assert os.path.exists(maskp)
+
+        assert os.path.exists(maskp)
         maskbase = os.path.basename(maskp)
 
         imgbase = os.path.splitext(imgbase)[0]
         maskbase = os.path.splitext(maskbase)[0]
 
-        print imgbase, maskbase
+        # print imgbase, maskbase
         ## TODO (nathan) check image-masks combos -- names should match
-
         img, mask, height, width = _read_img_mask(imgp, maskp,
-            subimage_size=subimage_size, n_classes=n_classes)
-
-        if img_process_fn is not None:
-            img = img_process_fn(img)
-
-        if mask_process_fn is not None:
-            mask = mask_process_fn(mask)
+            img_process_fn=img_process_fn,
+            mask_process_fn=mask_process_fn,
+            subimage_size=subimage_size)
 
         if subimage_size is not None:
             for img_, mask_ in zip(img, mask):
@@ -238,6 +233,7 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
                     print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(
                         record_path, count, len(img_list))
         else:
+            print 'writing img: {} mask: {}, {}'.format(img.shape, mask.shape, np.unique(mask))
             img_raw = img.tostring()
             mask_raw = mask.tostring()
             example = tf.train.Example(features=tf.train.Features(feature={
@@ -259,7 +255,7 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
 
 def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
     batch_size=32, prefetch=5000, n_threads=4, as_onehot=True, n_classes=None,
-    img_dtype=tf.uint8, mask_dtype=tf.uint8):
+    img_dtype=tf.uint8, mask_dtype=tf.uint8, img_channels=3, preprocess=[]):
     with tf.Session() as sess:
         dataset = TFRecordImageMask(
             training_record = record_path,
@@ -272,6 +268,8 @@ def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
             n_threads = n_threads,
             img_dtype = img_dtype,
             mask_dtype = mask_dtype,
+            img_channels = img_channels,
+            preprocess = preprocess,
             sess = sess )
 
         pull_times = []
