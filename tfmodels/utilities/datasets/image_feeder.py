@@ -1,4 +1,5 @@
 import tensorflow as tf
+from dataset_base import DataSet
 
 """
 Only images, unlabelled
