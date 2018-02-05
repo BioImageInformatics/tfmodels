@@ -222,7 +222,6 @@ class Segmentation(BaseModel):
         summary_str = self.sess.run(self.summary_images_op)
         self.summary_writer.add_summary(summary_str, self.global_step)
 
-
     def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob,
@@ -231,17 +230,14 @@ class Segmentation(BaseModel):
         # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
         return y_hat_
 
-
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
-
 
     def test_step(self, step_delta, keep_prob=1.0):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
         print '#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
-
 
     def train_step(self):
         self.global_step += 1

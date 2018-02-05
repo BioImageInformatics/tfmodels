@@ -31,6 +31,7 @@ class SegNet(Segmentation):
             if reuse:
                 scope.reuse_variables()
             print '\t x_in', x_in.get_shape()
+            conv_args = {'k_size': k_size, 'stride': 1, 'selu': True}
 
             c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=k_size, stride=1, var_scope='c0_0', selu=1))
             c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=k_size, stride=1, var_scope='c0_1', selu=1))

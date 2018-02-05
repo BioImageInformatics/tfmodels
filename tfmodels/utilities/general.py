@@ -34,20 +34,34 @@ def save_image_stack(stack, writeto,
         cv2.imwrite(img_name, img)
 
 
-def bayesian_inference(model, x_in, samples, keep_prob=0.5):
-    ## check x_in for shape
+def bayesian_inference(model, x_in, samples, keep_prob=0.5, verbose=False):
+    ## check x_in shape
     assert len(x_in.shape) == 4
     assert x_in.shape[0] == 1
+    if verbose:
+        print 'Entering ops.bayesian_inference() with {} samples'.format(samples)
+        print 'Got x_in: {} [{}-{}]'.format(x_in.shape, x_in.min(), x_in.max())
+        print 'initializing y_hat'
 
     y_hat = model.inference(x_in=x_in, keep_prob=keep_prob)
     y_hat = np.expand_dims(y_hat, -1)
+    if verbose:
+        print 'y_hat initialized: {}'.format(y_hat.shape)
+
     for tt in xrange(1, samples):
         y_hat_p = model.inference(x_in=x_in, keep_prob=keep_prob)
         y_hat = np.concatenate([y_hat, np.expand_dims(y_hat_p, -1)], -1)
 
+    if verbose:
+        print 'y_hat_i: {}'.format(y_hat.shape)
+        print 'finding means, variance and argmax'
     y_bar_mean = np.mean(y_hat, axis=-1)
     y_bar_var = np.var(y_hat, axis=-1)
     y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
+
+    if verbose:
+        print 'returning mean: {}, var: {}, y_bar: {} [{}]'.format(
+            y_bar_mean.shape, y_bar_var.shape, y_bar.shape, np.unique(y_bar))
 
     return y_bar_mean, y_bar_var, y_bar
 
@@ -220,7 +234,10 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
         ## Overwrite mask_list... this is bad bad bad
         if name_transl_fn is not None:
             maskp = name_transl_fn(imgp)
-            assert os.path.exists(maskp)
+            mask_exists = os.path.exists(maskp)
+            if not mask_exists:
+                print 'WARRNING!! Image {} no matching mask {}'.format(imgp, maskp)
+                continue
         maskbase = os.path.basename(maskp)
 
         imgbase = os.path.splitext(imgbase)[0]
