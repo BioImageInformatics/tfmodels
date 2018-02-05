@@ -17,12 +17,15 @@ TFRecordDataset(training_record = None,
     ratio = 1.0,
     batch_size = 32,
     prefetch = 1000,
+    shuffle_buffer = 512,
     n_threads = 4,
     sess = None,
     as_onehot = True,
     n_classes = True,
     img_dtype = tf.uint8,
     mask_dtype = tf.uint8,
+    img_channels = 3,
+    preprocess = ['brightness', 'hue', 'saturation', 'contrast'],
     name = 'TFRecordDataset' )
 
 
@@ -34,6 +37,7 @@ class TFRecordImageMask(object):
                 'ratio': 1.0,
                 'batch_size': 32,
                 'prefetch': 1000,
+                'shuffle_buffer': 512,
                 'n_threads': 4,
                 'sess': None,
                 'as_onehot': True,
