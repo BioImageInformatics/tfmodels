@@ -1,9 +1,9 @@
 from datasets import (
     MNISTDataSet,
     BaggedMNIST,
-    ImageMaskDataSet,
     ImageComboDataSet,
-    ImageFeeder
+    ImageFeeder,
+    TFRecordImageMask
 )
 
 from basemodel import BaseModel
@@ -21,24 +21,32 @@ from general import (
     save_image_stack,
     bayesian_inference,
     write_image_mask_combos,
-    test_bayesian_inference
+    test_bayesian_inference,
+    image_mask_2_tfrecord,
+    check_tfrecord,
+    check_tfrecord_dataset,
+    make_experiment
 )
 
 __all__ = [
+    'MNISTDataSet',
     'BaggedMNIST',
-    'BaseModel',
-    'bayesian_inference',
-    'ImageMaskDataSet',
     'ImageComboDataSet',
     'ImageFeeder',
-    'MNISTDataSet',
-    'save_image_stack',
-    'test_bayesian_inference',
-    'write_image_mask_combos',
+    'TFRecordImageMask',
+    'BaseModel',
     'batch_norm',
     'conv',
     'conv_cond_concat',
     'deconv',
     'linear',
     'lrelu',
+    'save_image_stack',
+    'bayesian_inference',
+    'write_image_mask_combos',
+    'test_bayesian_inference',
+    'image_mask_2_tfrecord',
+    'check_tfrecord',
+    'check_tfrecord_dataset',
+    'make_experiment'
 ]

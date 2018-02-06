@@ -22,6 +22,7 @@ class BaseModel(object):
         'global_step': 0,
         'log_dir': None,
         'save_dir': None,
+        'max_to_keep': 5,
         'name': 'base',
         'training_op_list': [],
         'summary_op_list': [],
@@ -29,30 +30,19 @@ class BaseModel(object):
 
     def __init__(self, **kwargs):
         self.base_defaults.update(**kwargs)
+
         for key, value in self.base_defaults.items():
             setattr(self, key, value)
 
-        ## Set nonlinearity for all downstream models
-        self.nonlin = tf.nn.selu
-
-    ## In progress for saving each model in its own snapshot (SAVE1)
-    # def make_saver(self):
-    #     t_vars = tf.trainable_variables()
-    #     self.saver = tf.train.Saver([var for var in t_vars if self.name in var.name],
-    #         max_to_keep=5,)
 
     def get_update_list(self):
         t_vars = tf.trainable_variables()
         return [var for var in t_vars if self.name in var.name]
 
-    def inference(self, x_in, keep_prob=1.0):
-        raise Exception(NotImplementedError)
-
-    def _loss_op(self):
-        raise Exception(NotImplementedError)
 
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
+
 
     def restore(self, snapshot_path):
         print 'Restoring from {}'.format(snapshot_path)
@@ -63,6 +53,7 @@ class BaseModel(object):
             # for saver, snap_path in zip(self.saver):
         except:
             print 'Failed! Continuing without loading snapshot.'
+
 
     def snapshot(self):
         ## In progress for saving model + discriminator separately (SAVE1)
@@ -75,29 +66,35 @@ class BaseModel(object):
         self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step)
         print 'Done'
 
-    def summaries(self):
-        raise Exception(NotImplementedError)
 
-    def test_step(self, keep_prob=1.0):
-        raise Exception(NotImplementedError)
+    def _count_params(self):
+        self.pcount = 0
+        try:
+            assert self.var_list is not None
+        except:
+            self.var_list = [var for var in tf.trainable_variables() if self.name in var.name]
+        for vv in self.var_list:
+            self.pcount += np.prod(vv.get_shape().as_list())
+
 
     def _tf_ops(self):
+        self._count_params()
+
+        # with tf.device('/cpu:0'):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
         ## Append a model name to the save path
         self.snapshot_path = os.path.join(self.save_dir, '{}.ckpt'.format(self.name))
         # self.make_saver() ## In progress (SAVE1)
-        self.saver = tf.train.Saver(max_to_keep=5)
+        self.saver = tf.train.Saver(max_to_keep=self.max_to_keep)
 
-    def train_step(self, global_step):
-        raise Exception(NotImplementedError)
 
     def print_info(self):
         print '------------------------ {} ---------------------- '.format(self.name)
         print '|\t\t TIMESTAMP: {}'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
         for key, value in sorted(self.__dict__.items()):
-            # if '_op' in key:
-            #     continue
+            if '_op' in key:
+                continue
 
             if 'list' in key:
                 print '|\t{}:'.format(key)
@@ -108,13 +105,14 @@ class BaseModel(object):
             print '|\t{}: {}'.format(key, value)
         print '------------------------ {} ---------------------- '.format(self.name)
 
+
     def _print_info_to_file(self, filename):
         with open(filename, 'w+') as f:
             f.write('---------------------- {} ----------------------\n'.format(self.name))
             f.write('|\t\t TIMESTAMP: {}\n'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")))
             for key, value in sorted(self.__dict__.items()):
-                # if '_op' in key:
-                #     continue
+                if '_op' in key:
+                    continue
 
                 if 'list' in key:
                     f.write('|\t{}:\n'.format(key))
