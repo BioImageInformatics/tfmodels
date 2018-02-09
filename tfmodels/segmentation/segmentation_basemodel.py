@@ -227,8 +227,7 @@ class Segmentation(BaseModel):
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob,
                      self.training: False}
-        y_hat_ = self.sess.run([self.y_hat_smax], feed_dict=feed_dict)[0]
-        # y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
+        y_hat_ = self.sess.run(self.y_hat_smax, feed_dict=feed_dict)
         return y_hat_
 
 
@@ -240,7 +239,7 @@ class Segmentation(BaseModel):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
-        print '#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
+        print '#### BASIC TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
 
 
     def train_step(self):

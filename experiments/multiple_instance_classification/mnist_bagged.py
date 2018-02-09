@@ -46,11 +46,10 @@ batch_size = 32
 samples = 256
 positive_class = [0,1]
 
-expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'bagged/logs/{}'.format(expdate)
-save_dir         = 'bagged/snapshots'
-debug_dir        = 'bagged/debug'
-snapshot_restore = 'bagged/snapshots/deepset.ckpt-{}'.format(step_start)
+basedir = 'multi_mnist_1'
+log_dir, save_dir, debug_dir, infer_dir = tfmodels.make_experiment(
+    basedir)
+snapshot_path = ''
 
 training_dataset = tfmodels.BaggedMNIST(
     as_images      = True,

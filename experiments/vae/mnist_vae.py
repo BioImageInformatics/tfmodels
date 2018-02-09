@@ -18,12 +18,10 @@ iterations = 1000
 batch_size = 256
 step_start = 0
 
-expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'vae/logs/{}'.format(expdate)
-save_dir         = 'vae/snapshots'
-debug_dir        = 'vae/debug'
-infer_dir        = 'vae/inference'
-snapshot_restore = 'vae/snapshots/vae.ckpt-{}'.format(step_start)
+basedir = 'mnist'
+log_dir, save_dir, debug_dir, infer_dir = tfmodels.make_experiment(
+    basedir)
+snapshot_path = ''
 
 with tf.Session(config=config) as sess:
 
@@ -47,7 +45,6 @@ with tf.Session(config=config) as sess:
         dataset=dataset,
         enc_kernels=[64, 128, 512],
         gen_kernels=[128, 64],
-        global_step= step_start,
         iterator_dataset=True,
         learning_rate=1e-3,
         log_dir=log_dir,
@@ -56,8 +53,8 @@ with tf.Session(config=config) as sess:
         x_dims=[28,28,1],
         z_dim=4)
     model.print_info()
-    if step_start > 0:
-        model.restore(snapshot_restore)
+    if snapshot_path > 0:
+        model.restore(snapshot_path)
 
     test_z = np.random.randn(144, model.z_dim)
 

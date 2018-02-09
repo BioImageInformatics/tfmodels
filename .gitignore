@@ -2,3 +2,4 @@ experiments/
 *.pyc
 latex/
 *.tar.gz
+*.tfrecord

@@ -2,61 +2,58 @@ import tensorflow as tf
 import numpy as np
 import sys, datetime, os, time
 
-sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 import tfmodels
+sys.path.insert(0, '.')
+from model import Training
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-# config.log_device_placement = True
-
-#data_home = '/Users/nathaning/_original_data/ccRCC_double_stain'
-#image_dir = '{}/paired_he_ihc_hmm/he'.format(data_home)
-#mask_dir = '{}/paired_he_ihc_hmm/hmm/4class'.format(data_home)
-
-# data_home = '/home/nathan/histo-seg/semantic-pca/data/train_combo'
-# data_home = '/home/chen/env/nathan_tf/data'
-record_path = 'gleason_grade.tfrecords'
+training_record = 'gleason_grade_train.tfrecord'
+testing_record = 'gleason_grade_test.tfrecord'
 
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 300
 batch_size = 32
-# iterations = 500/batch_size
 iterations = 1000
 snapshot_epochs = 10
-snapshot_steps = 10000
-step_start = 120000
 
-expdate = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-log_dir          = 'pca10Xdensenet_20180110/logs/{}'.format(expdate)
-save_dir         = 'pca10Xdensenet_20180110/snapshots'
-debug_dir        = 'pca10Xdensenet_20180110/debug'
-snapshot_restore = 'pca10Xdensenet_20180109/snapshots/densenet.ckpt-{}'.format(step_start)
+basedir = 'gleason'
+log_dir, save_dir, debug_dir, infer_dir = tfmodels.make_experiment(
+    basedir)
+snapshot_path = ''
 
 crop_size = 512
 image_ratio = 0.5
 prefetch = 1000
 threads = 8
 
+lr_start = 1e-4
+lr_gamma = 1e-4
+lr_step = 10000
+def learning_rate(step):
+    return lr_start * np.exp(-lr_gamma * step)
+
+
 with tf.Session(config=config) as sess:
-    with tf.device('/cpu:0'):
-        dataset = tfmodlels.TFRecordImageMask(record_path = record_path,
-            crop_size = crop_size,
-            ratio = image_ratio,
-            batch_size = batch_size,
-            prefetch = prefetch,
-            n_threads = 8,
-            n_classes = 2,
-            sess = sess )
+    dataset = tfmodlels.TFRecordImageMask(training_record = training_record,
+        testing_record = testing_record,
+        crop_size = crop_size,
+        ratio = image_ratio,
+        batch_size = batch_size,
+        prefetch = prefetch,
+        n_threads = 8,
+        n_classes = 2,
+        sess = sess )
     dataset.print_info()
 
     # with tf.device('/gpu:0'):
     # model = tfmodels.ResNetTraining(sess=sess,
     model = tfmodels.DenseNetTraining(sess=sess,
         dataset=dataset,
-        global_step= step_start,
         k_size= 3,
-        dense_stacks= [4, 4, 4],
-        growth_rate= 8,
+        dense_stacks= [4, 6, 8, 8],
+        growth_rate= 32,
         learning_rate= 1e-8,
         log_dir= log_dir,
         n_classes= 4,
@@ -64,41 +61,22 @@ with tf.Session(config=config) as sess:
         summarize_grads= True,
         summary_iters= 20,
         summary_image_iters= 250,
-        x_dims= [384, 384, 3],)
+        x_dims= [256, 256, 3],)
     model.print_info()
 
-    if step_start > 0:
-        model.restore(snapshot_restore)
+    if snapshot_path > 0:
+        model.restore(snapshot_path)
 
     ## ------------------- Input Coordinators ------------------- ##
     print 'Starting thread coordinators'
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord=coord)
 
-    ## ------------------- Pull a Test batch ------------------- ##
-    test_x, test_y = dataset.get_batch(sess)
-    test_x_list = np.split(test_x, test_x.shape[0], axis=0)
-    test_y_list = np.split(test_y, test_y.shape[0], axis=0)
-    print '\t test_x', test_x.shape
-    print '\t test_y', test_y.shape
-
-    tfmodels.save_image_stack(test_x[...,::-1]+1, debug_dir,
-        prefix='x_in', scale='max', stack_axis=0)
-    tfmodels.save_image_stack(test_y, debug_dir,
-        prefix='y_in', scale=3, stack_axis=0)
-    print 'Running initial test'
-    tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
-
     ## --------------------- Optimizing Loop -------------------- ##
     print 'Start'
 
     try:
-        if step_start == 0:
-            print 'Pretraining'
-            model.pretrain()
-
-        print 'Starting at step {}'.format(model.global_step)
-        global_step = step_start
+        global_step = 0
         for epx in xrange(1, epochs):
             epoch_start = time.time()
             for itx in xrange(iterations):
@@ -108,9 +86,12 @@ with tf.Session(config=config) as sess:
             print 'Epoch [{}] step [{}] time elapsed [{}]s'.format(
                 epx, model.global_step, time.time()-epoch_start)
 
-            if model.global_step % snapshot_steps == 0:
+            ## Run a test    
+            model.test()
+
+            if epx % snapshot_epochs == 0:
                 model.snapshot()
-                tfmodels.test_bayesian_inference(model, test_x_list, debug_dir)
+
     except Exception as e:
         print 'Caught exception'
         print e.__doc__
