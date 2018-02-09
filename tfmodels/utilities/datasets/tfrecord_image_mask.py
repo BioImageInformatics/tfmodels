@@ -23,6 +23,8 @@ TFRecordDataset(training_record = None,
     n_classes = True,
     img_dtype = tf.uint8,
     mask_dtype = tf.uint8,
+    img_channels = 3,
+    preprocess = ['brightness', 'hue', 'saturation', 'contrast'],
     name = 'TFRecordDataset' )
 
 
