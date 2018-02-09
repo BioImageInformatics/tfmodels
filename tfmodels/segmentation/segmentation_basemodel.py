@@ -147,8 +147,10 @@ class Segmentation(BaseModel):
 
             self.loss = self.seg_loss
 
-            self.train_op = self.optimizer.minimize(
-                self.loss, var_list=self.var_list, name='{}_train'.format(self.name))
+            self.batch_norm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(self.batch_norm_updates):
+                self.train_op = self.optimizer.minimize(self.loss,
+                    var_list=self.var_list, name='{}_train'.format(self.name))
 
             self.seg_training_op_list.append(self.train_op)
 
@@ -222,7 +224,6 @@ class Segmentation(BaseModel):
         summary_str = self.sess.run(self.summary_images_op)
         self.summary_writer.add_summary(summary_str, self.global_step)
 
-
     def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob,
@@ -230,17 +231,14 @@ class Segmentation(BaseModel):
         y_hat_ = self.sess.run(self.y_hat_smax, feed_dict=feed_dict)
         return y_hat_
 
-
     def model(self, x_hat, keep_prob=0.5, reuse=True, training=True):
         raise Exception(NotImplementedError)
-
 
     def test_step(self, step_delta, keep_prob=1.0):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
         print '#### BASIC TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
-
 
     def train_step(self):
         self.global_step += 1

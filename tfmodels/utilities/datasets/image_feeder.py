@@ -1,5 +1,6 @@
 import tensorflow as tf
 from dataset_base import DataSet
+import glob, os
 
 """
 Only images, unlabelled

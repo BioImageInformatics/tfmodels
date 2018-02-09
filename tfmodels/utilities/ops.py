@@ -103,7 +103,8 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope=
         return out
 
 ## BUG batch norm with training
-def batch_norm(features, momentum=0.99, reuse=False, training=True, var_scope='batch_norm'):
+def batch_norm(features, momentum=0.9, reuse=False, training=True, var_scope='batch_norm'):
+    print 'Batch norm input shape: {}'.format(features.get_shape())
     with tf.variable_scope(var_scope) as scope:
         ## ReLU
         out = tf.layers.batch_normalization(features, renorm=True, reuse=reuse,

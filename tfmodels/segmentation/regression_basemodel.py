@@ -129,8 +129,10 @@ class Regression(BaseModel):
 
             self.loss = self.reg_loss
 
-            self.train_op = self.optimizer.minimize(
-                self.loss, var_list=self.var_list, name='{}_train'.format(self.name))
+            self.batch_norm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(self.batch_norm_updates):
+                self.train_op = self.optimizer.minimize(self.loss,
+                    var_list=self.var_list, name='{}_train'.format(self.name))
 
             self.reg_training_op_list.append(self.train_op)
 
