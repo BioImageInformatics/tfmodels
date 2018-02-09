@@ -325,15 +325,20 @@ def make_experiment(basedir, remove_old=False):
     save_dir   = os.path.join(basedir, 'snapshots')
     debug_dir  = os.path.join(basedir, 'debug')
     infer_dir  = os.path.join(basedir, 'inference')
+    dirlist = [log_dir, save_dir, debug_dir, infer_dir]
 
     if os.path.isdir(basedir) and remove_old:
-        print 'Found directory {}; Removing it...'.format(basedir)
-        shutil.rmtree(basedir)
+        for dd in dirlist:
+            if os.path.isdir(dd):
+                print 'Found directory {}; Cleaning it...'.format(dd)
+                shutil.rmtree(dd)
     elif os.path.isdir(basedir) and not remove_old:
         print 'Found directory {}; remove_old was False; returning...'.format(basedir)
         return log_dir, save_dir, debug_dir, infer_dir
+    else:
+        print 'Creating base experiment directory'
+        os.makedirs(basedir)
 
-    dirlist = [basedir, log_dir, save_dir, debug_dir, infer_dir]
     for dd in dirlist:
         print 'Creating {}'.format(dd)
         os.makedirs(dd)
