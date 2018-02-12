@@ -240,7 +240,7 @@ class Segmentation(BaseModel):
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
         print '#### BASIC TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
 
-    def train_step(self):
+    def train_step(self, keep_prob=1.0):
         self.global_step += 1
         self.sess.run(self.seg_training_op_list)
 
@@ -252,11 +252,11 @@ class Segmentation(BaseModel):
 
 
     """ Run a number of testing iterations """
-    def test(self):
+    def test(self, keep_prob=1.0):
         ## Switch dataset to testing
         self.dataset._initalize_testing(self.sess)
 
         for step_delta in xrange(self.n_test_batches):
-            self.test_step(step_delta)
+            self.test_step(step_delta, keep_prob=keep_prob)
 
         self.dataset._initalize_training(self.sess)
