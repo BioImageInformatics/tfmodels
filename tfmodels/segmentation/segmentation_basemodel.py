@@ -45,25 +45,14 @@ class Segmentation(BaseModel):
     def _training_mode(self):
         print 'Setting up {} in training mode'.format(self.name)
         ## ------------------- Input ops ------------------- ##
-        self.x_in = tf.placeholder_with_default(self.dataset.image_op,
-            shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
-            name='x_in')
-        self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
-            shape=[None, self.x_dims[0], self.x_dims[1], self.n_classes], name='y_in')
+        self._make_input_ops()
 
         ## Check for a testing dataset
         if self.dataset.testing_record is not None:
             self.with_test = True
 
         ## ------------------- Model ops ------------------- ##
-        # self.keep_prob = tf.placeholder('float', name='keep_prob')
-        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-        self.training = tf.placeholder_with_default(True, shape=())
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
-            training=self.training)
-
-        self.y_hat_smax = tf.nn.softmax(self.y_hat)
-        print 'Model output y_hat:', self.y_hat.get_shape()
+        self._make_model_ops()
 
         ## ------------------- Training ops ------------------- ##
         self.var_list = self._get_update_list()
@@ -96,16 +85,10 @@ class Segmentation(BaseModel):
 
         ## ------------------- Model ops ------------------- ##
         # self.keep_prob = tf.placeholder('float', name='keep_prob')
-        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-        self.training = tf.placeholder_with_default(False, shape=[], name='training')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
-            training=self.training)
-        self.y_hat_smax = tf.nn.softmax(self.y_hat)
+        self._make_model_ops()
 
-        # self.make_saver() ## In progress (SAVE1)
-        # with tf.device('/cpu:0'):
+        ## -------------- Gotta have this stuff -------------##
         self.saver = tf.train.Saver(max_to_keep=5)
-
         self.sess.run(tf.global_variables_initializer())
 
 
@@ -124,19 +107,37 @@ class Segmentation(BaseModel):
         return seg_loss
 
 
+    def _make_input_ops(self):
+        self.x_in = tf.placeholder_with_default(self.dataset.image_op,
+            shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
+            name='x_in')
+        self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
+            shape=[None, self.x_dims[0], self.x_dims[1], self.n_classes], name='y_in')
+
+
+    def _make_model_ops(self):
+        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
+        self.training = tf.placeholder_with_default(True, shape=())
+        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
+            training=self.training)
+
+        self.y_hat_smax = tf.nn.softmax(self.y_hat)
+        print 'Model output y_hat:', self.y_hat.get_shape()
+
+
     ## define self.seg_loss
-    def _make_segmentation_loss(self):
+    def _make_segmentation_loss(self, target_op=None):
         if self.class_weights:
             self.seg_loss = self._class_weighted_loss()
         else:
             self.seg_loss = tf.nn.softmax_cross_entropy_with_logits_v2(
-                labels=self.y_in, logits=self.y_hat)
+                labels=self.y_in, logits=target_op)
             self.seg_loss = tf.reduce_mean(self.seg_loss)
 
 
     def _make_training_ops(self):
         with tf.name_scope('segmentation_losses'):
-            self._make_segmentation_loss()
+            self._make_segmentation_loss(self.y_hat)
 
             ## Unused except in pretraining or specificially requested
             self.seg_training_op = self.optimizer.minimize(
@@ -184,7 +185,6 @@ class Segmentation(BaseModel):
             self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=4)
 
         ## TODO Filters
-
         self.summary_images_op = tf.summary.merge(
             [self.x_in_sum, self.y_in_sum, self.y_hat_sum])
 

@@ -107,14 +107,8 @@ class Regression(BaseModel):
 
 
     ## define self.reg_loss
-    def _make_regression_loss(self):
-        # self.reg_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
-        #     logits=self.y_hat,
-        #     labels=self.y_in), )
-        # self.reg_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
-        #     logits=self.y_hat,
-        #     labels=self.y_in))
-        self.reg_loss = tf.losses.mean_squared_error( self.y_in, self.y_hat, )
+    def _make_regression_loss(self, target_op=None):
+        self.reg_loss = tf.losses.mean_squared_error( self.y_in, target_op)
 
     def _make_training_ops(self):
         with tf.name_scope('regression_losses'):
