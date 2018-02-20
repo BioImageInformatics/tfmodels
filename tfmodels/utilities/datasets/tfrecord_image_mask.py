@@ -60,7 +60,7 @@ class TFRecordImageMask(object):
         self.record_path = tf.placeholder_with_default(self.training_record, shape=())
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
-                        .shuffle(buffer_size=self.batch_size*2)
+                        .shuffle(buffer_size=self.shuffle_buffer)
                         # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)

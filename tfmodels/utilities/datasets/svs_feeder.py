@@ -14,12 +14,18 @@ use py_func option in tf.data.Dataset
 use py_func to preprocess. Accept a function to use for preprocessing
 from the outside.
 function should be of the form f(mask) --> mask_ , where dim(mask) = dim(mask_)
+
+https://www.tensorflow.org/api_docs/python/tf/data/Dataset#from_generator
+
 """
 
 class SVSFeeder(object):
     svs_feeder_defaults = {
         'svsfile': None,
         'coords': None,
+        'tile_size': 512,
+        'downsample': 0.5,
+        'overlap_fact': 1.5,
         'level': 0,
     }
 
@@ -32,6 +38,11 @@ class SVSFeeder(object):
         assert self.coords is not None
 
         self._get_svs_info()
+
+        self.dataset = tf.data.Dataset.from_generator(self._generator,
+            tf.float32, tf.TensorShape([]))
+        self.iterator = self.dataset.make_initializable_iterator()
+        self.image_op = self.iterator.get_next()
 
 
     """ Examine the svs file and populate:
@@ -47,6 +58,14 @@ class SVSFeeder(object):
         pass
 
 
+    """ Return list of foreground coordinates
+    """
+    def _find_foreground(self):
+        pass
+
+    """ Create a dataset that knows what coordinates to feed
+    it should exhaust itself after one time through the coordinates
+    """
     def _generator(self):
         pass
 
