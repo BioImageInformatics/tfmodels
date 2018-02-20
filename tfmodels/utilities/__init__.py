@@ -3,7 +3,8 @@ from datasets import (
     BaggedMNIST,
     ImageComboDataSet,
     ImageFeeder,
-    TFRecordImageMask
+    TFRecordImageMask,
+    TFRecordImageLabel
 )
 
 from basemodel import BaseModel
@@ -34,6 +35,7 @@ __all__ = [
     'ImageComboDataSet',
     'ImageFeeder',
     'TFRecordImageMask',
+    'TFRecordImageLabel',
     'BaseModel',
     'batch_norm',
     'conv',
