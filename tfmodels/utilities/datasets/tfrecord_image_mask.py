@@ -27,9 +27,8 @@ TFRecordDataset(training_record = None,
     img_channels = 3,
     preprocess = ['brightness', 'hue', 'saturation', 'contrast'],
     name = 'TFRecordDataset' )
-
-
 """
+
 class TFRecordImageMask(object):
     defaults = {'training_record': None,
                 'testing_record': None,
