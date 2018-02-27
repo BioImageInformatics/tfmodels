@@ -45,7 +45,7 @@ class TFRecordImageMask(object):
                 'mask_dtype': tf.uint8,
                 'img_channels': 3,
                 'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
-                'name': 'TFRecordDataset' }
+                'name': 'TFRecordImageMask' }
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
 
@@ -64,7 +64,8 @@ class TFRecordImageMask(object):
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
                         .prefetch(buffer_size=self.prefetch)
-                        .batch(self.batch_size) )
+                        .batch(self.batch_size)
+                        )
 
         self.iterator = self.dataset.make_initializable_iterator()
         self.image_op, self.mask_op = self.iterator.get_next()
@@ -72,11 +73,13 @@ class TFRecordImageMask(object):
         if self.sess is not None:
             self._initalize_training(self.sess)
 
+
     def _initalize_training(self, sess):
         fd = {self.record_path: self.training_record}
         sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TRAIN'
         print 'Dataset TRAINING phase'
+
 
     def _initalize_testing(self, sess):
         fd = {self.record_path: self.testing_record}

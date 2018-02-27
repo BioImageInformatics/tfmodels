@@ -22,12 +22,10 @@ https://www.tensorflow.org/api_docs/python/tf/data/Dataset#from_generator
 class SVSFeeder(object):
     svs_feeder_defaults = {
         'svsfile': None,
-        'coords': None,
         'tile_size': 512,
         'downsample': 0.5,
         'overlap_fact': 1.5,
-        'level': 0,
-    }
+        'level': 0, }
 
     def __init__(self, **kwargs):
         self.svs_feeder_defaults.update(kwargs)
@@ -37,7 +35,7 @@ class SVSFeeder(object):
         assert self.svsffile is not None
         assert self.coords is not None
 
-        self._get_svs_info()
+        self._prepare_generator()
 
         self.dataset = tf.data.Dataset.from_generator(self._generator,
             tf.float32, tf.TensorShape([]))
@@ -54,14 +52,20 @@ class SVSFeeder(object):
         pass
 
 
-    def _preprocess(self):
-        pass
-
-
     """ Return list of foreground coordinates
     """
     def _find_foreground(self):
         pass
+
+
+    """ Function to be run before constructing the dataset """
+    def _prepare_generator(self):
+        pass
+
+
+    def _preprocess(self):
+        pass
+
 
     """ Create a dataset that knows what coordinates to feed
     it should exhaust itself after one time through the coordinates
