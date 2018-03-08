@@ -115,9 +115,9 @@ class Segmentation(BaseModel):
             shape=[None, self.x_dims[0], self.x_dims[1], self.n_classes], name='y_in')
 
 
-    def _make_model_ops(self):
-        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-        self.training = tf.placeholder_with_default(True, shape=())
+    def _make_model_ops(self, keep_prob=0.5, training=True):
+        self.keep_prob = tf.placeholder_with_default(keep_prob, shape=[], name='keep_prob')
+        self.training = tf.placeholder_with_default(training, shape=())
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
             training=self.training)
 
