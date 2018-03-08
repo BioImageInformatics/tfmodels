@@ -80,7 +80,6 @@ class Generator(BaseGenerator):
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1', selu=1))
 
-            ## Output is not a probability -- no sigmoid
             x_hat = conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat')
             print '\t x_hat', x_hat.get_shape()
 
