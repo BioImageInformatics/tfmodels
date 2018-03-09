@@ -2,15 +2,13 @@ import tensorflow as tf
 import numpy as np
 import os
 
+from generator_basemodel import BaseGenerator
 from ..utilities.basemodel import BaseModel
 from discriminator_basemodel import BaseDiscriminator
-from generator_basemodel import BaseGenerator
-from ..utilities.ops import (
-    conv,
-    deconv,
-    linear,
-    conv_cond_concat
-)
+from ..utilities.ops import (conv,
+                             deconv,
+                             linear,
+                             conv_cond_concat)
 
 """
 Wasserstein Generative Adversarial Networks
@@ -20,7 +18,7 @@ https://wiseodd.github.io/techblog/2017/02/04/wasserstein-gan/
 """
 class Critic(BaseDiscriminator):
     wgan_critic_defaults = {
-        'dis_kernels': [32, 64, 128]
+        'dis_kernels': [32, 64, 128],
         'name': 'wgan_critic'
     }
 
@@ -80,7 +78,7 @@ class Generator(BaseGenerator):
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1', selu=1))
 
-            x_hat = conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat')
+            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat'))
             print '\t x_hat', x_hat.get_shape()
 
             return x_hat
@@ -94,17 +92,18 @@ class WGAN(BaseModel):
         'dataset': None,
         'critic': None,
         'critic_overtrain': 5,
-        'dis_learning_rate': 1e-4,
+        'clipping': 0.01,
+        'dis_learning_rate': 5e-5,
         'dis_kernels': [32, 64, 128, 256],
         'generator': None,
-        'gen_learning_rate': 2e-4,
+        'gen_learning_rate': 5e-5,
         'gen_kernels': [32, 64, 128, 256],
         'global_step': 0,
         'iterator_dataset': False,
         'log_dir': None,
         'mode': 'TRAIN',
         'name': 'WGAN',
-        'pretraining': 500,
+        'pretraining': None,
         'save_dir': None,
         'sess': None,
         'soften_labels': False,
@@ -172,38 +171,17 @@ class WGAN(BaseModel):
         self.sess.run(tf.global_variables_initializer())
 
         ## ---------------------- Pretraining --------------------- ##
-        self._pretraining()
+        if self.pretraining is not None:
+            self._pretraining()
 
 
     def _loss_op(self):
-        ## Define losses
-        # self.real_target = tf.ones_like(self.p_real_real)
-        # self.fake_target = tf.zeros_like(self.p_real_fake)
-        #
-        # if self.soften_labels:
-        #     real_epsilon = tf.random_normal(shape=tf.shape(real_target),
-        #         mean=0.0, stddev=self.soften_sddev)
-        #     fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
-        #         mean=0.0, stddev=self.soften_sddev)
-        #     self.real_target = self.real_target + real_epsilon
-        #     self.fake_target = self.fake_target + fake_epsilon
-        #
-        # self.dis_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-        #     labels=self.real_target, logits=self.p_real_real ))
-        # self.dis_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-        #     labels=self.fake_target, logits=self.p_real_fake ))
-
-        # self.dis_loss_real = self.p_real_fake + self.p_real_real
-
-        # self.generator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-        #     labels=self.real_target, logits=self.p_real_fake ))
-
-        # self.discriminator_loss = self.dis_loss_real + self.dis_loss_fake
         self.critic_loss = tf.reduce_mean(self.p_real_real) - tf.reduce_mean(self.p_real_fake)
         self.generator_loss = -tf.reduce_mean(self.p_real_fake)
 
         self.critic_loss_sum = tf.summary.scalar('critic_loss', self.critic_loss)
         self.generator_loss_sum = tf.summary.scalar('generator_loss', self.generator_loss)
+
 
     def _pretraining(self):
         print 'Pretraining critic'
@@ -232,6 +210,7 @@ class WGAN(BaseModel):
                 summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
                 self.summary_writer.add_summary(summary_str, self.global_step)
 
+
     def _training_ops(self):
         ## Define training ops
         # self.generator_vars = [var for var in tf.trainable_variables() if 'Generator' in var.name]
@@ -249,8 +228,9 @@ class WGAN(BaseModel):
         # self.training_op_list.append(self.gen_train_op)
         # self.training_op_list.append(self.dis_train_op)
 
-        ## ??
-        self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in self.critic_vars]
+        ## Weight clipping
+        self.clip_D = [p.assign(tf.clip_by_value(p, -self.clipping, self.clipping)) for p in self.critic_vars]
+
 
     def _summary_ops(self):
         self.x_hat_sum = tf.summary.image('x_hat', self.x_hat, max_outputs=8)
@@ -259,11 +239,13 @@ class WGAN(BaseModel):
         self.summary_op = tf.summary.merge_all()
         # self.training_op_list.append(self.summary_op)
 
+
     def inference(self, z_values):
         ## Take in values for z and return p(data|z)
         feed_dict = {self.zed: z_values}
         x_hat = self.sess.run(self.x_hat, feed_dict=feed_dict)
         return x_hat
+
 
     def train_step(self):
         self.global_step += 1

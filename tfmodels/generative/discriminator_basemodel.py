@@ -22,6 +22,8 @@ class BaseDiscriminator(BaseModel):
         self.p_real_fake = None
         self.p_real_real = None
 
+        self.nonlin = tf.nn.selu
+
         ## Set up discriminator and inputs
 
 

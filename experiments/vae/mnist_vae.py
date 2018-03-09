@@ -9,9 +9,6 @@ import tfmodels
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
-data_home = ''
-
-
 ## ------------------ Hyperparameters --------------------- ##
 epochs = 500
 iterations = 1000
@@ -28,11 +25,10 @@ with tf.Session(config=config) as sess:
     # coord = tf.train.Coordinator()
     # threads = tf.train.start_queue_runners(coord=coord)
 
-    dataset = tfmodels.IteratorDataSet(sess=sess,
+    dataset = tfmodels.MNISTDataSet(sess=sess,
         batch_size=batch_size,
         capacity=1024,
-        # source_dir='/Users/nathaning/Envs/tensorflow/MNIST_data')
-        source_dir='/home/nathan/envs/tensorflow/MNIST_data')
+        source_dir='../../assets/mnist_data')
     dataset.print_info()
 
     print 'test batch:'

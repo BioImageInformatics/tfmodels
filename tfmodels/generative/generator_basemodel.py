@@ -15,6 +15,8 @@ class BaseGenerator(BaseModel):
         self.generator_defaults.update(**kwargs)
         super(BaseGenerator, self).__init__(**self.generator_defaults)
 
+        self.nonlin = tf.nn.selu
+
         if self.project_shape is None:
             self.n_upsamples = len(self.gen_kernels)
             print 'Calculating projection factor for {} upsamples'.format(self.n_upsamples)

@@ -26,10 +26,10 @@ snapshot_path = ''
 
 with tf.Session(config=config) as sess:
 
-    dataset = tfmodels.IteratorDataSet(sess=sess,
+    dataset = tfmodels.MNISTDataSet(sess=sess,
         batch_size=batch_size,
         capacity=512,
-        source_dir='../MNIST_data')
+        source_dir='../../assets/mnist_data')
     dataset.print_info()
 
     print 'test batch:'
