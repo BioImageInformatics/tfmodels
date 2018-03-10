@@ -156,10 +156,10 @@ class Generator(BaseGenerator):
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], k_size=4, var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], k_size=4, var_scope='h1', selu=1))
 
-            x_hat_logit = conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat')
-            x_hat = tf.nn.sigmoid(x_hat_logit)
+            x_hat = conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat')
+            # x_hat = tf.nn.sigmoid(x_hat)
 
-            return x_hat, x_hat_logit
+            return x_hat
 
 
 class VAE(BaseModel):
@@ -215,7 +215,7 @@ class VAE(BaseModel):
         self.zed_model, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
         self.zed = tf.placeholder_with_default(self.zed_model,
             shape=[None, self.z_dim], name='zed')
-        self.x_hat, self.x_hat_logit = self.generator.model(self.zed, keep_prob=self.keep_prob)
+        self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
 
         ## ---------------------- Loss ops ------------------------ ##
         self._loss_op()
@@ -234,29 +234,36 @@ class VAE(BaseModel):
             '{}_settings.txt'.format(self.name)))
         self.sess.run(tf.global_variables_initializer())
 
-    def _kl_divergence(self):
-        with tf.name_scope('kld'):
-            self.kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
-                tf.square(self.mu) - \
-                tf.exp(self.log_var), 1)
-            print 'kld', self.kld.get_shape()
-            # self.kld = tf.reduce_mean(self.kld)
 
     def _loss_op(self):
-        self._reconstruction_loss()
-        self._kl_divergence()
+        self.recon_loss = self._reconstruction_loss()
+        self.kld = self._kl_divergence()
 
         self.loss = self.recon_loss + self.kld
         self.loss = tf.reduce_mean(self.loss)
+
+
+    def _kl_divergence(self):
+        with tf.name_scope('kld'):
+            kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
+                tf.square(self.mu) - \
+                tf.exp(self.log_var), 1)
+            print 'kld', kld.get_shape()
+            # self.kld = tf.reduce_mean(self.kld)
+
+        return kld
+
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
             # self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
             #     logits=self.x_hat_logit,
             #     labels=self.x_in), axis=[1,2,3])
-            self.recon_loss = tf.losses.mean_squared_error( self.x_in, self.x_hat_logit, reduction=None)
-            self.recon_loss = tf.reduce_sum(self.recon_loss, axis=[1,2,3])
-            print 'recon_loss', self.recon_loss.get_shape()
+            recon_loss = tf.losses.mean_squared_error(self.x_in, self.x_hat, reduction="none")
+            recon_loss = tf.reduce_sum(recon_loss, axis=[1,2,3])
+            print 'recon_loss', recon_loss.get_shape()
+
+        return recon_loss
 
     def _summary_ops(self):
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
@@ -279,7 +286,11 @@ class VAE(BaseModel):
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
         self.train_op = self.optimizer.minimize(self.loss)
 
-
+    def inference(self, z_values):
+        ## Take in values for z and return p(data|z)
+        feed_dict = {self.zed: z_values}
+        x_hat = self.sess.run(self.x_hat, feed_dict=feed_dict)
+        return x_hat
 
     def train_step(self):
         self.global_step += 1

@@ -43,7 +43,7 @@ class Critic(BaseDiscriminator):
             flat = tf.contrib.layers.flatten(c1)
             print '\t flat', flat.get_shape()
             h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0', selu=1))
-            p_real = linear(h0, 1, var_scope='p_real')
+            p_real = linear(h0, 1, var_scope='p_real', no_bias=True)
             print '\t p_real', p_real.get_shape()
 
             return p_real
@@ -78,10 +78,11 @@ class Generator(BaseGenerator):
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1', selu=1))
 
-            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat'))
+            x_hat = conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat')
             print '\t x_hat', x_hat.get_shape()
 
             return x_hat
+            # return x_hat
 
 
 
@@ -109,6 +110,7 @@ class WGAN(BaseModel):
         'soften_labels': False,
         'soften_sddev': 0.01,
         'summary_iters': 50,
+        'summarize_grads': False,
         'x_dims': [256, 256, 3],
         'z_dim': 64, }
 
@@ -176,39 +178,11 @@ class WGAN(BaseModel):
 
 
     def _loss_op(self):
-        self.critic_loss = tf.reduce_mean(self.p_real_real) - tf.reduce_mean(self.p_real_fake)
+        self.critic_loss = tf.reduce_mean(self.p_real_real - self.p_real_fake)
         self.generator_loss = -tf.reduce_mean(self.p_real_fake)
 
         self.critic_loss_sum = tf.summary.scalar('critic_loss', self.critic_loss)
         self.generator_loss_sum = tf.summary.scalar('generator_loss', self.generator_loss)
-
-
-    def _pretraining(self):
-        print 'Pretraining critic'
-        for _ in xrange(self.pretraining):
-            self.global_step += 1
-            if self.iterator_dataset:
-                feed_dict = {self.x_in: next(self.dataset.iterator)}
-                _ = self.sess.run([self.dis_train_op], feed_dict=feed_dict)
-            else:
-                _ = self.sess.run([self.dis_train_op])
-
-            if self.global_step % self.summary_iters == 0:
-                summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
-                self.summary_writer.add_summary(summary_str, self.global_step)
-
-        print 'Pretraining generator'
-        for _ in xrange(self.pretraining):
-            self.global_step += 1
-            if self.iterator_dataset:
-                feed_dict = {self.x_in: next(self.dataset.iterator)}
-                _ = self.sess.run([self.gen_train_op], feed_dict=feed_dict)
-            else:
-                _ = self.sess.run([self.gen_train_op])
-
-            if self.global_step % self.summary_iters == 0:
-                summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
-                self.summary_writer.add_summary(summary_str, self.global_step)
 
 
     def _training_ops(self):
@@ -222,22 +196,55 @@ class WGAN(BaseModel):
         self.critic_optimizer = tf.train.RMSPropOptimizer(self.dis_learning_rate)
 
         self.gen_train_op = self.generator_optimizer.minimize(self.generator_loss, var_list=self.generator_vars)
-        self.dis_train_op = self.critic_optimizer.minimize(self.critic_loss, var_list=self.critic_vars)
+        self.dis_train_op = self.critic_optimizer.minimize(-self.critic_loss, var_list=self.critic_vars)
 
         self.gan_train_op_list = [self.gen_train_op, self.dis_train_op]
         # self.training_op_list.append(self.gen_train_op)
         # self.training_op_list.append(self.dis_train_op)
 
         ## Weight clipping
-        self.clip_D = [p.assign(tf.clip_by_value(p, -self.clipping, self.clipping)) for p in self.critic_vars]
+        with tf.variable_scope('clip_d'):
+            self.clip_D = [p.assign(tf.clip_by_value(p, -self.clipping, self.clipping)) for p in self.critic_vars]
 
 
     def _summary_ops(self):
+        if self.summarize_grads:
+            self.summary_gradient_list = []
+            grads = tf.gradients(self.generator_loss, tf.trainable_variables())
+            grads = list(zip(grads, tf.trainable_variables()))
+            for grad, var in grads:
+                self.summary_gradient_list.append(
+                    tf.summary.histogram(var.name + '/gradient', grad))
+
         self.x_hat_sum = tf.summary.image('x_hat', self.x_hat, max_outputs=8)
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
 
         self.summary_op = tf.summary.merge_all()
         # self.training_op_list.append(self.summary_op)
+
+
+    ## Only pretrain the critic
+    def _pretraining(self):
+        print 'Pretraining critic'
+        for _ in xrange(self.pretraining):
+            if self.iterator_dataset:
+                feed_dict = {self.x_in: next(self.dataset.iterator)}
+                _ = self.sess.run([self.dis_train_op], feed_dict=feed_dict)
+            else:
+                _ = self.sess.run([self.dis_train_op])
+
+        # print 'Pretraining generator'
+        # for _ in xrange(self.pretraining):
+        #     self.global_step += 1
+        #     if self.iterator_dataset:
+        #         feed_dict = {self.x_in: next(self.dataset.iterator)}
+        #         _ = self.sess.run([self.gen_train_op], feed_dict=feed_dict)
+        #     else:
+        #         _ = self.sess.run([self.gen_train_op])
+        #
+        #     if self.global_step % self.summary_iters == 0:
+        #         summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
+        #         self.summary_writer.add_summary(summary_str, self.global_step)
 
 
     def inference(self, z_values):
@@ -252,8 +259,8 @@ class WGAN(BaseModel):
 
         for _ in range(self.critic_overtrain):
             feed_dict = {self.x_in: next(self.dataset.iterator)}
-            self.sess.run(self.dis_train_op, feed_dict=feed_dict)
-            self.sess.run(self.clip_D)
+            self.sess.run([self.dis_train_op, self.clip_D], feed_dict=feed_dict)
+            # self.sess.run(self.clip_D)
 
 
         feed_dict = {self.x_in: next(self.dataset.iterator)}

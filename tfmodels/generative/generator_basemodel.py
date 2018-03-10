@@ -5,6 +5,7 @@ class BaseGenerator(BaseModel):
     generator_defaults = {
         'gen_kernels': [128, 64, 64, 32],
         'name': 'generator',
+        'nonlin': tf.nn.selu,
         'x_dims': [256, 256, 3],
         'project_shape': None,
         'resize_shape': None,
@@ -15,7 +16,6 @@ class BaseGenerator(BaseModel):
         self.generator_defaults.update(**kwargs)
         super(BaseGenerator, self).__init__(**self.generator_defaults)
 
-        self.nonlin = tf.nn.selu
 
         if self.project_shape is None:
             self.n_upsamples = len(self.gen_kernels)
@@ -31,7 +31,8 @@ class BaseGenerator(BaseModel):
             print 'Using resize shape: {}'.format(self.resize_shape)
 
 
-    """ generator.model()
+    """ 
+    generator.model()
 
     Inputs:
         z_in:        tensor rank 2: [batch_size, z_dim]

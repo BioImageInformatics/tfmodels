@@ -58,10 +58,10 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
         if dilation is not None:
             assert stride==1
             # dilation = 1
-            print '\t using dilation, {}'.format(dilation)
+            # print '\t using dilation, {}'.format(dilation)
             dilation = [dilation, dilation]
-        else:
-            print '\t using no dilation'
+        # else:
+        #     print '\t using no dilation'
 
         out = tf.nn.convolution(features, weight, strides=[stride, stride],
             padding=pad, dilation_rate=dilation)

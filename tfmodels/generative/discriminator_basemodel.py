@@ -8,6 +8,7 @@ class BaseDiscriminator(BaseModel):
         'dis_kernels': [32, 64, 128],
         'adversary_feature_matching': False,
         'name': 'discriminator',
+        'nonlin': tf.nn.selu,
         'soften_labels': False,
         'soften_sddev': 0.01,
     }
@@ -22,7 +23,6 @@ class BaseDiscriminator(BaseModel):
         self.p_real_fake = None
         self.p_real_real = None
 
-        self.nonlin = tf.nn.selu
 
         ## Set up discriminator and inputs
 
