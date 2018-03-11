@@ -59,7 +59,7 @@ class Generator(BaseGenerator):
     wgan_generator_defaults = {
         'gen_kernels': [256, 128, 64],
         'x_dims': [128, 128, 3],
-        # 'z_in': None
+        'z_dim': None
     }
 
     def __init__(self, **kwargs):
@@ -68,7 +68,7 @@ class Generator(BaseGenerator):
         ## Set the shape for the layer immediately after noise
         ## Manually specifying this sets up freedom for the rest of the layers
         self.project_shape = 3*3*256
-        self.resize_shape = [-1, 3, 3, 256]
+        self.resize_shape = [-1, 1, 1, self.z_dim]
         super(Generator, self).__init__(**self.wgan_generator_defaults)
 
     def model(self, z_in, keep_prob=0.5, reuse=False):
@@ -82,11 +82,12 @@ class Generator(BaseGenerator):
 
             ## Project
             print '\t z_in', z_in.get_shape()
-            projection = nonlin(linear(z_in, self.project_shape, var_scope='projection', selu=1))
-            project_conv = tf.reshape(projection, self.resize_shape)
+            # projection = nonlin(linear(z_in, self.project_shape, var_scope='projection', selu=1))
+            reshape_layer = tf.reshape(z_in, self.resize_shape)
 
             print '\t project_conv', project_conv.get_shape()
-            h0 = nonlin(deconv(project_conv, self.gen_kernels[0], upsample_rate=3, var_scope='h0', selu=1))
+            h0_0 = nonlin(deconv(reshape_layer, self.z_dim, upsample_rate=3, var_scope='h0_0', selu=1))
+            h0 = nonlin(deconv(h0_0, self.gen_kernels[0], upsample_rate=3, var_scope='h0', selu=1))
             h0_1 = nonlin(conv(h0, self.gen_kernels[0], k_size=3, stride=1, pad='VALID', var_scope='h0_1', selu=1))
             h0_1 = tf.contrib.nn.alpha_dropout(h0_1, 0.5)
 
@@ -118,7 +119,7 @@ class DCWGAN(WGAN):
             setattr(self, key, attr)
 
         self.generator = Generator(gen_kernels=self.gen_kernels,
-            x_dims=self.x_dims)
+            x_dims=self.x_dims, z_dim=self.z_dim)
         self.critic = Critic(dis_kernels=self.dis_kernels)
 
         ## IFFY
