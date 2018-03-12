@@ -6,6 +6,8 @@ import sys, datetime, os, time
 sys.path.insert(0, '../..')
 import tfmodels
 
+from custom_mnist_vae import mnistVAE
+
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
@@ -36,11 +38,11 @@ with tf.Session(config=config) as sess:
     print 'batch_x ', batch_x.shape, batch_x.dtype, batch_x.min(), batch_x.max()
 
 
-    model = tfmodels.VAE(sess=sess,
+    model = mnistVAE(sess=sess,
         batch_size=batch_size,
         dataset=dataset,
-        enc_kernels=[64, 128, 512],
-        gen_kernels=[128, 64],
+        enc_kernels=[64, 128, 256],
+        gen_kernels=[256, 128, 64],
         iterator_dataset=True,
         learning_rate=1e-4,
         log_dir=log_dir,

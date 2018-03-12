@@ -120,12 +120,7 @@ class Encoder(BaseEncoder):
             # sigma = linear(h0, self.z_dim, var_scope='sigma')
             log_var = linear(h0, self.z_dim, var_scope='log_var')
 
-            epsilon = tf.random_normal(shape=tf.shape(mu), mean=0.0, stddev=1.0)
-            zed = mu + epsilon * tf.exp(0.5 * log_var)
-            # zed = mu + epsilon * sigma
-            print '\t zed', zed.get_shape()
-
-            return zed, mu, log_var
+            return mu, log_var
 
 
 class Generator(BaseGenerator):
@@ -191,12 +186,17 @@ class VAE(BaseModel):
         assert len(self.x_dims) == 3
         if self.mode=='TRAIN': assert self.dataset is not None
 
-        self.encoder = Encoder(
-            enc_kernels=self.enc_kernels,
-            z_dim=self.z_dim )
-        self.generator = Generator(
-            gen_kernels=self.gen_kernels,
-            x_dims=self.x_dims )
+        if self.encoder is None:
+            print 'Setting up VAE Encoder with default encoder'
+            self.encoder = Encoder(
+                enc_kernels=self.enc_kernels,
+                z_dim=self.z_dim )
+
+        if self.generator is None:
+            print 'Setting up VAE Generator with default generator'
+            self.generator = Generator(
+                gen_kernels=self.gen_kernels,
+                x_dims=self.x_dims )
         # self.discriminator = Discriminator(
         #     dis_kernels=self.dis_kernels,
         #     soften_labels=self.soften_labels,
@@ -216,10 +216,11 @@ class VAE(BaseModel):
 
         ## ---------------------- Model ops ----------------------- ##
         self.batch_size_in = tf.placeholder_with_default(self.batch_size, shape=(), name='batch_size')
-        self.zed_model, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
-        self.zed_feed = tf.placeholder_with_default(self.zed_model,
-            shape=[None, self.z_dim], name='zed')
-        self.zed_sample = tf.random_normal(shape=(self.batch_size_in, self.z_dim), mean=self.mu, stddev=tf.square(self.log_var))
+        self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
+
+        # self.zed_sample = tf.random_normal(shape=(self.batch_size_in, self.z_dim), mean=self.mu, stddev=tf.square(self.log_var))
+        self.epsilon = tf.random_normal(shape=(self.batch_size_in, self.z_dim), mean=0, stddev=1.0)
+        self.zed_sample = self.mu + self.epsilon * tf.exp(0.5 * self.log_var)
 
         self.zed = tf.placeholder_with_default(self.zed_sample,
             shape=[None, self.z_dim], name='zed')

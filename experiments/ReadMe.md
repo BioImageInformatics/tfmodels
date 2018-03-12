@@ -1,5 +1,4 @@
 ## Experiments
-
 Here are some demo's to use the built-in model definitions.
 This section is in constant progress, as the model implementations are constantly being updated.
 In most cases, the base implementations are for MNIST data, i.e. 28 x 28 squares.
@@ -15,4 +14,4 @@ Generative models (vae, gan, wgan) use MNIST data, packaged up under assets.
 Multiple instance models also use MNIST data, and the BaggedMNIST dataset class.
 (Note, there's an updated implementation of multiple-instance networks [HERE].)
 Segmentation, and image-regression will have to be data supplied by yourself, for now.
-There's a thought to include an interface to some public benchmark dataset such as CamVid, but this is low priority. 
+There's a thought to include an interface to some public benchmark dataset such as CamVid, but this is low priority.
