@@ -188,13 +188,22 @@ class MNISTDataSet(object):
         self.data = input_data.read_data_sets(self.source_dir)
         self.iterator = self.iterator_fn()
 
+    def get_batch(self, batch_size):
+        batch_x, batch_y = self.data.train.next_batch(batch_size)
+        batch_x = np.reshape(batch_x, [batch_size, 28, 28, 1])
+
+        ## move to [-1, 1] for SELU
+        batch_x = batch_x * (2) - 1
+        return batch_x
+
     def iterator_fn(self):
         while True:
-            batch_x, batch_y = self.data.train.next_batch(self.batch_size)
-            batch_x = np.reshape(batch_x, [self.batch_size, 28, 28, 1])
-
-            ## move to [-1, 1] for SELU
-            batch_x = batch_x * (2) - 1
+            batch_x = self.get_batch(self.batch_size)
+            # batch_x, batch_y = self.data.train.next_batch(self.batch_size)
+            # batch_x = np.reshape(batch_x, [self.batch_size, 28, 28, 1])
+            #
+            # ## move to [-1, 1] for SELU
+            # batch_x = batch_x * (2) - 1
             yield batch_x
 
     def print_info(self):

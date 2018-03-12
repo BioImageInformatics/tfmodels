@@ -132,7 +132,6 @@ class Generator(BaseGenerator):
     vae_generator_defaults = {
         'gen_kernels': [128, 64, 32],
         'x_dims': [128, 128, 3],
-        # 'z_in': None
     }
 
     def __init__(self, **kwargs):
@@ -151,6 +150,10 @@ class Generator(BaseGenerator):
             ## These first two layers will be pretty much the same in all generators
             ## Project
             print '\t z_in', z_in.get_shape()
+            # z_dim = z_in.get_shape().as_list()[-1]
+            # net = tf.reshape(z_in, (-1, 1, 1, z_dim))
+            # net = nonlin(deconv, net, self.gen_kernels[0], k_size=4, var)
+
             projection = nonlin(linear(z_in, self.project_shape, var_scope='projection', selu=1))
             project_conv = tf.reshape(projection, self.resize_shape)
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], k_size=4, var_scope='h0', selu=1))
@@ -212,10 +215,17 @@ class VAE(BaseModel):
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
 
         ## ---------------------- Model ops ----------------------- ##
+        self.batch_size_in = tf.placeholder_with_default(self.batch_size, shape=(), name='batch_size')
         self.zed_model, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
-        self.zed = tf.placeholder_with_default(self.zed_model,
+        self.zed_feed = tf.placeholder_with_default(self.zed_model,
             shape=[None, self.z_dim], name='zed')
+        self.zed_sample = tf.random_normal(shape=(self.batch_size_in, self.z_dim), mean=self.mu, stddev=tf.square(self.log_var))
+
+        self.zed = tf.placeholder_with_default(self.zed_sample,
+            shape=[None, self.z_dim], name='zed')
+
         self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
+        # self.x_hat_feed = self.generator.model(self.zed_feed, keep_prob=self.keep_prob, reuse=True)
 
         ## ---------------------- Loss ops ------------------------ ##
         self._loss_op()
@@ -253,7 +263,6 @@ class VAE(BaseModel):
 
         return kld
 
-
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
             # self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
@@ -286,11 +295,13 @@ class VAE(BaseModel):
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
         self.train_op = self.optimizer.minimize(self.loss)
 
+
     def inference(self, z_values):
         ## Take in values for z and return p(data|z)
-        feed_dict = {self.zed: z_values}
+        feed_dict = {self.zed: z_values, self.keep_prob: 1.0}
         x_hat = self.sess.run(self.x_hat, feed_dict=feed_dict)
         return x_hat
+
 
     def train_step(self):
         self.global_step += 1
