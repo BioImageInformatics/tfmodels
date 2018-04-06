@@ -246,9 +246,9 @@ class Segmentation(BaseModel):
     def test_step(self, step_delta, keep_prob=1.0):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
-        self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
+        # self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
         print('#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))
-        return test_loss_
+        return test_loss_, summary_str
 
     def train_step(self, keep_prob=1.0):
         self.global_step += 1
@@ -268,10 +268,11 @@ class Segmentation(BaseModel):
 
         test_losses = []
         for step_delta in xrange(self.n_test_batches):
-            loss_ = self.test_step(step_delta, keep_prob=keep_prob)
+            loss_, summary_str = self.test_step(step_delta, keep_prob=keep_prob)
             test_losses.append(loss_)
         loss_mean = np.mean(test_losses)
         loss_std = np.std(test_losses)
         print('\n#### MEAN TEST LOSS = {:3.5f} +/- {:3.6f} #####\n'.format(loss_mean, loss_std))
 
+        self.summary_writer.add_summary(summary_str, self.global_step)
         self.dataset._initalize_training(self.sess)
