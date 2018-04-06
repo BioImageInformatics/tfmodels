@@ -176,9 +176,8 @@ def estimate_dataset_size(img_path, mask_path, n_classes, n_examples):
     return (img_.nbytes + mask_.nbytes) * n_examples
 
 """
-TODO (Nathan)
-IN case the dataset is too large to fit into memory, it's probably best to split
-it up into several smaller TFRecord's
+TODO
+Add option to split several records after shuffling to help distributed training
 During training we'll have to switch the active dataset with a placeholder
 that feeds initialized datasets
 
@@ -188,8 +187,11 @@ that feeds initialized datasets
 2. Shuffle the file handles
 3. Split it into sizable chunks
 4. Save them
+
+Note: via the subimage_size argument this function is set up to handle
+variable sized inputs, and normalize them to subimages with uniform size
 """
-def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
+def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambda x: x[:,:,::-1],
     mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,):
 
     writer = tf.python_io.TFRecordWriter(record_path)
@@ -213,7 +215,7 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
     img_list, mask_list = zip(*tmp_list)
 
     count = 0
-    for imgp, maskp in zip(img_list, mask_list):
+    for source_idx, (imgp, maskp) in enumerate(zip(img_list, mask_list)):
         imgbase = os.path.basename(imgp)
         ## Overwrite mask_list... this is bad bad bad
         if name_transl_fn is not None:
@@ -246,8 +248,8 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
                 writer.write(example.SerializeToString())
                 count += 1
                 if count % 100 == 0:
-                    print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(
-                        record_path, count, len(img_list))
+                    print 'Writing [{}] image [{:05d}] (source [{:05d}]/[{:05d}])'.format(
+                        record_path, count, source_idx, len(img_list))
         else:
             print 'writing img: {} mask: {}, {}'.format(img.shape, mask.shape, np.unique(mask))
             img_raw = img.tostring()
@@ -262,7 +264,6 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=None,
             if count % 100 == 0:
                 print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(
                     record_path, count, len(img_list))
-
 
     writer.close()
     print 'Finished writing [{}]'.format(record_path)

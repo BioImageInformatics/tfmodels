@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
 import sys, os
@@ -43,7 +45,7 @@ class Segmentation(BaseModel):
 
 
     def _training_mode(self):
-        print 'Setting up {} in training mode'.format(self.name)
+        print('Setting up {} in training mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self._make_input_ops()
 
@@ -74,10 +76,11 @@ class Segmentation(BaseModel):
 
         self._print_info_to_file(filename=os.path.join(self.save_dir,
             '{}_settings.txt'.format(self.name)))
+        print('Done setting up {}'.format(self.name))
 
 
     def _test_mode(self):
-        print 'Setting up {} in inference mode'.format(self.name)
+        print('Setting up {} in inference mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder('float',
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -100,10 +103,10 @@ class Segmentation(BaseModel):
     def _class_weighted_loss(self):
         ## https://github.com/tensorflow/tensorflow/issues/10021
         sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.class_weights), -1)
-        print '\t segmentation losses sample_weights:', sample_weights
+        print('\t segmentation losses sample_weights:', sample_weights)
         seg_loss = tf.losses.softmax_cross_entropy(onehot_labels=self.y_in,
             logits=self.y_hat, weights=sample_weights)
-        print '\t segmentation losses seg_loss:', seg_loss
+        print('\t segmentation losses seg_loss:', seg_loss)
         return seg_loss
 
 
@@ -122,11 +125,15 @@ class Segmentation(BaseModel):
             training=self.training)
 
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
-        print 'Model output y_hat:', self.y_hat.get_shape()
+        print('Model output y_hat:', self.y_hat.get_shape())
 
 
     ## define self.seg_loss
     def _make_segmentation_loss(self, target_op=None):
+        ## Default target
+        if target_op is None:
+            target_op = self.y_hat
+
         if self.class_weights:
             self.seg_loss = self._class_weighted_loss()
         else:
@@ -191,7 +198,7 @@ class Segmentation(BaseModel):
 
     def _make_test_ops(self):
         if self.with_test is None:
-            print 'WARNING no TEST tfrecord dataset; Skipping test mode'
+            print('WARNING no TEST tfrecord dataset; Skipping test mode')
             return
 
         with tf.variable_scope('testing_scalars'):
@@ -215,14 +222,16 @@ class Segmentation(BaseModel):
         if lr is None: lr='constant'
         summary_str, seg_loss_ = self.sess.run([self.summary_scalars_op, self.seg_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
-        print '[{:07d}] writing scalar summaries (loss={:3.3f}) (lr={:03E})'.format(self.global_step, seg_loss_,
-            lr)
+        print('[{:07d}] writing scalar summaries (loss={:3.3f}) (lr={:03E})'.format(self.global_step, seg_loss_, lr))
 
 
     def _write_image_summaries(self):
-        print '[{:07d}] writing image summaries'.format(self.global_step)
+        print('[{:07d}] writing image summaries'.format(self.global_step))
         summary_str = self.sess.run(self.summary_images_op)
         self.summary_writer.add_summary(summary_str, self.global_step)
+
+
+    ## ------------------- Callable functions --------------------- ##
 
     def inference(self, x_in, keep_prob=1.0):
         feed_dict = {self.x_in: x_in,
@@ -238,7 +247,8 @@ class Segmentation(BaseModel):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
-        print '#### BASIC TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
+        print('#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))
+        return test_loss_
 
     def train_step(self, keep_prob=1.0):
         self.global_step += 1
@@ -256,7 +266,12 @@ class Segmentation(BaseModel):
         ## Switch dataset to testing
         self.dataset._initalize_testing(self.sess)
 
+        test_losses = []
         for step_delta in xrange(self.n_test_batches):
-            self.test_step(step_delta, keep_prob=keep_prob)
+            loss_ = self.test_step(step_delta, keep_prob=keep_prob)
+            test_losses.append(loss_)
+        loss_mean = np.mean(test_losses)
+        loss_std = np.std(test_losses)
+        print('\n#### MEAN TEST LOSS = {:3.5f} +/- {:3.6f} #####\n'.format(loss_mean, loss_std))
 
         self.dataset._initalize_training(self.sess)

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
 import sys, os
@@ -10,7 +12,8 @@ class SegmentationBayesian(Segmentation):
         'class_weights': None, ## https://arxiv.org/abs/1511.00561
         'dataset': None,
         'aleatoric': False, ## https://arxiv.org/abs/1703.04977
-        'aleatoric_T': 50,
+        'aleatoric_T': 25,
+        'epistemic_T': 10,
         'global_step': 0,
         'k_size': 3,
         'learning_rate': 1e-3,
@@ -32,81 +35,33 @@ class SegmentationBayesian(Segmentation):
         self.bayesian_segmentation_defaults.update(**kwargs)
 
         super(SegmentationBayesian, self).__init__(**self.bayesian_segmentation_defaults)
-        assert self.sess is not None
 
-        if self.mode=='TRAIN':
-            self._training_mode()
-        elif self.mode=='TEST':
-            self._test_mode()
-
-    def _training_mode(self):
-        print 'Setting up {} in training mode'.format(self.name)
-        ## ------------------- Input ops ------------------- ##
+        
+    def _make_input_ops(self):
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
-                name='x_in')
-        self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
-            shape=[None, self.x_dims[0], self.x_dims[1], 1], name='y_in')
-
-        ## ------------------- Model ops ------------------- ##
-        # self.keep_prob = tf.placeholder('float', name='keep_prob')
-        self.keep_prob = tf.placeholder_with_default(0.5, shape=(), name='keep_prob')
-        self.y_hat, self.sigma = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False)
-
-        self.y_hat_smax = tf.nn.softmax(self.y_hat)
-        self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
-        self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
-        print 'Model output y_hat:', self.y_hat.get_shape()
-
-        ## ------------------- Training ops ------------------- ##
-        self.var_list = self._get_update_list()
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
-            name='{}_Adam'.format(self.name))
-
-        self._make_training_ops()
-
-        ## ------------------- Gather Summary ops ------------------- ##
-        self._make_summaries()
-
-        ## ------------------- TensorFlow helpers ------------------- ##
-        self._tf_ops()
-        self.sess.run(tf.global_variables_initializer())
-
-        self._print_info_to_file(filename=os.path.join(self.save_dir,
-            '{}_settings.txt'.format(self.name)))
-
-        if self.adversary:
-            self.discriminator._print_info_to_file(filename=os.path.join(self.save_dir,
-                '{}_settings.txt'.format(self.discriminator.name)))
-
-        ## Somehow calling this during init() makes it not work
-        # if self.adversary and self.pretraining_iters:
-        #     self.pretrain()
-
-    def _test_mode(self):
-        print 'Setting up {} in inference mode'.format(self.name)
-        ## ------------------- Input ops ------------------- ##
-        self.x_in = tf.placeholder('float',
-            shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
             name='x_in')
+        self.y_in = tf.placeholder_with_default(self.dataset.mask_op,
+            shape=[None, self.x_dims[0], self.x_dims[1], self.n_classes], name='y_in')
 
-        ## ------------------- Model ops ------------------- ##
-        # self.keep_prob = tf.placeholder('float', name='keep_prob')
-        self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
-        self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False)
-        self.y_hat_smax = tf.nn.softmax(self.y_hat)
 
-        self.saver = tf.train.Saver(max_to_keep=5)
+    def _make_model_ops(self, keep_prob=0.5, training=True):
+        self.keep_prob = tf.placeholder_with_default(keep_prob, shape=[], name='keep_prob')
+        self.training = tf.placeholder_with_default(training, shape=())
+        self.y_hat, self.sigma = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
+            training=self.training)
 
-        self.sess.run(tf.global_variables_initializer())
+        self.y_hat_smax = tf.nn.softmax(self.y_hat, axis=-1)
+        print('Model output y_hat:', self.y_hat.get_shape())
+        print('Model output sigma:', self.sigma.get_shape())
 
-    
+
     def _heteroscedastic_aleatoric_loss(self):
         assert self.sigma is not None, 'Model does not have attribute sigma. Define sigma in model()'
 
-        print 'Setting up heteroscedastic aleatoric loss:'
+        print('Setting up heteroscedastic aleatoric loss:')
         ## Make a summary for sigma
-        self.sigma_summary = tf.summary.histogram('sigma', self.sigma)
+        self.sigma_summary = tf.summary.scalar('sigma_mean', tf.reduce_mean(self.sigma))
         self.summary_op_list.append(self.sigma_summary)
 
         with tf.variable_scope('aleatoric') as scope:
@@ -116,9 +71,9 @@ class SegmentationBayesian(Segmentation):
             y_hat_v = tf.reshape(self.y_hat, [-1, np.prod(self.x_dims[:2]), self.n_classes])
             y_in_v = tf.reshape(self.y_in, [-1, np.prod(self.x_dims[:2]), self.n_classes])
 
-            print '\t sigma_v', sigma_v.get_shape()
-            print '\t y_hat_v', y_hat_v.get_shape()
-            print '\t y_in_v', y_in_v.get_shape()
+            print('\t sigma_v', sigma_v.get_shape())
+            print('\t y_hat_v', y_hat_v.get_shape())
+            print('\t y_in_v', y_in_v.get_shape())
 
             def _corrupt_with_noise(yhat, dist):
                 ## sample is the same shape as the sigma output
@@ -129,10 +84,10 @@ class SegmentationBayesian(Segmentation):
 
             def loss_fn(yhat):
                 y_hat_eps = _corrupt_with_noise(yhat, dist)
-                print '\t y_hat_eps', y_hat_eps.get_shape()
+                print('\t y_hat_eps', y_hat_eps.get_shape())
 
-                loss = tf.nn.softmax_cross_entropy_with_logits(labels=y_in_v, logits=y_hat_eps)
-                print '\t loss', loss.get_shape()
+                loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_in_v, logits=y_hat_eps)
+                print('\t loss', loss.get_shape())
 
                 # y_hat_c = tf.reduce_sum(y_hat_eps * y_in_v, axis=-1, keep_dims=True)
                 # print 'y_hat_c', y_hat_c.get_shape()
@@ -144,11 +99,11 @@ class SegmentationBayesian(Segmentation):
                 return loss
 
             y_hat_tile = tf.tile(tf.expand_dims(y_hat_v, 0), [self.epistemic_T,1,1,1], name='y_hat_tile')
-            print 'y_hat_tile', y_hat_tile.get_shape()
+            print('y_hat_tile', y_hat_tile.get_shape())
 
             loss_fn_map = lambda x: loss_fn(x)
             losses = tf.map_fn(loss_fn_map, y_hat_tile)
-            print 'losses', losses.get_shape()
+            print('losses', losses.get_shape())
 
             ## Sum over classes
             # loss = tf.reduce_sum(losses, axis=-1)
@@ -162,14 +117,12 @@ class SegmentationBayesian(Segmentation):
 
 
     def _make_training_ops(self):
+        print('Bayesian model setting up losses')
         with tf.name_scope('segmentation_losses'):
             ## Logic to define the correct version of segmentation loss
             ## BUG if aleatoric is requested, the constructor will ignore
             ##  the request for weighted classes
-            if self.aleatoric:
-                self._heteroscedastic_aleatoric_loss()
-            else:
-                self._segmentation_loss()
+            self._heteroscedastic_aleatoric_loss()
 
             ## Unused except in pretraining or specificially requested
             self.seg_training_op = self.optimizer.minimize(
@@ -184,6 +137,71 @@ class SegmentationBayesian(Segmentation):
                 self.loss, var_list=self.var_list, name='{}_train'.format(self.name))
 
             self.seg_training_op_list.append(self.train_op)
+
+
+    def _make_summaries(self):
+        ## https://github.com/aymericdamien/ \
+        ## TensorFlow-Examples/blob/master/examples/4_Utils/tensorboard_advanced.py
+        if self.summarize_grads:
+            self.summary_gradient_list = []
+            grads = tf.gradients(self.loss, tf.trainable_variables())
+            grads = list(zip(grads, tf.trainable_variables()))
+            for grad, var in grads:
+                try:
+                    self.summary_gradient_list.append(
+                        tf.summary.histogram(var.name + '/gradient', grad))
+                except:
+                    print('Failed to make summary for: {}'.format(var.name))
+
+        ## Loss scalar
+        self.loss_sum = tf.summary.scalar('loss', self.loss)
+
+        ## Scalars:
+        self.summary_scalars_op = tf.summary.merge_all()
+
+        ## Images
+        with tf.variable_scope('training_images'):
+            self.y_in_mask = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
+            self.y_in_mask = tf.expand_dims(self.y_in_mask, axis=-1)
+            self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
+            self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
+
+            self.sigma_sum = tf.summary.image('sigma_img', self.sigma, max_outputs=self.summary_image_n)
+
+            self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=self.summary_image_n)
+            self.y_in_sum = tf.summary.image('y_in', self.y_in_mask, max_outputs=self.summary_image_n)
+            self.y_hat_sum = tf.summary.image('y_hat', self.y_hat_mask, max_outputs=self.summary_image_n)
+
+        ## TODO Filters
+        self.summary_images_op = tf.summary.merge(
+            [self.x_in_sum, self.y_in_sum, self.y_hat_sum, self.sigma_sum])
+
+
+    def _make_test_ops(self):
+        if self.with_test is None:
+            print('WARNING no TEST tfrecord dataset; Skipping test mode')
+            return
+
+        with tf.variable_scope('testing_scalars'):
+            self.loss_sum_test = tf.summary.scalar('loss_test', self.loss)
+
+        with tf.variable_scope('testing_images'):
+            # self.y_in_mask_test = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
+            # self.y_in_mask_test = tf.expand_dims(self.y_in_mask, axis=-1)
+            # self.y_hat_mask_test = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
+            # self.y_hat_mask_test = tf.cast(self.y_hat_mask, tf.float32)
+
+            self.sigma_sum_test = tf.summary.image('sigma_img_test', self.sigma, max_outputs=self.summary_image_n)
+
+            self.x_in_sum_test = tf.summary.image('x_in_test', self.x_in, max_outputs=self.summary_image_n)
+            self.y_in_sum_test = tf.summary.image('y_in_test', self.y_in_mask, max_outputs=self.summary_image_n)
+            self.y_hat_sum_test = tf.summary.image('y_hat_test', self.y_hat_mask, max_outputs=self.summary_image_n)
+
+            self.summary_test_ops = tf.summary.merge(
+                [self.loss_sum_test, self.x_in_sum_test,
+                 self.y_in_sum_test, self.y_hat_sum_test,
+                 self.sigma_sum_test])
+
 
 
     """ function for approximate bayesian inference via dropout

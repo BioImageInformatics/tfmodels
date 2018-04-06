@@ -1,7 +1,7 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
-
-
 """
 TODO:
 https://www.tensorflow.org/programmers_guide/datasets#applying_arbitrary_python_logic_with_tfpy_func
@@ -27,9 +27,8 @@ TFRecordDataset(training_record = None,
     img_channels = 3,
     preprocess = ['brightness', 'hue', 'saturation', 'contrast'],
     name = 'TFRecordDataset' )
-
-
 """
+
 class TFRecordImageMask(object):
     defaults = {'training_record': None,
                 'testing_record': None,
@@ -77,19 +76,22 @@ class TFRecordImageMask(object):
         fd = {self.record_path: self.training_record}
         sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TRAIN'
-        print 'Dataset TRAINING phase'
+        print('Dataset TRAINING phase')
 
     def _initalize_testing(self, sess):
+        if self.testing_record is None:
+            print('WARNING DATSET {} HAS NO TEST RECORD'.format(self.name))
+            return
         fd = {self.record_path: self.testing_record}
         sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TEST'
-        print 'Dataset TESTING phase'
+        print('Dataset TESTING phase')
 
     def print_info(self):
-        print '-------------------- {} ---------------------- '.format(self.name)
+        print('-------------------- {} ---------------------- '.format(self.name))
         for key, value in sorted(self.__dict__.items()):
-            print '|\t{}: {}'.format(key, value)
-        print '-------------------- {} ---------------------- '.format(self.name)
+            print('|\t{}: {}'.format(key, value))
+        print('-------------------- {} ---------------------- '.format(self.name))
 
     def _decode(self, example):
         features = {'height': tf.FixedLenFeature((), tf.int64, default_value=0),
