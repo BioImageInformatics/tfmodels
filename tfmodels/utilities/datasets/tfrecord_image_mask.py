@@ -1,7 +1,7 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
-
-
 """
 TODO:
 https://www.tensorflow.org/programmers_guide/datasets#applying_arbitrary_python_logic_with_tfpy_func
@@ -45,7 +45,7 @@ class TFRecordImageMask(object):
                 'mask_dtype': tf.uint8,
                 'img_channels': 3,
                 'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
-                'name': 'TFRecordImageMask' }
+                'name': 'TFRecordDataset' }
     def __init__(self, **kwargs):
         self.defaults.update(kwargs)
 
@@ -59,12 +59,12 @@ class TFRecordImageMask(object):
         self.record_path = tf.placeholder_with_default(self.training_record, shape=())
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
-                        .shuffle(buffer_size=self.shuffle_buffer)
+                        .shuffle(buffer_size=self.batch_size*2)
+                        # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
                         .prefetch(buffer_size=self.prefetch)
-                        .batch(self.batch_size)
-                        )
+                        .batch(self.batch_size) )
 
         self.iterator = self.dataset.make_initializable_iterator()
         self.image_op, self.mask_op = self.iterator.get_next()
@@ -72,25 +72,26 @@ class TFRecordImageMask(object):
         if self.sess is not None:
             self._initalize_training(self.sess)
 
-
     def _initalize_training(self, sess):
         fd = {self.record_path: self.training_record}
         sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TRAIN'
-        print 'Dataset TRAINING phase'
-
+        print('Dataset TRAINING phase')
 
     def _initalize_testing(self, sess):
+        if self.testing_record is None:
+            print('WARNING DATSET {} HAS NO TEST RECORD'.format(self.name))
+            return
         fd = {self.record_path: self.testing_record}
         sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TEST'
-        print 'Dataset TESTING phase'
+        print('Dataset TESTING phase')
 
     def print_info(self):
-        print '-------------------- {} ---------------------- '.format(self.name)
+        print('-------------------- {} ---------------------- '.format(self.name))
         for key, value in sorted(self.__dict__.items()):
-            print '|\t{}: {}'.format(key, value)
-        print '-------------------- {} ---------------------- '.format(self.name)
+            print('|\t{}: {}'.format(key, value))
+        print('-------------------- {} ---------------------- '.format(self.name))
 
     def _decode(self, example):
         features = {'height': tf.FixedLenFeature((), tf.int64, default_value=0),

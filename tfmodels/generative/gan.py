@@ -45,10 +45,10 @@ class Discriminator(BaseDiscriminator):
             flat = tf.contrib.layers.flatten(c1)
             print '\t flat', flat.get_shape()
             h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0', selu=1))
-            p_real = linear(h0, 1, var_scope='p_real')
+            p_real = linear(h0, 1, var_scope='p_real', no_bias=True)
             print '\t p_real', p_real.get_shape()
 
-            return p_real
+            return tf.nn.sigmoid(p_real)
 
 
 
@@ -56,7 +56,6 @@ class Generator(BaseGenerator):
     gan_generator_defaults = {
         'gen_kernels': [128, 64, 32],
         'x_dims': [128, 128, 3],
-        # 'z_in': None
     }
 
     def __init__(self, **kwargs):
@@ -80,7 +79,7 @@ class Generator(BaseGenerator):
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1', selu=1))
 
-            x_hat = tf.nn.sigmoid(conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat'))
+            x_hat = conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat')
             print '\t x_hat', x_hat.get_shape()
 
             return x_hat
@@ -96,19 +95,20 @@ class GAN(BaseModel):
         'dis_learning_rate': 1e-4,
         'dis_kernels': [32, 64, 128, 256],
         'generator': None,
-        'gen_learning_rate': 2e-4,
+        'gen_learning_rate': 1e-4,
         'gen_kernels': [32, 64, 128, 256],
         'global_step': 0,
         'iterator_dataset': False,
         'log_dir': None,
         'mode': 'TRAIN',
         'name': 'GAN',
-        'pretraining': 500,
+        'pretraining': None,
         'save_dir': None,
         'sess': None,
         'soften_labels': False,
         'soften_sddev': 0.01,
         'summary_iters': 50,
+        'summarize_grads': False,
         'x_dims': [256, 256, 3],
         'z_dim': 64, }
 
@@ -168,61 +168,40 @@ class GAN(BaseModel):
         self.sess.run(tf.global_variables_initializer())
 
         ## ---------------------- Pretraining --------------------- ##
-        self._pretraining()
+        if self.pretraining is not None:
+            self._pretraining()
 
 
     def _loss_op(self):
         ## Define losses
-        self.real_target = tf.ones_like(self.p_real_real)
-        self.fake_target = tf.zeros_like(self.p_real_fake)
+        # self.real_target = tf.ones_like(self.p_real_real)
+        # self.fake_target = tf.zeros_like(self.p_real_fake)
+        #
+        # if self.soften_labels:
+        #     real_epsilon = tf.random_normal(shape=tf.shape(real_target),
+        #         mean=0.0, stddev=self.soften_sddev)
+        #     fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
+        #         mean=0.0, stddev=self.soften_sddev)
+        #     self.real_target = self.real_target + real_epsilon
+        #     self.fake_target = self.fake_target + fake_epsilon
 
-        if self.soften_labels:
-            real_epsilon = tf.random_normal(shape=tf.shape(real_target),
-                mean=0.0, stddev=self.soften_sddev)
-            fake_epsilon = tf.random_normal(shape=tf.shape(fake_target),
-                mean=0.0, stddev=self.soften_sddev)
-            self.real_target = self.real_target + real_epsilon
-            self.fake_target = self.fake_target + fake_epsilon
+        # self.dis_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+        #     labels=self.real_target, logits=self.p_real_real ))
+        # self.dis_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+        #     labels=self.fake_target, logits=self.p_real_fake ))
 
-        self.dis_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=self.real_target, logits=self.p_real_real ))
-        self.dis_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=self.fake_target, logits=self.p_real_fake ))
+        # self.generator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+        #     labels=self.real_target, logits=self.p_real_fake ))
+        #
+        # self.discriminator_loss = self.dis_loss_real + self.dis_loss_fake
 
-        self.generator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=self.real_target, logits=self.p_real_fake ))
+        TINY = 1e-11
+        self.generator_loss = -tf.reduce_mean(tf.log(self.p_real_fake+TINY))
+        self.discriminator_loss = -tf.reduce_mean(tf.log(self.p_real_real+TINY) + tf.log(1. - self.p_real_fake+TINY))
 
-        self.discriminator_loss = self.dis_loss_real + self.dis_loss_fake
-
-        self.discriminator_loss_sum = tf.summary.scalar('discriminator_loss', self.discriminator_loss)
         self.generator_loss_sum = tf.summary.scalar('generator_loss', self.generator_loss)
+        self.discriminator_loss_sum = tf.summary.scalar('discriminator_loss', self.discriminator_loss)
 
-    def _pretraining(self):
-        print 'Pretraining discriminator'
-        for _ in xrange(self.pretraining):
-            self.global_step += 1
-            if self.iterator_dataset:
-                feed_dict = {self.x_in: next(self.dataset.iterator)}
-                _ = self.sess.run([self.dis_train_op], feed_dict=feed_dict)
-            else:
-                _ = self.sess.run([self.dis_train_op])
-
-            if self.global_step % self.summary_iters == 0:
-                summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
-                self.summary_writer.add_summary(summary_str, self.global_step)
-
-        print 'Pretraining generator'
-        for _ in xrange(self.pretraining):
-            self.global_step += 1
-            if self.iterator_dataset:
-                feed_dict = {self.x_in: next(self.dataset.iterator)}
-                _ = self.sess.run([self.gen_train_op], feed_dict=feed_dict)
-            else:
-                _ = self.sess.run([self.gen_train_op])
-
-            if self.global_step % self.summary_iters == 0:
-                summary_str = self.sess.run(self.summary_op, feed_dict=feed_dict)
-                self.summary_writer.add_summary(summary_str, self.global_step)
 
     def _training_ops(self):
         ## Define training ops
@@ -242,11 +221,37 @@ class GAN(BaseModel):
         # self.training_op_list.append(self.dis_train_op)
 
     def _summary_ops(self):
+        if self.summarize_grads:
+            self.summary_gradient_list = []
+            grads = tf.gradients(self.generator_loss, tf.trainable_variables())
+            grads = list(zip(grads, tf.trainable_variables()))
+            for grad, var in grads:
+                self.summary_gradient_list.append(
+                    tf.summary.histogram(var.name + '/gradient', grad))
+
         self.x_hat_sum = tf.summary.image('x_hat', self.x_hat, max_outputs=8)
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
 
         self.summary_op = tf.summary.merge_all()
         # self.training_op_list.append(self.summary_op)
+
+
+    def _pretraining(self):
+        print 'Pretraining discriminator'
+        for _ in xrange(self.pretraining):
+            if self.iterator_dataset:
+                feed_dict = {self.x_in: next(self.dataset.iterator)}
+                _ = self.sess.run([self.dis_train_op], feed_dict=feed_dict)
+            else:
+                _ = self.sess.run([self.dis_train_op])
+
+        print 'Pretraining generator'
+        for _ in xrange(self.pretraining):
+            if self.iterator_dataset:
+                feed_dict = {self.x_in: next(self.dataset.iterator)}
+                _ = self.sess.run([self.gen_train_op], feed_dict=feed_dict)
+            else:
+                _ = self.sess.run([self.gen_train_op])
 
     def inference(self, z_values):
         ## Take in values for z and return p(data|z)

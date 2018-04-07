@@ -1,4 +1,5 @@
 from segmentation_basemodel import Segmentation
+from segmentation_bayesian import SegmentationBayesian
 from regression_basemodel import Regression
 from discriminator import SegmentationDiscriminator
 from segnet import SegNetTraining, SegNetInference
@@ -10,6 +11,7 @@ from densenet import DenseNetTraining, DenseNetInference
 
 
 __all__ = ['Segmentation',
+           'SegmentationBayesian',
            'Regression',
            'SegmentationDiscriminator',
            'SegNetTraining',

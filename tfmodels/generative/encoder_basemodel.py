@@ -14,6 +14,8 @@ class BaseEncoder(BaseModel):
         self.discriminator_defaults.update(**kwargs)
         super(BaseEncoder, self).__init__(**self.discriminator_defaults)
 
+        self.nonlin = tf.nn.selu
+
     """ return q(z|x) """
     def model(self, x_in, keep_prob=0.5, reuse=False):
         raise Exception(NotImplementedError)

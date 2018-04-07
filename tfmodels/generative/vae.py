@@ -120,19 +120,13 @@ class Encoder(BaseEncoder):
             # sigma = linear(h0, self.z_dim, var_scope='sigma')
             log_var = linear(h0, self.z_dim, var_scope='log_var')
 
-            epsilon = tf.random_normal(shape=tf.shape(mu), mean=0.0, stddev=1.0)
-            zed = mu + epsilon * tf.exp(0.5 * log_var)
-            # zed = mu + epsilon * sigma
-            print '\t zed', zed.get_shape()
-
-            return zed, mu, log_var
+            return mu, log_var
 
 
 class Generator(BaseGenerator):
     vae_generator_defaults = {
         'gen_kernels': [128, 64, 32],
         'x_dims': [128, 128, 3],
-        # 'z_in': None
     }
 
     def __init__(self, **kwargs):
@@ -151,15 +145,19 @@ class Generator(BaseGenerator):
             ## These first two layers will be pretty much the same in all generators
             ## Project
             print '\t z_in', z_in.get_shape()
+            # z_dim = z_in.get_shape().as_list()[-1]
+            # net = tf.reshape(z_in, (-1, 1, 1, z_dim))
+            # net = nonlin(deconv, net, self.gen_kernels[0], k_size=4, var)
+
             projection = nonlin(linear(z_in, self.project_shape, var_scope='projection', selu=1))
             project_conv = tf.reshape(projection, self.resize_shape)
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], k_size=4, var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], k_size=4, var_scope='h1', selu=1))
 
-            x_hat_logit = conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat')
-            x_hat = tf.nn.sigmoid(x_hat_logit)
+            x_hat = conv(h1, self.x_dims[-1], k_size=3, stride=1, var_scope='x_hat')
+            # x_hat = tf.nn.sigmoid(x_hat)
 
-            return x_hat, x_hat_logit
+            return x_hat
 
 
 class VAE(BaseModel):
@@ -188,12 +186,17 @@ class VAE(BaseModel):
         assert len(self.x_dims) == 3
         if self.mode=='TRAIN': assert self.dataset is not None
 
-        self.encoder = Encoder(
-            enc_kernels=self.enc_kernels,
-            z_dim=self.z_dim )
-        self.generator = Generator(
-            gen_kernels=self.gen_kernels,
-            x_dims=self.x_dims )
+        if self.encoder is None:
+            print 'Setting up VAE Encoder with default encoder'
+            self.encoder = Encoder(
+                enc_kernels=self.enc_kernels,
+                z_dim=self.z_dim )
+
+        if self.generator is None:
+            print 'Setting up VAE Generator with default generator'
+            self.generator = Generator(
+                gen_kernels=self.gen_kernels,
+                x_dims=self.x_dims )
         # self.discriminator = Discriminator(
         #     dis_kernels=self.dis_kernels,
         #     soften_labels=self.soften_labels,
@@ -212,10 +215,18 @@ class VAE(BaseModel):
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
 
         ## ---------------------- Model ops ----------------------- ##
-        self.zed_model, self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
-        self.zed = tf.placeholder_with_default(self.zed_model,
+        self.batch_size_in = tf.placeholder_with_default(self.batch_size, shape=(), name='batch_size')
+        self.mu, self.log_var = self.encoder.model(self.x_in, keep_prob=self.keep_prob)
+
+        # self.zed_sample = tf.random_normal(shape=(self.batch_size_in, self.z_dim), mean=self.mu, stddev=tf.square(self.log_var))
+        self.epsilon = tf.random_normal(shape=(self.batch_size_in, self.z_dim), mean=0, stddev=1.0)
+        self.zed_sample = self.mu + self.epsilon * tf.exp(0.5 * self.log_var)
+
+        self.zed = tf.placeholder_with_default(self.zed_sample,
             shape=[None, self.z_dim], name='zed')
-        self.x_hat, self.x_hat_logit = self.generator.model(self.zed, keep_prob=self.keep_prob)
+
+        self.x_hat = self.generator.model(self.zed, keep_prob=self.keep_prob)
+        # self.x_hat_feed = self.generator.model(self.zed_feed, keep_prob=self.keep_prob, reuse=True)
 
         ## ---------------------- Loss ops ------------------------ ##
         self._loss_op()
@@ -234,29 +245,35 @@ class VAE(BaseModel):
             '{}_settings.txt'.format(self.name)))
         self.sess.run(tf.global_variables_initializer())
 
-    def _kl_divergence(self):
-        with tf.name_scope('kld'):
-            self.kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
-                tf.square(self.mu) - \
-                tf.exp(self.log_var), 1)
-            print 'kld', self.kld.get_shape()
-            # self.kld = tf.reduce_mean(self.kld)
 
     def _loss_op(self):
-        self._reconstruction_loss()
-        self._kl_divergence()
+        self.recon_loss = self._reconstruction_loss()
+        self.kld = self._kl_divergence()
 
         self.loss = self.recon_loss + self.kld
         self.loss = tf.reduce_mean(self.loss)
+
+
+    def _kl_divergence(self):
+        with tf.name_scope('kld'):
+            kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
+                tf.square(self.mu) - \
+                tf.exp(self.log_var), 1)
+            print 'kld', kld.get_shape()
+            # self.kld = tf.reduce_mean(self.kld)
+
+        return kld
 
     def _reconstruction_loss(self):
         with tf.name_scope('MSE'):
             # self.recon_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
             #     logits=self.x_hat_logit,
             #     labels=self.x_in), axis=[1,2,3])
-            self.recon_loss = tf.losses.mean_squared_error( self.x_in, self.x_hat_logit, reduction=None)
-            self.recon_loss = tf.reduce_sum(self.recon_loss, axis=[1,2,3])
-            print 'recon_loss', self.recon_loss.get_shape()
+            recon_loss = tf.losses.mean_squared_error(self.x_in, self.x_hat, reduction="none")
+            recon_loss = tf.reduce_sum(recon_loss, axis=[1,2,3])
+            print 'recon_loss', recon_loss.get_shape()
+
+        return recon_loss
 
     def _summary_ops(self):
         self.x_in_sum = tf.summary.image('x_in', self.x_in, max_outputs=8)
@@ -279,6 +296,12 @@ class VAE(BaseModel):
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
         self.train_op = self.optimizer.minimize(self.loss)
 
+
+    def inference(self, z_values):
+        ## Take in values for z and return p(data|z)
+        feed_dict = {self.zed: z_values, self.keep_prob: 1.0}
+        x_hat = self.sess.run(self.x_hat, feed_dict=feed_dict)
+        return x_hat
 
 
     def train_step(self):

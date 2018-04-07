@@ -8,8 +8,6 @@ Additionally, there is some support for image classification tasks.
 **Note** instead of using batch norm everywhere, the default activation (see `tfmodels/utilities/basemodel.py`) is SeLU (https://arxiv.org/abs/1706.02515). Accordingly, the inputs should be scaled to `[-1.0, 1.0]` in the dataset loading functions, and models should use `tf.contrib.nn.alpha_dropout` (added as of TensorFlow 1.4.1).
 
 ## Versioning
-This is the relevant packages, and their versions that I use. I try to keep up to date with the latest TensorFlow release since that's the fastest moving of these by far.
-
 ```
 Python 2.7.12
 TensorFlow 1.5
