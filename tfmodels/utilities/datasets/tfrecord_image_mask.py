@@ -60,7 +60,6 @@ class TFRecordImageMask(object):
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
                         .shuffle(buffer_size=self.shuffle_buffer)
-                        # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
                         .prefetch(buffer_size=self.prefetch)
@@ -135,16 +134,16 @@ class TFRecordImageMask(object):
 
         for px in self.preprocess:
             if px == 'brightness':
-                img = tf.image.random_brightness(img, max_delta=0.05)
+                img = tf.image.random_brightness(img, max_delta=0.1)
 
             elif px == 'contrast':
-                img = tf.image.random_contrast(img, lower=0.7, upper=0.9)
+                img = tf.image.random_contrast(img, lower=0.4, upper=0.8)
 
             elif px == 'hue':
-                img = tf.image.random_hue(img, max_delta=0.05)
+                img = tf.image.random_hue(img, max_delta=0.1)
 
             elif px == 'saturation':
-                img = tf.image.random_saturation(img, lower=0.7, upper=0.9)
+                img = tf.image.random_saturation(img, lower=0.4, upper=0.8)
 
         target_h = tf.cast(crop_size*ratio, tf.int32)
         target_w = tf.cast(crop_size*ratio, tf.int32)
