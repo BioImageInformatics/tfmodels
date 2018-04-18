@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import tensorflow as tf
-import numpy as np
 """
 TODO:
 https://www.tensorflow.org/programmers_guide/datasets#applying_arbitrary_python_logic_with_tfpy_func
@@ -59,7 +58,7 @@ class TFRecordImageMask(object):
         self.record_path = tf.placeholder_with_default(self.training_record, shape=())
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
-                        .shuffle(buffer_size=self.batch_size*2)
+                        .shuffle(buffer_size=self.shuffle_buffer)
                         # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
@@ -151,7 +150,7 @@ class TFRecordImageMask(object):
         img = tf.image.resize_images(img, [target_h, target_w])
         mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
-        ## Recenter to [-0.5, 0.5] for SELU activations
+        ## Recenter to [-1, 1] for SELU activations
         # img = tf.cast(img, tf.float32)
         img = tf.multiply(img, 2/255.0) - 1
         mask = tf.cast(mask, self.mask_dtype)

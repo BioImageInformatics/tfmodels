@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import cv2
@@ -39,29 +40,29 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5, verbose=False):
     assert len(x_in.shape) == 4
     assert x_in.shape[0] == 1
     if verbose:
-        print 'Entering ops.bayesian_inference() with {} samples'.format(samples)
-        print 'Got x_in: {} [{}-{}]'.format(x_in.shape, x_in.min(), x_in.max())
-        print 'initializing y_hat'
+        print('Entering ops.bayesian_inference() with {} samples'.format(samples))
+        print('Got x_in: {} [{}-{}]'.format(x_in.shape, x_in.min(), x_in.max()))
+        print('initializing y_hat')
 
     y_hat = model.inference(x_in=x_in, keep_prob=keep_prob)
     y_hat = np.expand_dims(y_hat, -1)
     if verbose:
-        print 'y_hat initialized: {}'.format(y_hat.shape)
+        print('y_hat initialized: {}'.format(y_hat.shape))
 
     for tt in xrange(1, samples):
         y_hat_p = model.inference(x_in=x_in, keep_prob=keep_prob)
         y_hat = np.concatenate([y_hat, np.expand_dims(y_hat_p, -1)], -1)
 
     if verbose:
-        print 'y_hat_i: {}'.format(y_hat.shape)
-        print 'finding means, variance and argmax'
+        print('y_hat_i: {}'.format(y_hat.shape))
+        print('finding means, variance and argmax')
     y_bar_mean = np.mean(y_hat, axis=-1)
     y_bar_var = np.var(y_hat, axis=-1)
     y_bar = np.argmax(y_bar_mean, axis=-1) ## (1, h, w)
 
     if verbose:
-        print 'returning mean: {}, var: {}, y_bar: {} [{}]'.format(
-            y_bar_mean.shape, y_bar_var.shape, y_bar.shape, np.unique(y_bar))
+        print('returning mean: {}, var: {}, y_bar: {} [{}]'.format(
+            y_bar_mean.shape, y_bar_var.shape, y_bar.shape, np.unique(y_bar)))
 
     return y_bar_mean, y_bar_var, y_bar
 
@@ -95,7 +96,7 @@ def write_image_mask_combos(img_src_dir, mask_src_dir, save_dir,
         img_mask = np.concatenate([img_, mask_], axis=-1)
 
         success = cv2.imwrite(outname, img_mask)
-        print counter, img_mask.shape, img_mask.dtype, outname
+        print(counter, img_mask.shape, img_mask.dtype, outname)
         counter += 1
 
 
@@ -135,20 +136,21 @@ def _int64_feature(value):
     return tf.train.Feature(
         int64_list=tf.train.Int64List(value=[value]))
 
-def _cut_subimages(img, subimage_size):
+def _cut_subimages(img, subimage_size, oversample_factor):
     h, w = img.shape[:2]
 
     hT = h / float(subimage_size)
     wT = w / float(subimage_size)
 
     subimgs = []
-    for ih in np.linspace(0, h-subimage_size, np.ceil(hT), dtype=np.int):
-        for iw in np.linspace(0, w-subimage_size, np.ceil(wT), dtype=np.int):
+    for ih in np.linspace(0, h-subimage_size, int(np.ceil(hT)*oversample_factor), dtype=np.int):
+        for iw in np.linspace(0, w-subimage_size, int(np.ceil(wT)*oversample_factor), dtype=np.int):
             subimgs.append(img[ih:ih+subimage_size, iw:iw+subimage_size])
 
     return subimgs
 
-def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subimage_size=None):
+def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subimage_size=None,
+    oversample_factor=1):
     img = cv2.imread(imgp, -1)
     mask = cv2.imread(maskp, -1)
 
@@ -164,8 +166,8 @@ def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subim
     assert iw == mw
 
     if subimage_size is not None:
-        img = _cut_subimages(img, subimage_size)
-        mask = _cut_subimages(mask, subimage_size)
+        img = _cut_subimages(img, subimage_size, oversample_factor)
+        mask = _cut_subimages(mask, subimage_size, oversample_factor)
 
     return img, mask, ih, iw
 
@@ -192,7 +194,8 @@ Note: via the subimage_size argument this function is set up to handle
 variable sized inputs, and normalize them to subimages with uniform size
 """
 def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambda x: x[:,:,::-1],
-    mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,):
+    mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,
+    oversample_factor=1.2):
 
     writer = tf.python_io.TFRecordWriter(record_path)
 
@@ -205,7 +208,7 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
         ## We're relying on our past selves to have not messed up
         assert len(img_list) == len(mask_list)
         assert len(img_list) > 0
-    print 'Got {} source images'.format(len(img_list))
+    print('Got {} source images'.format(len(img_list)))
     # estimated_size = estimate_dataset_size(img_list[0], mask_list[0], n_classes)
 
     ## Shuffle and subset
@@ -222,7 +225,7 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
             maskp = name_transl_fn(imgp)
             mask_exists = os.path.exists(maskp)
             if not mask_exists:
-                print 'WARRNING!! Image {} no matching mask {}'.format(imgp, maskp)
+                print('WARRNING!! Image {} no matching mask {}'.format(imgp, maskp))
                 continue
         maskbase = os.path.basename(maskp)
 
@@ -234,7 +237,8 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
         img, mask, height, width = _read_img_mask(imgp, maskp,
             img_process_fn=img_process_fn,
             mask_process_fn=mask_process_fn,
-            subimage_size=subimage_size)
+            subimage_size=subimage_size,
+            oversample_factor=oversample_factor)
 
         if subimage_size is not None:
             for img_, mask_ in zip(img, mask):
@@ -248,10 +252,10 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
                 writer.write(example.SerializeToString())
                 count += 1
                 if count % 100 == 0:
-                    print 'Writing [{}] image [{:05d}] (source [{:05d}]/[{:05d}])'.format(
-                        record_path, count, source_idx, len(img_list))
+                    print('Writing [{}] image [{:05d}] (source [{:05d}]/[{:05d}])'.format(
+                        record_path, count, source_idx, len(img_list)))
         else:
-            print 'writing img: {} mask: {}, {}'.format(img.shape, mask.shape, np.unique(mask))
+            # print('writing img: {} mask: {}, {}'.format(img.shape, mask.shape, np.unique(mask)))
             img_raw = img.tostring()
             mask_raw = mask.tostring()
             example = tf.train.Example(features=tf.train.Features(feature={
@@ -262,11 +266,11 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
             writer.write(example.SerializeToString())
             count += 1
             if count % 100 == 0:
-                print 'Writing [{}] image [{:05d}]/[{:05d}]'.format(
-                    record_path, count, len(img_list))
+                print('Writing [{}] image [{:05d}]/[{:05d}]'.format(
+                    record_path, count, len(img_list)))
 
     writer.close()
-    print 'Finished writing [{}]'.format(record_path)
+    print('Finished writing [{}]'.format(record_path))
 
 
 
@@ -290,29 +294,29 @@ def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
             sess = sess )
 
         pull_times = []
-        print 'Checking 25 batches of {} examples'.format(batch_size)
+        print('Checking 25 batches of {} examples'.format(batch_size))
         for k in xrange(iterations):
             tstart = time.time()
             img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
             pull_times.append(time.time() - tstart)
             ps = '{:03d} IMG type [{}] shape [{}]'.format(k, img_.dtype, img_.shape, )
             ps += ' MASK type [{}] range [{}-{}] shape [{}]'.format(mask_.dtype, mask_.min(), mask_.max(), mask_.shape)
-            print ps
+            print(ps)
 
-    print 'Average time:', np.mean(pull_times)
+    print('Average time:', np.mean(pull_times))
 
 
 """ Same as above; except use a dataset defined externally. """
 def check_tfrecord_dataset(dataset, iterations=25):
     pull_times = []
-    print 'Checking average load time for {} batches'.format(iterations)
+    print('Checking average load time for {} batches'.format(iterations))
     for _ in xrange(iterations):
         tstart = time.time()
         img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
-        print img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max()
+        print(img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max())
         pull_times.append(time.time() - tstart)
 
-    print 'Average time:', np.mean(pull_times)
+    print('Average time:', np.mean(pull_times))
 
 
 """ Create an experiment directory for organizing logs and snapshots
@@ -331,17 +335,17 @@ def make_experiment(basedir, remove_old=False):
     if os.path.isdir(basedir) and remove_old:
         for dd in dirlist:
             if os.path.isdir(dd):
-                print 'Found directory {}; Cleaning it...'.format(dd)
+                print('Found directory {}; Cleaning it...'.format(dd))
                 shutil.rmtree(dd)
     elif os.path.isdir(basedir) and not remove_old:
-        print 'Found directory {}; remove_old was False; returning...'.format(basedir)
+        print('Found directory {}; remove_old was False; returning...'.format(basedir))
         return log_dir, save_dir, debug_dir, infer_dir
     else:
-        print 'Creating base experiment directory'
+        print('Creating base experiment directory')
         os.makedirs(basedir)
 
     for dd in dirlist:
-        print 'Creating {}'.format(dd)
+        print('Creating {}'.format(dd))
         os.makedirs(dd)
 
     return log_dir, save_dir, debug_dir, infer_dir

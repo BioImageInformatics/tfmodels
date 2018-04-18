@@ -33,10 +33,9 @@ class SegmentationBayesian(Segmentation):
 
     def __init__(self, **kwargs):
         self.bayesian_segmentation_defaults.update(**kwargs)
-
         super(SegmentationBayesian, self).__init__(**self.bayesian_segmentation_defaults)
 
-        
+
     def _make_input_ops(self):
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -77,8 +76,7 @@ class SegmentationBayesian(Segmentation):
 
             def _corrupt_with_noise(yhat, dist):
                 ## sample is the same shape as the sigma output
-                ## LOL
-                epsilon = tf.transpose(dist.sample(self.n_classes), perm=[1,2,0,3])
+                epsilon = tf.transpose(dist.sample(self.n_classes), perm=[1,2,0,3]) ## LOL
                 epsilon = tf.squeeze(epsilon)
                 return yhat + epsilon
 
@@ -98,7 +96,7 @@ class SegmentationBayesian(Segmentation):
                 # return tf.reduce_logsumexp(y_hat_eps - y_hat_c, 1, name='delta')
                 return loss
 
-            y_hat_tile = tf.tile(tf.expand_dims(y_hat_v, 0), [self.epistemic_T,1,1,1], name='y_hat_tile')
+            y_hat_tile = tf.tile(tf.expand_dims(y_hat_v, 0), [self.aleatoric_T,1,1,1], name='y_hat_tile')
             print('y_hat_tile', y_hat_tile.get_shape())
 
             loss_fn_map = lambda x: loss_fn(x)
@@ -203,33 +201,44 @@ class SegmentationBayesian(Segmentation):
                  self.sigma_sum_test])
 
 
+    """
+    Inference function needs to perturb output based on sigma
+    """
+    def inference(self, x_in, keep_prob=1.0):
+        feed_dict = {self.x_in: x_in,
+                     self.keep_prob: keep_prob,
+                     self.training: False}
+        y_hat_, sigma_ = self.sess.run([self.y_hat, self.sigma], feed_dict=feed_dict)
+        return y_hat_, sigma_
+
 
     """ function for approximate bayesian inference via dropout
-
-    if ret_all is true, then we return the mean and variance
-    if ret_all is false, then we return just the mean, similar to returning
-        a single y_hat_
+    if ret_all is true, then we return the mean, variance and sigma images
+    if ret_all is false, then we return just the softmaxed yhat
     """
     def bayesian_inference(self, x_in, samples=25, keep_prob=0.5, ret_all=False):
         assert keep_prob < 1.0
-        assert samples > 1
         assert x_in.shape[0] == 1 and len(x_in.shape) == 4
 
-        ## Option A:
-        x_in_stack = np.concatenate([x_in]*samples, axis=0)
+        ## Option A: (one big iteration)
+        # x_in_stack = np.concatenate([x_in]*samples, axis=0)
+        # y_hat = self.inference(x_in=x_in_stack, keep_prob=keep_prob)
+        # y_bar_mean = np.mean(y_hat, axis=0) ## (1, h, w, n_classes)
 
-        y_hat = self.inference(x_in=x_in_stack, keep_prob=keep_prob)
-        y_bar_mean = np.mean(y_hat, axis=0) ## (1, h, w, n_classes)
+        ## Option B: (smaller iterations)
+        y_hat_sigmas = [self.inference(x_in=x_in, keep_prob=keep_prob) for _ in xrange(samples)]
+        y_hat = [x[0] for x in y_hat_sigmas]
+        y_hat = np.stack(y_hat, axis=0)
+        y_bar_mean = np.mean(y_hat, axis=0)
 
-        ## Option B:
-        # y_hat = [self.inference(x_in=x_in, keep_prob=keep_prob) for _ in xrange(samples)]
-        # y_hat = np.stack(y_hat, axis=0)
-        # y_bar_mean = np.mean(y_hat, axis=0)
+        sigmas = [x[1] for x in y_hat_sigmas]
+        sigmas = np.stack(sigmas, axis=0)
 
         if ret_all:
             y_bar_var = np.var(y_hat, axis=0)
+            sigma_bar = np.mean(sigmas, axis=0)
             # y_bar_argmax = np.argmax(y_bar_mean, axis=-1)
             # y_bar_argmax = np.expand_dims(y_bar_argmax, 0)
-            return y_bar_mean, y_bar_var
+            return y_bar_mean, y_bar_var, sigma_bar
         else:
             return y_bar_mean

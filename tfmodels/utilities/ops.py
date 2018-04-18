@@ -44,7 +44,7 @@ def linear(features, n_output, var_scope='linear', no_bias=False,
         else:
             bias = bias_variable(n_output, name='b')
             out = tf.matmul(features, weight) + bias
-        print '\t {} dense: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print '\t {} dense: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 
 def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
@@ -77,7 +77,7 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
             oH, oW, oC = out.get_shape().as_list()[1:]
             bias = bias_variable([n_kernel], name='b')
             out = tf.reshape(tf.nn.bias_add(out, bias), [-1, oH, oW, oC])
-        print '\t {} conv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print '\t {} conv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 
 def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope='deconv',
@@ -99,12 +99,12 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope=
         else:
             bias = bias_variable([n_kernel], name='b')
             out = tf.reshape(tf.nn.bias_add(out, bias), [-1, out_h, out_w, n_kernel])
-        print '\t {} deconv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print '\t {} deconv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 
 ## BUG batch norm with training
 def batch_norm(features, momentum=0.9, reuse=False, training=True, var_scope='batch_norm'):
-    print 'Batch norm input shape: {}'.format(features.get_shape())
+    # print 'Batch norm input shape: {}'.format(features.get_shape())
     with tf.variable_scope(var_scope) as scope:
         ## ReLU
         out = tf.layers.batch_normalization(features, renorm=True, reuse=reuse,
@@ -150,7 +150,7 @@ def unpool(features, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
         set_output_shape = [set_input_shape[0], set_input_shape[1] * k_size[1], set_input_shape[2] * k_size[2], set_input_shape[3]]
         out.set_shape(set_output_shape)
 
-        print '\t {} unpool: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print '\t {} unpool: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
         return out
 #
 # def class_weighted_pixelwise_crossentropy(labels, logits, weights=1):
