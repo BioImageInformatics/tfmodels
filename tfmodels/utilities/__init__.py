@@ -16,6 +16,7 @@ from ops import (
     deconv,
     linear,
     lrelu,
+    crop_concat
 )
 
 from general import (

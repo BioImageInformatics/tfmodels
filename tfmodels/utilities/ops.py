@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 
@@ -10,7 +11,7 @@ def selu_initializer(shape):
     if len(shape) == 4:
         input_size = np.prod(shape[:-1])
     sqrt_1_input = np.sqrt(1.0/input_size)
-    # print '\t\t SELU intializer stddev = {:1.5f}'.format(sqrt_1_input)
+    # print('\t\t SELU intializer stddev = {:1.5f}'.format(sqrt_1_input))
     return tf.random_normal_initializer(mean=0.0, stddev=sqrt_1_input)
 
 def conv_cond_concat(x, y):
@@ -19,6 +20,27 @@ def conv_cond_concat(x, y):
   y_shapes = y.get_shape()
   return concat([
     x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
+
+
+def crop_concat(x, y):
+    """ Crop x to match y on dim 1 & 2 then return the concatenated tensors
+
+    https://github.com/jakeret/tf_unet/blob/master/tf_unet/layers.py
+    """
+    x_shape = tf.shape(x)
+    y_shape = tf.shape(y)
+    x_shape_ = x.get_shape()
+    y_shape_ = y.get_shape()
+    expected_shape = [-1, y_shape_[1], y_shape_[2], x_shape_[-1]+y_shape_[-1]]
+
+    offsets = [0, (x_shape[1] - y_shape[1]) // 2, (x_shape[2] - y_shape[2]) // 2, 0]
+    size = [-1, y_shape[1], y_shape[2], -1]
+    # size = tf.constant([-1, y_shape[1], y_shape[2], x_shape[-1]])
+    x_crop = tf.slice(x, offsets, size)
+    x_y = tf.concat([x_crop, y], -1)
+    x_y = tf.reshape(x_y, expected_shape)
+    return x_y
+
 
 def weight_variable(shape, name='weight',
     initializer=tf.contrib.layers.xavier_initializer(uniform=False),
@@ -44,7 +66,7 @@ def linear(features, n_output, var_scope='linear', no_bias=False,
         else:
             bias = bias_variable(n_output, name='b')
             out = tf.matmul(features, weight) + bias
-        # print '\t {} dense: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print('\t {} dense: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape()))
         return out
 
 def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
@@ -58,10 +80,10 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
         if dilation is not None:
             assert stride==1
             # dilation = 1
-            # print '\t using dilation, {}'.format(dilation)
+            # print('\t using dilation, {}'.format(dilation))
             dilation = [dilation, dilation]
         # else:
-        #     print '\t using no dilation'
+        #     print('\t using no dilation')
 
         out = tf.nn.convolution(features, weight, strides=[stride, stride],
             padding=pad, dilation_rate=dilation)
@@ -77,7 +99,7 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
             oH, oW, oC = out.get_shape().as_list()[1:]
             bias = bias_variable([n_kernel], name='b')
             out = tf.reshape(tf.nn.bias_add(out, bias), [-1, oH, oW, oC])
-        # print '\t {} conv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print('\t {} conv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape()))
         return out
 
 def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope='deconv',
@@ -99,12 +121,12 @@ def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope=
         else:
             bias = bias_variable([n_kernel], name='b')
             out = tf.reshape(tf.nn.bias_add(out, bias), [-1, out_h, out_w, n_kernel])
-        # print '\t {} deconv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print('\t {} deconv: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape()))
         return out
 
 ## BUG batch norm with training
 def batch_norm(features, momentum=0.9, reuse=False, training=True, var_scope='batch_norm'):
-    # print 'Batch norm input shape: {}'.format(features.get_shape())
+    # print('Batch norm input shape: {}'.format(features.get_shape()))
     with tf.variable_scope(var_scope) as scope:
         ## ReLU
         out = tf.layers.batch_normalization(features, renorm=True, reuse=reuse,
@@ -150,59 +172,5 @@ def unpool(features, ind, k_size=[1, 2, 2, 1], var_scope='unpool'):
         set_output_shape = [set_input_shape[0], set_input_shape[1] * k_size[1], set_input_shape[2] * k_size[2], set_input_shape[3]]
         out.set_shape(set_output_shape)
 
-        # print '\t {} unpool: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape())
+        # print('\t {} unpool: {} --> {}'.format(var_scope, features.get_shape(), out.get_shape()))
         return out
-#
-# def class_weighted_pixelwise_crossentropy(labels, logits, weights=1):
-#     sample_weights = tf.reduce_sum(tf.multiply(self.y_in, self.classweights), -1)
-#     print '\t segmentation losses sample_weights:', sample_weights
-#     xent = tf.losses.softmax_cross_entropy(
-#         labels=self.y_in, logits=self.y_hat, weights=sample_weights)
-#     print '\t segmentation losses seg_loss:', self.seg_loss
-#
-#     return xent
-
-
-
-## https://github.com/mshunshin/SegNetCMR/blob/master/tfmodel/layers.py
-# def unpool_with_argmax(pool, ind, var_scope=None, k_size=[1, 2, 2, 1]):
-#     """
-#        Unpooling layer after max_pool_with_argmax.
-#        Args:
-#            pool:   max pooled output tensor
-#            ind:      argmax indices
-#            ksize:     ksize is the same as for the pool
-#        Return:
-#            unpool:    unpooling tensor
-#     """
-#     with tf.variable_scope(var_scope):
-#         print 'inputs'
-#         print 'pool', pool.get_shape()
-#         print 'ind', ind.get_shape()
-#         input_shape = pool.get_shape().as_list()
-#         batch_size = pool.get_shape().as_list()[0]
-#         print 'input_shape', input_shape
-#         output_shape = (batch_size, input_shape[1] * k_size[1], input_shape[2] * k_size[2], input_shape[3])
-#
-#         flat_input_size = np.prod(input_shape[1:])
-#         print 'flat_input_size', flat_input_size
-#         flat_output_shape = [batch_size, output_shape[1] * output_shape[2] * output_shape[3]]
-#         print 'flat_output_shape', flat_output_shape
-#
-#         print 'ind', ind.dtype
-#         # output_shape = tf.cast(output_shape, dtype=ind.dtype)
-#         # pool_ = tf.reshape(pool, flat_input_size)
-#         pool_ = tf.contrib.layers.flatten(pool)
-#         print 'pool_', pool_.get_shape()
-#         batch_range = tf.reshape(tf.range(batch_size, dtype=ind.dtype), shape=[batch_size, 1,1,1])
-#         b = tf.ones_like(ind) * batch_range
-#         print 'b', b.get_shape()
-#         b = tf.reshape(b, flat_input_size)
-#         print 'b', b.get_shape()
-#         ind_ = tf.reshape(ind, flat_input_size)
-#         print 'ind_', ind_.get_shape()
-#         ind_ = tf.concat([b, ind_], 1)
-#
-#         ret = tf.scatter_nd(ind_, pool_, shape=flat_output_shape)
-#         ret = tf.reshape(ret, output_shape)
-#         return ret
