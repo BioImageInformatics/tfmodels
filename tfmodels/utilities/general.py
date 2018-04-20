@@ -259,11 +259,6 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
                     print('Writing [{}] image [{:05d}] (source [{:05d}]/[{:05d}])'.format(
                         record_path, count, source_idx, len(img_list)))
         else:
-<<<<<<< HEAD
-            # print('writing img: {} mask: {}'.format(img.shape, mask.shape))
-=======
-            # print('writing img: {} mask: {}, {}'.format(img.shape, mask.shape, np.unique(mask)))
->>>>>>> 4ffd99d2e65dfaa3780afc93b792404237e9e195
             img_raw = img.tostring()
             mask_raw = mask.tostring()
             example = tf.train.Example(features=tf.train.Features(feature={

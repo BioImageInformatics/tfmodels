@@ -7,33 +7,33 @@ import sys, os
 from segmentation_basemodel import Segmentation
 
 class SegmentationBayesian(Segmentation):
-    ## Defaults. arXiv links correspond to inspirational materials
-    bayesian_segmentation_defaults={
-        'class_weights': None, ## https://arxiv.org/abs/1511.00561
-        'dataset': None,
-        'aleatoric': False, ## https://arxiv.org/abs/1703.04977
-        'aleatoric_T': 25,
-        'epistemic_T': 10,
-        'global_step': 0,
-        'k_size': 3,
-        'learning_rate': 1e-3,
-        'log_dir': None,
-        'mode': 'TRAIN',
-        'name': 'Segmentation',
-        'n_classes': None,
-        'save_dir': None,
-        'sess': None,
-        'seg_training_op_list': [],
-        'summarize_grads': False,
-        'summary_iters': 50,
-        'summary_image_iters': 250,
-        'summary_op_list': [],
-        'x_dims': [256, 256, 3],
-     }
 
     def __init__(self, **kwargs):
-        self.bayesian_segmentation_defaults.update(**kwargs)
-        super(SegmentationBayesian, self).__init__(**self.bayesian_segmentation_defaults)
+        ## Defaults. arXiv links correspond to inspirational materials
+        bayesian_segmentation_defaults={
+            'class_weights': None, ## https://arxiv.org/abs/1511.00561
+            'dataset': None,
+            'aleatoric': False, ## https://arxiv.org/abs/1703.04977
+            'aleatoric_T': 25,
+            'epistemic_T': 10,
+            'global_step': 0,
+            'k_size': 3,
+            'learning_rate': 1e-3,
+            'log_dir': None,
+            'mode': 'TRAIN',
+            'name': 'Segmentation',
+            'n_classes': None,
+            'save_dir': None,
+            'sess': None,
+            'seg_training_op_list': [],
+            'summarize_grads': False,
+            'summary_iters': 50,
+            'summary_image_iters': 250,
+            'summary_op_list': [],
+            'x_dims': [256, 256, 3],
+         }
+        bayesian_segmentation_defaults.update(**kwargs)
+        super(SegmentationBayesian, self).__init__(**bayesian_segmentation_defaults)
 
 
     def _make_input_ops(self):
