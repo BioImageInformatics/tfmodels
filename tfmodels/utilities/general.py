@@ -1,8 +1,5 @@
 from __future__ import print_function
-<<<<<<< HEAD
 
-=======
->>>>>>> 4ffd99d2e65dfaa3780afc93b792404237e9e195
 import tensorflow as tf
 import numpy as np
 import cv2

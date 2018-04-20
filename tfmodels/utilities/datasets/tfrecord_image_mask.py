@@ -158,7 +158,7 @@ class TFRecordImageMask(object):
         img = tf.multiply(img, 2/255.0) - 1
 
         if self.as_onehot:
-            mask = tf.cast(mask, tf.int)
+            mask = tf.cast(mask, tf.uint8)
             mask = tf.one_hot(mask, depth=self.n_classes)
             mask = tf.squeeze(mask)
 

@@ -87,12 +87,12 @@ class BaseModel(object):
         # with tf.device('/cpu:0'):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
-            
+
         ## Append a model name to the save path
         self.snapshot_path = os.path.join(self.save_dir, '{}.ckpt'.format(self.name))
 
         ## april 19 - add var list that is only trainable variables - NI
-        self.saver = tf.train.Saver(var_list=var_list, max_to_keep=self.max_to_keep)
+        self.saver = tf.train.Saver(var_list=self.var_list, max_to_keep=self.max_to_keep)
 
 
 
