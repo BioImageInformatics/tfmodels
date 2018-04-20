@@ -1,7 +1,7 @@
+from __future__ import print_function
 import tensorflow as tf
 from segmentation_basemodel import Segmentation
 from ..utilities.ops import *
-
 
 """
 To build a resnet with 3 stacks of down/upsampling,
@@ -28,10 +28,10 @@ class ResNet(Segmentation):
             setattr(self, key, val)
 
         self.modules = len(self.kernels)
-        print 'Requesting {} resnet blocks'.format(self.modules)
+        print('Requesting {} resnet blocks'.format(self.modules))
         start_size = self.x_dims[0]/4 ## start with 2 stride conv and pool
         min_dimension = start_size / np.power(2,self.modules)
-        print 'MINIMIUM DIMENSION: ', min_dimension
+        print('MINIMIUM DIMENSION: ', min_dimension)
         assert min_dimension >= 1
 
         super(ResNet, self).__init__(**self.resnet_defaults)
@@ -72,7 +72,7 @@ class ResNet(Segmentation):
     do dropout after the residual block, before the down/up sampling
     """
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'Resnet Model'
+        print('Resnet Model')
         k_size = self.k_size
         nonlin = self.nonlin
         # print 'Non-linearity:', nonlin
@@ -80,7 +80,7 @@ class ResNet(Segmentation):
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
-            print '\t x_in', x_in.get_shape()
+            print('\t x_in', x_in.get_shape())
 
             p0 = nonlin(conv(x_in, self.kernels[0], stride=2, k_size=7, var_scope='p0', selu=1))
             signal = tf.nn.max_pool(p0, [1,2,2,1], [1,2,2,1], padding='VALID', name='pool_p0')
@@ -121,7 +121,7 @@ class ResNet(Segmentation):
 
 
             y_hat = deconv(d0_residual, self.n_classes, upsample_rate=2, k_size=3, var_scope='y_hat')
-            print '\t y_hat', y_hat.get_shape()
+            print('\t y_hat', y_hat.get_shape())
 
             ## New logic at the end of model building
             if self.aleatoric:

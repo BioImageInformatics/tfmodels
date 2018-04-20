@@ -1,5 +1,8 @@
 from __future__ import print_function
+<<<<<<< HEAD
 
+=======
+>>>>>>> 4ffd99d2e65dfaa3780afc93b792404237e9e195
 import tensorflow as tf
 import numpy as np
 import cv2
@@ -137,20 +140,21 @@ def _int64_feature(value):
     return tf.train.Feature(
         int64_list=tf.train.Int64List(value=[value]))
 
-def _cut_subimages(img, subimage_size):
+def _cut_subimages(img, subimage_size, oversample_factor):
     h, w = img.shape[:2]
 
     hT = h / float(subimage_size)
     wT = w / float(subimage_size)
 
     subimgs = []
-    for ih in np.linspace(0, h-subimage_size, np.ceil(hT), dtype=np.int):
-        for iw in np.linspace(0, w-subimage_size, np.ceil(wT), dtype=np.int):
+    for ih in np.linspace(0, h-subimage_size, int(np.ceil(hT)*oversample_factor), dtype=np.int):
+        for iw in np.linspace(0, w-subimage_size, int(np.ceil(wT)*oversample_factor), dtype=np.int):
             subimgs.append(img[ih:ih+subimage_size, iw:iw+subimage_size])
 
     return subimgs
 
-def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subimage_size=None):
+def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subimage_size=None,
+    oversample_factor=1):
     img = cv2.imread(imgp, -1)
     mask = cv2.imread(maskp, -1)
 
@@ -166,8 +170,8 @@ def _read_img_mask(imgp, maskp, img_process_fn=None, mask_process_fn=None, subim
     assert iw == mw
 
     if subimage_size is not None:
-        img = _cut_subimages(img, subimage_size)
-        mask = _cut_subimages(mask, subimage_size)
+        img = _cut_subimages(img, subimage_size, oversample_factor)
+        mask = _cut_subimages(mask, subimage_size, oversample_factor)
 
     return img, mask, ih, iw
 
@@ -194,7 +198,8 @@ Note: via the subimage_size argument this function is set up to handle
 variable sized inputs, and normalize them to subimages with uniform size
 """
 def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambda x: x[:,:,::-1],
-    mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,):
+    mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,
+    oversample_factor=1.2):
 
     writer = tf.python_io.TFRecordWriter(record_path)
 
@@ -236,7 +241,8 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
         img, mask, height, width = _read_img_mask(imgp, maskp,
             img_process_fn=img_process_fn,
             mask_process_fn=mask_process_fn,
-            subimage_size=subimage_size)
+            subimage_size=subimage_size,
+            oversample_factor=oversample_factor)
 
         if subimage_size is not None:
             for img_, mask_ in zip(img, mask):
@@ -253,7 +259,11 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
                     print('Writing [{}] image [{:05d}] (source [{:05d}]/[{:05d}])'.format(
                         record_path, count, source_idx, len(img_list)))
         else:
+<<<<<<< HEAD
             # print('writing img: {} mask: {}'.format(img.shape, mask.shape))
+=======
+            # print('writing img: {} mask: {}, {}'.format(img.shape, mask.shape, np.unique(mask)))
+>>>>>>> 4ffd99d2e65dfaa3780afc93b792404237e9e195
             img_raw = img.tostring()
             mask_raw = mask.tostring()
             example = tf.train.Example(features=tf.train.Features(feature={

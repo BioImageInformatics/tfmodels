@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import datetime, os
@@ -45,14 +46,17 @@ class BaseModel(object):
 
 
     def restore(self, snapshot_path):
-        print 'Restoring from {}'.format(snapshot_path)
-        try:
-            self.saver.restore(self.sess, snapshot_path)
-            print 'Success!'
-            ## In progress for restoring model + discriminator separately (SAVE1)
-            # for saver, snap_path in zip(self.saver):
-        except:
-            print 'Failed! Continuing without loading snapshot.'
+        print('Restoring from {}'.format(snapshot_path))
+        # try:
+        #     self.saver.restore(self.sess, snapshot_path)
+        #     print 'Success!'
+        #     ## In progress for restoring model + discriminator separately (SAVE1)
+        #     # for saver, snap_path in zip(self.saver):
+        # except:
+        #     print 'Failed! Continuing without loading snapshot.'
+
+        self.saver.restore(self.sess, snapshot_path)
+        print('Success!')
 
 
     def snapshot(self):
@@ -62,9 +66,9 @@ class BaseModel(object):
         #     print 'Snapshotting to [{}] step [{}]'.format(snap_dir, step),
         #     saver.save(self.sess, snap_dir, global_step=step)
 
-        print 'Snapshotting to [{}] step [{}]'.format(self.snapshot_path, self.global_step),
-        self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step)
-        print 'Done'
+        print('Snapshotting to [{}] step [{}]'.format(self.snapshot_path, self.global_step),
+        self.saver.save(self.sess, self.snapshot_path, global_step=self.global_step))
+        print('Done')
 
 
     def _count_params(self):
@@ -90,20 +94,20 @@ class BaseModel(object):
 
 
     def print_info(self):
-        print '------------------------ {} ---------------------- '.format(self.name)
-        print '|\t\t TIMESTAMP: {}'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+        print('------------------------ {} ---------------------- '.format(self.name))
+        print('|\t\t TIMESTAMP: {}'.format(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")))
         for key, value in sorted(self.__dict__.items()):
             if '_op' in key:
                 continue
 
             if 'list' in key:
-                print '|\t{}:'.format(key)
+                print('|\t{}:'.format(key))
                 for val in value:
-                    print '|\t\t{}:'.format(val)
+                    print('|\t\t{}:'.format(val))
                 continue
 
-            print '|\t{}: {}'.format(key, value)
-        print '------------------------ {} ---------------------- '.format(self.name)
+            print('|\t{}: {}'.format(key, value))
+        print('------------------------ {} ---------------------- '.format(self.name))
 
 
     def _print_info_to_file(self, filename):
