@@ -7,35 +7,35 @@ import sys, os
 from ..utilities.basemodel import BaseModel
 
 class Segmentation(BaseModel):
-    ## Defaults. arXiv links correspond to inspirational materials
-    segmentation_defaults={
-        'class_weights': None, ## https://arxiv.org/abs/1511.00561
-        'dataset': None,
-        'global_step': 0,
-        'k_size': 3,
-        'learning_rate': 1e-3,
-        'log_dir': None,
-        'mode': 'TRAIN',
-        'name': 'Segmentation',
-        'nonlin': tf.nn.selu,
-        'n_classes': None,
-        'save_dir': None,
-        'sess': None,
-        'seg_training_op_list': [],
-        'summarize_grads': False,
-        'summary_iters': 50,
-        'summary_image_iters': 250,
-        'summary_image_n': 4,
-        'summary_op_list': [],
-        'with_test': False,
-        'n_test_batches': 10,
-        'x_dims': [256, 256, 3],
-     }
 
     def __init__(self, **kwargs):
-        self.segmentation_defaults.update(**kwargs)
+        ## Defaults. arXiv links correspond to inspirational materials
+        segmentation_defaults={
+            'class_weights': None, ## https://arxiv.org/abs/1511.00561
+            'dataset': None,
+            'global_step': 0,
+            'k_size': 3,
+            'learning_rate': 1e-3,
+            'log_dir': None,
+            'mode': 'TRAIN',
+            'name': 'Segmentation',
+            'nonlin': tf.nn.selu,
+            'n_classes': None,
+            'save_dir': None,
+            'sess': None,
+            'seg_training_op_list': [],
+            'summarize_grads': False,
+            'summary_iters': 50,
+            'summary_image_iters': 250,
+            'summary_image_n': 4,
+            'summary_op_list': [],
+            'with_test': False,
+            'n_test_batches': 10,
+            'x_dims': [256, 256, 3],
+         }
+        segmentation_defaults.update(**kwargs)
 
-        super(Segmentation, self).__init__(**self.segmentation_defaults)
+        super(Segmentation, self).__init__(**segmentation_defaults)
         assert self.sess is not None
 
         if self.mode=='TRAIN':
@@ -123,8 +123,10 @@ class Segmentation(BaseModel):
         self.training = tf.placeholder_with_default(training, shape=())
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False,
             training=self.training)
-
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
+
+        ## Pull out the variables belonging to this model
+        self.var_list = [var for var in tf.trainable_variables() if self.name in var.name]
         print('Model output y_hat:', self.y_hat.get_shape())
 
 

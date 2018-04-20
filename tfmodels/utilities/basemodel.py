@@ -18,21 +18,21 @@ It holds shared operations such as
 """
 class BaseModel(object):
     ## Defaults
-    base_defaults={
-        'sess': None,
-        'global_step': 0,
-        'log_dir': None,
-        'save_dir': None,
-        'max_to_keep': 5,
-        'name': 'base',
-        'training_op_list': [],
-        'summary_op_list': [],
-        }
-
     def __init__(self, **kwargs):
-        self.base_defaults.update(**kwargs)
+        base_defaults={
+            'sess': None,
+            'global_step': 0,
+            'log_dir': None,
+            'save_dir': None,
+            'max_to_keep': 5,
+            'name': 'base',
+            'training_op_list': [],
+            'summary_op_list': [],
+            }
 
-        for key, value in self.base_defaults.items():
+        base_defaults.update(**kwargs)
+
+        for key, value in base_defaults.items():
             setattr(self, key, value)
 
 
@@ -87,10 +87,13 @@ class BaseModel(object):
         # with tf.device('/cpu:0'):
         self.summary_writer = tf.summary.FileWriter(self.log_dir,
             graph=self.sess.graph, flush_secs=30)
+            
         ## Append a model name to the save path
         self.snapshot_path = os.path.join(self.save_dir, '{}.ckpt'.format(self.name))
-        # self.make_saver() ## In progress (SAVE1)
-        self.saver = tf.train.Saver(max_to_keep=self.max_to_keep)
+
+        ## april 19 - add var list that is only trainable variables - NI
+        self.saver = tf.train.Saver(var_list=var_list, max_to_keep=self.max_to_keep)
+
 
 
     def print_info(self):
