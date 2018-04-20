@@ -36,14 +36,16 @@ class TFRecordImageMask(object):
                 'ratio': 1.0,
                 'batch_size': 32,
                 'prefetch': 1000,
-                'shuffle_buffer': 512,
+                'shuffle_buffer': 128,
                 'n_threads': 4,
                 'sess': None,
                 'as_onehot': True,
+                'target_image': False,
                 'n_classes': None,
                 'img_dtype': tf.uint8,
                 'mask_dtype': tf.uint8,
                 'img_channels': 3,
+                'mask_channels': 1,
                 'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
                 'name': 'TFRecordDataset' }
     def __init__(self, **kwargs):
@@ -59,7 +61,7 @@ class TFRecordImageMask(object):
         self.record_path = tf.placeholder_with_default(self.training_record, shape=())
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
-                        .shuffle(buffer_size=self.batch_size*2)
+                        .shuffle(buffer_size=self.shuffle_buffer)
                         # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
@@ -119,19 +121,20 @@ class TFRecordImageMask(object):
     def _preprocessing(self, example, crop_size, ratio):
         h, w, img, mask = self._decode(example)
         img_shape = tf.stack([h, w, self.img_channels], axis=0)
-        mask_shape = tf.stack([h, w], axis=0)
+        mask_shape = tf.stack([h, w, self.mask_channels], axis=0)
 
         img = tf.reshape(img, img_shape)
         mask = tf.reshape(mask, mask_shape)
 
-        mask = tf.expand_dims(mask, axis=-1)
+        if len(mask.shape) == 2:
+            mask = tf.expand_dims(mask, axis=-1)
         image_mask = tf.concat([img, mask], axis=-1)
 
         image_mask = tf.random_crop(image_mask,
-            [crop_size, crop_size, self.img_channels + 1])
+            [crop_size, crop_size, self.img_channels + self.mask_channels])
         image_mask = tf.image.random_flip_left_right(image_mask)
         image_mask = tf.image.random_flip_up_down(image_mask)
-        img, mask = tf.split(image_mask, [self.img_channels,1], axis=-1)
+        img, mask = tf.split(image_mask, [self.img_channels, self.mask_channels], axis=-1)
 
         for px in self.preprocess:
             if px == 'brightness':
@@ -152,14 +155,14 @@ class TFRecordImageMask(object):
         mask = tf.image.resize_images(mask, [target_h, target_w], method=1) ## nearest neighbor
 
         ## Recenter to [-0.5, 0.5] for SELU activations
-        # img = tf.cast(img, tf.float32)
         img = tf.multiply(img, 2/255.0) - 1
-        mask = tf.cast(mask, self.mask_dtype)
 
         if self.as_onehot:
+            mask = tf.cast(mask, tf.int)
             mask = tf.one_hot(mask, depth=self.n_classes)
             mask = tf.squeeze(mask)
-        # mask = tf.reshape(mask,
-        #     [-1, self.x_dims[0], self.x_dims[1], self.n_classes])
+
+        if self.target_image:
+            mask = tf.multiply(mask, 2/255.0) - 1
 
         return img, mask

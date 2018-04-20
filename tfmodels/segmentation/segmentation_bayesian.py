@@ -36,7 +36,7 @@ class SegmentationBayesian(Segmentation):
 
         super(SegmentationBayesian, self).__init__(**self.bayesian_segmentation_defaults)
 
-        
+
     def _make_input_ops(self):
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -86,17 +86,17 @@ class SegmentationBayesian(Segmentation):
                 y_hat_eps = _corrupt_with_noise(yhat, dist)
                 print('\t y_hat_eps', y_hat_eps.get_shape())
 
-                loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_in_v, logits=y_hat_eps)
-                print('\t loss', loss.get_shape())
-
-                # y_hat_c = tf.reduce_sum(y_hat_eps * y_in_v, axis=-1, keep_dims=True)
-                # print 'y_hat_c', y_hat_c.get_shape()
-                #
-                # y_hat_c = tf.tile(y_hat_c, [1, 1, self.n_classes])
-                # print 'y_hat_c', y_hat_c.get_shape()
-
-                # return tf.reduce_logsumexp(y_hat_eps - y_hat_c, 1, name='delta')
-                return loss
+                if self.class_weights:
+                    sample_weights = tf.reduce_sum(tf.multiply(y_in_v, self.class_weights), -1)
+                    print('\t segmentation losses sample_weights:', sample_weights)
+                    loss = tf.losses.softmax_cross_entropy(onehot_labels=y_in_v,
+                        logits=y_hat_eps, weights=sample_weights)
+                    print('\t segmentation losses loss:', loss)
+                    return loss
+                else:
+                    loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_in_v, logits=y_hat_eps)
+                    print('\t loss', loss.get_shape())
+                    return loss
 
             y_hat_tile = tf.tile(tf.expand_dims(y_hat_v, 0), [self.epistemic_T,1,1,1], name='y_hat_tile')
             print('y_hat_tile', y_hat_tile.get_shape())

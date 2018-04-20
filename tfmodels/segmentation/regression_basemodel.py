@@ -89,6 +89,9 @@ class Regression(BaseModel):
         self.x_in = tf.placeholder('float',
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
             name='x_in')
+        # self.x_in = tf.placeholder('float',
+        #     shape=[None]*4,
+        #     name='x_in')
 
         ## ------------------- Model ops ------------------- ##
         self.keep_prob = tf.placeholder_with_default(0.5, shape=[], name='keep_prob')
@@ -108,6 +111,9 @@ class Regression(BaseModel):
 
     ## define self.reg_loss
     def _make_regression_loss(self, target_op=None):
+        if target_op is None:
+            target_op = self.y_hat
+
         self.reg_loss = tf.losses.mean_squared_error( self.y_in, target_op)
 
     def _make_training_ops(self):
@@ -192,6 +198,18 @@ class Regression(BaseModel):
 
 
     def inference(self, x_in, keep_prob=1.0):
+        # ## Check 4D input
+        xshape = x_in.shape
+        if len(xshape) < 4:
+            raise Exception('Regression Model Inference requires 4D input')
+
+        # ## Check to resize x_in
+        # if xshape[1] != self.x_dims[1] or xshape[2] != self.x_dims[2]:
+        #     print('Reforming x_in to shape: {}'.format(xshape))
+        #     self.x_in = tf.placeholder(tf.float32, shape=[None, xshape[1], xshape[2], xshape[3]],
+        #         name='x_in')
+        #     self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=True, training=self.training)
+
         feed_dict = {self.x_in: x_in,
                      self.keep_prob: keep_prob}
         y_hat_ = self.sess.run([self.y_hat], feed_dict=feed_dict)[0]
