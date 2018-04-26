@@ -259,7 +259,8 @@ class Segmentation(BaseModel):
         raise Exception(NotImplementedError)
 
     def test_step(self, step_delta, keep_prob=1.0):
-        fd = {self.keep_prob: keep_prob}
+        fd = {self.keep_prob: keep_prob,
+              self.training: False}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         # self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
         print('#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))

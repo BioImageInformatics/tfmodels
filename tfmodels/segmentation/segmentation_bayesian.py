@@ -184,11 +184,6 @@ class SegmentationBayesian(Segmentation):
             self.loss_sum_test = tf.summary.scalar('loss_test', self.loss)
 
         with tf.variable_scope('testing_images'):
-            # self.y_in_mask_test = tf.cast(tf.argmax(self.y_in, axis=-1), tf.float32)
-            # self.y_in_mask_test = tf.expand_dims(self.y_in_mask, axis=-1)
-            # self.y_hat_mask_test = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
-            # self.y_hat_mask_test = tf.cast(self.y_hat_mask, tf.float32)
-
             self.sigma_sum_test = tf.summary.image('sigma_img_test', self.sigma, max_outputs=self.summary_image_n)
 
             self.x_in_sum_test = tf.summary.image('x_in_test', self.x_in, max_outputs=self.summary_image_n)
@@ -242,3 +237,29 @@ class SegmentationBayesian(Segmentation):
             return y_bar_mean, y_bar_var, sigma_bar
         else:
             return y_bar_mean
+
+
+    def test_step(self, step_delta, keep_prob=0.7):
+        fd = {self.keep_prob: keep_prob,
+              self.training: False}
+        summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
+        # self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
+        print('#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))
+        return test_loss_, summary_str
+
+
+    """ Run a number of testing iterations """
+    def test(self, keep_prob=0.7):
+        ## Switch dataset to testing
+        self.dataset._initalize_testing(self.sess)
+
+        test_losses = []
+        for step_delta in xrange(self.n_test_batches):
+            loss_, summary_str = self.test_step(step_delta, keep_prob=keep_prob)
+            test_losses.append(loss_)
+        loss_mean = np.mean(test_losses)
+        loss_std = np.std(test_losses)
+        print('\n#### MEAN TEST LOSS = {:3.5f} +/- {:3.6f} #####\n'.format(loss_mean, loss_std))
+
+        self.summary_writer.add_summary(summary_str, self.global_step)
+        self.dataset._initalize_training(self.sess)
