@@ -21,6 +21,7 @@ class Segmentation(BaseModel):
             'name': 'Segmentation',
             'nonlin': tf.nn.selu,
             'n_classes': None,
+            'use_optimizer': 'Adam',
             'save_dir': None,
             'sess': None,
             'seg_training_op_list': [],
@@ -59,8 +60,20 @@ class Segmentation(BaseModel):
         ## ------------------- Training ops ------------------- ##
         self.var_list = self._get_update_list()
         self.learning_rate = tf.placeholder_with_default(self.learning_rate, shape=(), name='LR')
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
-            name='{}_Adam'.format(self.name))
+        if self.use_optimizer == 'Adam':
+            self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
+                name='{}_Adam'.format(self.name))
+        elif self.use_optimizer == 'RMSProp':
+            self.optimizer = tf.train.RMSPropOptimizer(self.learning_rate, centered=True,
+                name='{}_RMSProp'.format(self.name))
+        elif self.use_optimizer == 'Momentum':
+            self.optimizer = tf.train.MomentumOptimizer(self.learning_rate,
+                momentum=0.9, use_nesterov=True,
+                name='{}_Momentum'.format(self.name))
+        else: ## Default to Adam
+            print('Optimizer setting (`use_optimizer`) not one of the defaults; using Adam')
+            self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
+                name='{}_Adam'.format(self.name))
 
         self._make_training_ops()
 
@@ -252,7 +265,7 @@ class Segmentation(BaseModel):
         print('#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))
         return test_loss_, summary_str
 
-    def train_step(self, keep_prob=1.0):
+    def train_step(self):
         self.global_step += 1
         self.sess.run(self.seg_training_op_list)
 

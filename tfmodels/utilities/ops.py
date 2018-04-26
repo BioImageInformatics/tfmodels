@@ -85,8 +85,9 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
         # else:
         #     print('\t using no dilation')
 
-        out = tf.nn.convolution(features, weight, strides=[stride, stride],
-            padding=pad, dilation_rate=dilation)
+        # out = tf.nn.convolution(features, weight, strides=[stride, stride],
+        #     padding=pad, dilation_rate=dilation)
+        out = tf.nn.conv2d(features, weight, strides=[1, stride, stride, 1], padding=pad)
         # if dilation is not None:
         #     out = tf.nn.atrous_conv2d(features, weight, strides=[1, stride, stride, 1],
         #         padding=pad)
@@ -103,14 +104,19 @@ def conv(features, n_kernel, k_size=4, stride=2, pad='SAME', var_scope='conv',
         return out
 
 def deconv(features, n_kernel, upsample_rate=2, k_size=4, pad='SAME', var_scope='deconv',
-    dilation=None, selu=True, no_bias=False):
+    dilation=None, selu=True, no_bias=False, shape=None):
     with tf.variable_scope(var_scope) as scope:
         dim_h_in, dim_w_in, dim_k_in = features.get_shape().as_list()[1:]
         ## output must be whole numbered
         batch_size = tf.shape(features)[0]
         out_h = dim_h_in*upsample_rate
         out_w = dim_w_in*upsample_rate
-        output_shape = [batch_size, out_h, out_w, n_kernel]
+
+        if shape is not None:
+            output_shape = [batch_size, shape[1], shape[2], n_kernel]
+        else:
+            output_shape = [batch_size, out_h, out_w, n_kernel]
+
         weight_shape = [k_size, k_size, n_kernel, dim_k_in]
         weight = weight_variable(weight_shape, name='w', selu=selu)
         ## why
