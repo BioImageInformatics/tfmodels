@@ -4,16 +4,19 @@ Since this is for segmentation, we have to also read masks in the same order
 
 Assume the images and masks are named similarly and are in different folders
 """
-class DataSet(object):
-    defaults = {
-        'capacity': 5000,
-        'name': 'DataSet',
-        'seed': 5555,
-        'threads': 4,
-        'min_holding': 1250,}
 
+from __future__ import print_function
+
+class DataSet(object):
     def __init__(self, **kwargs):
-        self.defaults.update(**kwargs)
+        defaults = {
+            'capacity': 5000,
+            'name': 'DataSet',
+            'seed': 5555,
+            'threads': 4,
+            'min_holding': 1250,}
+
+        defaults.update(**kwargs)
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -22,10 +25,10 @@ class DataSet(object):
 
 
     def print_info(self):
-        print '-------------------- {} ---------------------- '.format(self.name)
+        print('-------------------- {} ---------------------- '.format(self.name))
         for key, value in sorted(self.__dict__.items()):
-            print '|\t{}: {}'.format(key, value)
-        print '-------------------- {} ---------------------- '.format(self.name)
+            print('|\t{}: {}'.format(key, value))
+        print('-------------------- {} ---------------------- '.format(self.name))
 
 
     def _preprocessing(self, image, mask):

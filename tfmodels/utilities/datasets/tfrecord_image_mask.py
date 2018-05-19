@@ -29,28 +29,28 @@ TFRecordDataset(training_record = None,
 """
 
 class TFRecordImageMask(object):
-    defaults = {'training_record': None,
-                'testing_record': None,
-                'crop_size': 512,
-                'ratio': 1.0,
-                'batch_size': 32,
-                'prefetch': 1000,
-                'shuffle_buffer': 128,
-                'n_threads': 4,
-                'sess': None,
-                'as_onehot': True,
-                'target_image': False,
-                'n_classes': None,
-                'img_dtype': tf.uint8,
-                'mask_dtype': tf.uint8,
-                'img_channels': 3,
-                'mask_channels': 1,
-                'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
-                'name': 'TFRecordDataset' }
     def __init__(self, **kwargs):
-        self.defaults.update(kwargs)
+        defaults = {'training_record': None,
+                    'testing_record': None,
+                    'crop_size': 512,
+                    'ratio': 1.0,
+                    'batch_size': 32,
+                    'prefetch': 1000,
+                    'shuffle_buffer': 128,
+                    'n_threads': 4,
+                    'sess': None,
+                    'as_onehot': True,
+                    'target_image': False,
+                    'n_classes': None,
+                    'img_dtype': tf.uint8,
+                    'mask_dtype': tf.uint8,
+                    'img_channels': 3,
+                    'mask_channels': 1,
+                    'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
+                    'name': 'TFRecordDataset' }
+        defaults.update(kwargs)
 
-        for key,val in self.defaults.items():
+        for key,val in defaults.items():
             setattr(self, key, val)
 
         assert self.training_record is not None
@@ -61,7 +61,6 @@ class TFRecordImageMask(object):
         self.dataset = (tf.data.TFRecordDataset(self.record_path)
                         .repeat()
                         .shuffle(buffer_size=self.shuffle_buffer)
-                        # .prefetch(buffer_size=self.prefetch)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
                         .prefetch(buffer_size=self.prefetch)

@@ -13,18 +13,18 @@ stacks  = 5
 
 """
 class ResNet(Segmentation):
-    resnet_defaults={
-        'kernels': [64, 64, 64, 128],
-        'k_size': 3,
-        'name': 'resnet',
-        'stacks': 5,
-    }
-
     def __init__(self, **kwargs):
-        self.resnet_defaults.update(**kwargs)
+        resnet_defaults={
+            'kernels': [64, 64, 64, 128],
+            'k_size': 3,
+            'name': 'resnet',
+            'stacks': 5,
+        }
+
+        resnet_defaults.update(**kwargs)
 
         ## not sure sure it's good to do this first
-        for key, val in self.resnet_defaults.items():
+        for key, val in resnet_defaults.items():
             setattr(self, key, val)
 
         self.modules = len(self.kernels)
@@ -34,7 +34,7 @@ class ResNet(Segmentation):
         print('MINIMIUM DIMENSION: ', min_dimension)
         assert min_dimension >= 1
 
-        super(ResNet, self).__init__(**self.resnet_defaults)
+        super(ResNet, self).__init__(**resnet_defaults)
 
         ## Check input shape is compatible with the number of downsampling modules
 

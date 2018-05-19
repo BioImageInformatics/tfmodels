@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import sys
 
@@ -27,24 +28,24 @@ for each x.
 """
 
 class Encoder(BaseEncoder):
-    encoder_defaults = {
-        'kernels': [64, 128],
-        'hidden_dim': [512],
-        'name': 'Encoder',
-        }
 
     def __init__(self, name='convolutional_encoder', **kwargs):
-        self.encoder_defaults.update(**kwargs)
-        super(Encoder, self).__init__(**self.encoder_defaults)
+        encoder_defaults = {
+            'kernels': [64, 128],
+            'hidden_dim': [512],
+            'name': 'Encoder',
+            }
+        encoder_defaults.update(**kwargs)
+        super(Encoder, self).__init__(**encoder_defaults)
 
         self.name = name
 
     def model(self, x_in, keep_prob=0.5, reuse=False, return_mode='z_bar_x'):
-        print 'Setting up Encoder model'
-        print '\t x_in: ', x_in.get_shape()
+        print('Setting up Encoder model')
+        print('\t x_in: ', x_in.get_shape())
         with tf.variable_scope(self.name) as scope:
             if reuse:
-                print '\t Reusing variables'
+                print('\t Reusing variables')
                 scope.reuse_variables()
 
             nonlin = tf.nn.selu
@@ -67,11 +68,11 @@ class Encoder(BaseEncoder):
             z_bar_x = tf.reduce_mean(z_i, axis=0)
             y_bar_x = tf.reduce_mean(y_i, axis=0)
 
-            print '\t Encoder heads:'
-            print '\t z_i', z_i.get_shape()
-            print '\t y_i', y_i.get_shape()
-            print '\t z_bar_x', z_bar_x.get_shape()
-            print '\t y_bar_x', y_bar_x.get_shape()
+            print('\t Encoder heads:')
+            print('\t z_i', z_i.get_shape())
+            print('\t y_i', y_i.get_shape())
+            print('\t z_bar_x', z_bar_x.get_shape())
+            print('\t y_bar_x', y_bar_x.get_shape())
 
             ## super weird
             if return_mode == 'z_bar_x':
@@ -97,11 +98,11 @@ class Generator(BaseGenerator):
         super(Generator, self).__init__(**self.deflt)
 
     def model(self, z_in, reuse=False):
-        print 'Setting up Generator model'
-        print '\t z_in:', z_in.get_shape()
+        print('Setting up Generator model')
+        print('\t z_in:', z_in.get_shape())
         with tf.variable_scope(self.name) as scope:
             if reuse:
-                print 'Reusing variables'
+                print('Reusing variables')
                 scope.reuse_variables()
 
             nonlin = tf.nn.selu
@@ -177,8 +178,8 @@ class ImageBagAutoencoder(BaseModel):
 
     ## still want model to return, but save hooks to intermediate ops as class attr.
     def model(self, x_in, keep_prob=0.5, reuse=False):
-        print '\t Setting up Classification model'
-        print '\t Using name scope: {}'.format(self.name)
+        print('\t Setting up Classification model')
+        print('\t Using name scope: {}'.format(self.name))
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
@@ -187,30 +188,30 @@ class ImageBagAutoencoder(BaseModel):
 
             ## Initialize the encoder
             self.y_individual = self.encoder.model(self.x_individual, return_mode='y_i')
-            print '\t y_individual', self.y_individual.get_shape()
+            print('\t y_individual', self.y_individual.get_shape())
 
             ## Get average y for each sample set
             self.y_bar_map_fn = lambda x: self.encoder.model(x, return_mode='y_bar_x', reuse=True)
             self.y_bar_x = tf.map_fn(self.y_bar_map_fn, x_in, infer_shape=True, name='y_bar_x', parallel_iterations=4)
-            print '\t y_bar_x:', self.y_bar_x.get_shape()
+            print('\t y_bar_x:', self.y_bar_x.get_shape())
 
             ## Get latent codes for all x_i
             self.z_i_map_fn = lambda x: self.encoder.model(x, return_mode='z_i', reuse=True)
             self.z_i_x = tf.map_fn(self.z_i_map_fn, x_in, infer_shape=True, name='z_i_x', parallel_iterations=4)
-            print '\t z_i_x:', self.z_i_x.get_shape()
+            print('\t z_i_x:', self.z_i_x.get_shape())
 
             ## Initialize the generator
             self.x_i_hat = self.generator.model(self.z_individual)
             self.x_hat_map_fn = lambda z: self.generator.model(z, reuse=True)
             self.x_hat_logit = tf.map_fn(self.x_hat_map_fn, self.z_i_x, infer_shape=True, name='x_hat_logit', parallel_iterations=4)
-            print '\t x_hat_logit:', self.x_hat_logit.get_shape()
+            print('\t x_hat_logit:', self.x_hat_logit.get_shape())
 
             batch_size = tf.shape(x_in)[0]
             samples = tf.shape(x_in)[1]
             self.x_in_all = tf.reshape(x_in, [batch_size*samples]+self.x_dim)
-            print 'x_in_all', self.x_in_all.get_shape()
+            print('x_in_all', self.x_in_all.get_shape())
             self.x_hat_all = tf.reshape(self.x_hat_logit, [batch_size*samples]+self.x_dim)
-            print 'x_hat_all', self.x_in_all.get_shape()
+            print('x_hat_all', self.x_in_all.get_shape())
 
 
     def _loss_op(self):
@@ -219,7 +220,7 @@ class ImageBagAutoencoder(BaseModel):
         #     logits=self.y_bar_x, labels=self.y_in), name='loss')
         self.y_loss = tf.nn.softmax_cross_entropy_with_logits(
             logits=self.y_bar_x, labels=self.y_in)
-        print 'y_loss', self.y_loss.get_shape()
+        print('y_loss', self.y_loss.get_shape())
         self.y_in_argmax = tf.argmax(self.y_in, axis=1)
         self.y_hat_argmax = tf.argmax(self.y_bar_x, axis=1)
 
@@ -235,7 +236,7 @@ class ImageBagAutoencoder(BaseModel):
         self.recon_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
             logits=self.x_hat_logit,
             labels=self.x_in), axis=[1,2,3,4])
-        print 'recon_loss', self.recon_loss.get_shape()
+        print('recon_loss', self.recon_loss.get_shape())
 
         self.loss = tf.reduce_mean(self.y_loss + self.recon_loss)
 

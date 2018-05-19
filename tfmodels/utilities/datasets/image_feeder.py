@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 from dataset_base import DataSet
 import glob, os
@@ -6,26 +7,25 @@ import glob, os
 Only images, unlabelled
 """
 class ImageFeeder(DataSet):
-    defaults = {
-        'augmentation': None,
-        'batch_size': 16,
-        'capacity': 5000,
-        'channels': 3,
-        'crop_size': 256,
-        'dstype': 'Image',
-        'image_dir': None,
-        'image_ext': 'jpg',
-        'min_holding': 1250,
-        'name': 'ImageFeeder',
-        'ratio': 1.0,
-        'seed': 5555,
-        'threads': 1,
-    }
 
     def __init__(self, **kwargs):
-        self.defaults.update(kwargs)
-        # print self.defaults
-        super(ImageFeeder, self).__init__(**self.defaults)
+        defaults = {
+            'augmentation': None,
+            'batch_size': 16,
+            'capacity': 5000,
+            'channels': 3,
+            'crop_size': 256,
+            'dstype': 'Image',
+            'image_dir': None,
+            'image_ext': 'jpg',
+            'min_holding': 1250,
+            'name': 'ImageFeeder',
+            'ratio': 1.0,
+            'seed': 5555,
+            'threads': 1,
+        }
+        defaults.update(kwargs)
+        super(ImageFeeder, self).__init__(**defaults)
         assert self.image_dir is not None
 
         ## ----------------- Load Image Lists ------------------- ##
@@ -40,7 +40,7 @@ class ImageFeeder(DataSet):
         self.image_reader = tf.WholeFileReader()
         image_key, image_file = self.image_reader.read(self.feature_queue)
         image = tf.image.decode_image(image_file, channels=self.channels)
-        print image.get_shape()
+        print(image.get_shape())
 
         #with tf.device('/cpu:0'):
         image = self._preprocessing(image)

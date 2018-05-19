@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import sys
 
@@ -71,8 +72,8 @@ class FCEncoder(BaseEncoder):
             if reuse:
                 scope.reuse_variables()
 
-            print 'Setting up FCEncoder model'
-            print '\t x_in: ', x_in.get_shape()
+            print('Setting up FCEncoder model')
+            print('\t x_in: ', x_in.get_shape())
             nonlin = self.nonlin
             h0 = nonlin(linear(x_in, self.hidden_dim[0], var_scope='d0'))
             h1 = nonlin(linear(h0, self.hidden_dim[1], var_scope='d1'))
@@ -105,11 +106,11 @@ class ConvEncoder(BaseEncoder):
         self.name = name
 
     def model(self, x_in, keep_prob=0.5, reuse=False, return_mode='z_bar_x'):
-        print 'Setting up Encoder model'
-        print '\t x_in: ', x_in.get_shape()
+        print('Setting up Encoder model')
+        print('\t x_in: ', x_in.get_shape())
         with tf.variable_scope(self.name) as scope:
             if reuse:
-                print '\t Reusing variables'
+                print('\t Reusing variables')
                 scope.reuse_variables()
 
             nonlin = tf.nn.selu
@@ -132,11 +133,11 @@ class ConvEncoder(BaseEncoder):
             z_bar_x = tf.reduce_mean(z_i, axis=0)
             y_bar_x = tf.reduce_mean(y_i, axis=0)
 
-            print '\t Encoder heads:'
-            print '\t z_i', z_i.get_shape()
-            print '\t y_i', y_i.get_shape()
-            print '\t z_bar_x', z_bar_x.get_shape()
-            print '\t y_bar_x', y_bar_x.get_shape()
+            print('\t Encoder heads:')
+            print('\t z_i', z_i.get_shape())
+            print('\t y_i', y_i.get_shape())
+            print('\t z_bar_x', z_bar_x.get_shape())
+            print('\t y_bar_x', y_bar_x.get_shape())
 
             ## super weird
             if return_mode == 'z_bar_x':
@@ -210,8 +211,8 @@ class ImageBagModel(BaseModel):
 
     ## still want model to return, but save hooks to intermediate ops as class attr.
     def model(self, x_in, keep_prob=0.5, reuse=False):
-        print '\t Setting up Classification model'
-        print '\t Using name scope: {}'.format(self.name)
+        print('\t Setting up Classification model')
+        print('\t Using name scope: {}'.format(self.name))
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
@@ -223,7 +224,7 @@ class ImageBagModel(BaseModel):
 
             self.y_bar_x_map_fn = lambda x: self.encoder.model(x, reuse=True, return_mode='y_bar_x')
             self.y_bar = tf.map_fn(self.y_bar_x_map_fn, x_in, infer_shape=False, name='y_bar')
-            print '\t y_bar:', self.y_bar.get_shape() ## batch_size, dimensions
+            print('\t y_bar:', self.y_bar.get_shape()) ## batch_size, dimensions
 
 
     def _loss_op(self):

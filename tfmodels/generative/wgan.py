@@ -1,10 +1,11 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import os
 
-from generator_basemodel import BaseGenerator
+from .generator_basemodel import BaseGenerator
 from ..utilities.basemodel import BaseModel
-from discriminator_basemodel import BaseDiscriminator
+from .discriminator_basemodel import BaseDiscriminator
 from ..utilities.ops import (conv,
                              deconv,
                              linear,
@@ -32,19 +33,19 @@ class Critic(BaseDiscriminator):
             if reuse:
                 scope.reuse_variables()
 
-            print 'Setting up GAN/Discriminator'
-            print 'Nonlinearity: ', self.nonlin
+            print('Setting up GAN/Discriminator')
+            print('Nonlinearity: ', self.nonlin)
             nonlin = self.nonlin
 
-            print '\t x_in', x_in.get_shape()
+            print('\t x_in', x_in.get_shape())
             c0 = nonlin(conv(x_in, self.dis_kernels[0], k_size=5, stride=3, var_scope='c0', selu=1))
             c1 = nonlin(conv(c0, self.dis_kernels[1], k_size=5, stride=3, var_scope='c1', selu=1))
             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
             flat = tf.contrib.layers.flatten(c1)
-            print '\t flat', flat.get_shape()
+            print('\t flat', flat.get_shape())
             h0 = nonlin(linear(flat, self.dis_kernels[2], var_scope='h0', selu=1))
             p_real = linear(h0, 1, var_scope='p_real', no_bias=True)
-            print '\t p_real', p_real.get_shape()
+            print('\t p_real', p_real.get_shape())
 
             return p_real
 
@@ -66,20 +67,20 @@ class Generator(BaseGenerator):
             if reuse:
                 scope.reuse_variables()
 
-            print 'Setting up GAN/Generator'
-            print 'Nonlinearity: ', self.nonlin
+            print('Setting up GAN/Generator')
+            print('Nonlinearity: ', self.nonlin)
             nonlin = self.nonlin
 
             ## Project
-            print '\t z_in', z_in.get_shape()
+            print('\t z_in', z_in.get_shape())
             projection = nonlin(linear(z_in, self.project_shape, var_scope='projection', selu=1))
             project_conv = tf.reshape(projection, self.resize_shape)
-            print '\t project_conv', project_conv.get_shape()
+            print('\t project_conv', project_conv.get_shape())
             h0 = nonlin(deconv(project_conv, self.gen_kernels[0], var_scope='h0', selu=1))
             h1 = nonlin(deconv(h0, self.gen_kernels[1], var_scope='h1', selu=1))
 
             x_hat = conv(h1, self.x_dims[-1], stride=1, var_scope='x_hat')
-            print '\t x_hat', x_hat.get_shape()
+            print('\t x_hat', x_hat.get_shape())
 
             return x_hat
             # return x_hat
@@ -225,7 +226,7 @@ class WGAN(BaseModel):
 
     ## Only pretrain the critic
     def _pretraining(self):
-        print 'Pretraining critic'
+        print('Pretraining critic')
         for _ in xrange(self.pretraining):
             if self.iterator_dataset:
                 feed_dict = {self.x_in: next(self.dataset.iterator)}

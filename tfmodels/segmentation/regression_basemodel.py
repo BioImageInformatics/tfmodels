@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import sys, os
@@ -5,32 +6,32 @@ import sys, os
 from ..utilities.basemodel import BaseModel
 
 class Regression(BaseModel):
-    ## Defaults. arXiv links correspond to inspirational materials
-    regression_defaults={
-        'dataset': None,
-        'global_step': 0,
-        'k_size': 3,
-        'learning_rate': 1e-3,
-        'mode': 'TRAIN',
-        'name': 'ImageRegression',
-        'nonlin': tf.nn.selu,
-        'log_dir': None,
-        'save_dir': None,
-        'sess': None,
-        'reg_training_op_list': [],
-        'summarize_grads': False,
-        'summary_iters': 50,
-        'summary_image_iters': 250,
-        'summary_image_n': 4,
-        'summary_op_list': [],
-        'n_test_batches': 10,
-        'x_dims': [256, 256, 3],
-     }
-
     def __init__(self, **kwargs):
-        self.regression_defaults.update(**kwargs)
+        ## Defaults. arXiv links correspond to inspirational materials
+        regression_defaults={
+            'dataset': None,
+            'global_step': 0,
+            'k_size': 3,
+            'learning_rate': 1e-3,
+            'mode': 'TRAIN',
+            'name': 'ImageRegression',
+            'nonlin': tf.nn.selu,
+            'log_dir': None,
+            'save_dir': None,
+            'sess': None,
+            'reg_training_op_list': [],
+            'summarize_grads': False,
+            'summary_iters': 50,
+            'summary_image_iters': 250,
+            'summary_image_n': 4,
+            'summary_op_list': [],
+            'n_test_batches': 10,
+            'x_dims': [256, 256, 3],
+         }
 
-        super(Regression, self).__init__(**self.regression_defaults)
+        regression_defaults.update(**kwargs)
+
+        super(Regression, self).__init__(**regression_defaults)
         assert self.sess is not None
 
         if self.mode=='TRAIN':
@@ -40,7 +41,7 @@ class Regression(BaseModel):
 
 
     def _training_mode(self):
-        print 'Setting up {} in training mode'.format(self.name)
+        print('Setting up {} in training mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -60,7 +61,7 @@ class Regression(BaseModel):
         self.training = tf.placeholder_with_default(True, shape=[], name='training')
         self.y_hat = self.model(self.x_in, keep_prob=self.keep_prob, reuse=False, training=self.training)
 
-        print 'Model output y_hat:', self.y_hat.get_shape()
+        print('Model output y_hat:', self.y_hat.get_shape())
 
         ## ------------------- Training ops ------------------- ##
         self.var_list = self._get_update_list()
@@ -84,7 +85,7 @@ class Regression(BaseModel):
 
 
     def _test_mode(self):
-        print 'Setting up {} in inference mode'.format(self.name)
+        print('Setting up {} in inference mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder('float',
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -169,7 +170,7 @@ class Regression(BaseModel):
 
     def _make_test_ops(self):
         if self.with_test is None:
-            print 'WARNING no TEST tfrecord dataset; Skipping test mode'
+            print('WARNING no TEST tfrecord dataset; Skipping test mode')
             return
 
         with tf.variable_scope('testing_scalars'):
@@ -188,11 +189,11 @@ class Regression(BaseModel):
     def _write_scalar_summaries(self):
         summary_str, reg_loss_ = self.sess.run([self.summary_scalars_op, self.reg_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
-        print '[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, reg_loss_)
+        print('[{:07d}] writing scalar summaries (loss={:3.3f})'.format(self.global_step, reg_loss_))
 
 
     def _write_image_summaries(self):
-        print '[{:07d}] writing image summaries'.format(self.global_step)
+        print('[{:07d}] writing image summaries'.format(self.global_step))
         summary_str = self.sess.run(self.summary_images_op)
         self.summary_writer.add_summary(summary_str, self.global_step)
 
@@ -225,7 +226,7 @@ class Regression(BaseModel):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
-        print '#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
+        print('#### TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))
 
 
     def train_step(self):

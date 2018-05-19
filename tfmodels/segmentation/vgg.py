@@ -1,37 +1,37 @@
+from __future__ import print_function
 import tensorflow as tf
-from segmentation_basemodel import Segmentation
+from .segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 """
 Segmentation VGG style network
 """
 class VGG(Segmentation):
-    vgg_defaults={
-        'conv_kernels': None,
-        'deconv_kernels': None,
-        'k_size': 5,
-        'name': 'vgg',
-        }
-
     def __init__(self, **kwargs):
-        self.vgg_defaults.update(**kwargs)
+        vgg_defaults={
+            'conv_kernels': None,
+            'deconv_kernels': None,
+            'k_size': 5,
+            'name': 'vgg',
+            }
+        vgg_defaults.update(**kwargs)
 
         assert vgg_defaults['n_classes'] is not None
         assert vgg_defaults['conv_kernels'] is not None
         assert vgg_defaults['deconv_kernels'] is not None
 
-        super(VGG, self).__init__(**self.vgg_defaults)
+        super(VGG, self).__init__(**vgg_defaults)
 
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'VGG-FCN Model'
+        print('VGG-FCN Model')
         nonlin = self.nonlin
-        print 'Non-linearity:', nonlin
+        print('Non-linearity:', nonlin)
 
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
-            print '\t x_in', x_in.get_shape()
+            print('\t x_in', x_in.get_shape())
 
             c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=5, stride=1, var_scope='c0_0', selu=1))
             c0_1 = nonlin(conv(c0_0, self.conv_kernels[0], k_size=5, stride=1, var_scope='c0_1', selu=1))

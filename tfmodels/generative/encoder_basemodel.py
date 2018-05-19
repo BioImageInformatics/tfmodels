@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 from ..utilities.basemodel import BaseModel
 

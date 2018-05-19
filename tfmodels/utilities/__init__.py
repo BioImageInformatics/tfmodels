@@ -1,4 +1,4 @@
-from datasets import (
+from .datasets import (
     MNISTDataSet,
     BaggedMNIST,
     ImageComboDataSet,
@@ -7,9 +7,9 @@ from datasets import (
     TFRecordImageLabel
 )
 
-from basemodel import BaseModel
+from .basemodel import BaseModel
 
-from ops import (
+from .ops import (
     batch_norm,
     conv,
     conv_cond_concat,
@@ -19,7 +19,7 @@ from ops import (
     crop_concat
 )
 
-from general import (
+from .general import (
     save_image_stack,
     bayesian_inference,
     write_image_mask_combos,

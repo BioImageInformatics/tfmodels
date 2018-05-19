@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import sys, os
@@ -43,7 +44,7 @@ class Classifier(BaseModel):
 
 
     def _training_mode(self):
-        print 'Setting up {} in training mode'.format(self.name)
+        print('Setting up {} in training mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self._make_input_ops()
 
@@ -77,7 +78,7 @@ class Classifier(BaseModel):
 
 
     def _test_mode(self):
-        print 'Setting up {} in inference mode'.format(self.name)
+        print('Setting up {} in inference mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder('float',
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -121,7 +122,7 @@ class Classifier(BaseModel):
             training=self.training)
 
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
-        print 'Model output y_hat:', self.y_hat.get_shape()
+        print('Model output y_hat:', self.y_hat.get_shape())
 
 
     ## define self.class_loss
@@ -188,7 +189,7 @@ class Classifier(BaseModel):
 
     def _make_test_ops(self):
         if self.with_test is None:
-            print 'WARNING no TEST tfrecord dataset; Skipping test mode'
+            print('WARNING no TEST tfrecord dataset; Skipping test mode')
             return
 
         with tf.variable_scope('testing_scalars'):
@@ -213,7 +214,7 @@ class Classifier(BaseModel):
         if lr is None: lr='constant'
         summary_str, class_loss_ = self.sess.run([self.summary_scalars_op, self.class_loss])
         self.summary_writer.add_summary(summary_str, self.global_step)
-        print '[{:07d}] writing scalar summaries (loss={:3.3f}) (lr={:03E})'.format(self.global_step, class_loss_, lr)
+        print('[{:07d}] writing scalar summaries (loss={:3.3f}) (lr={:03E})'.format(self.global_step, class_loss_, lr))
 
 
     # def _write_image_summaries(self):
@@ -238,7 +239,7 @@ class Classifier(BaseModel):
         fd = {self.keep_prob: keep_prob}
         summary_str, test_loss_ = self.sess.run([self.summary_test_ops, self.loss], feed_dict=fd)
         self.summary_writer.add_summary(summary_str, self.global_step+step_delta)
-        print '#### BASIC TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_)
+        print('#### BASIC TEST #### [{:07d}] writing test summaries (loss={:3.3f})'.format(self.global_step, test_loss_))
 
 
     def train_step(self, keep_prob=1.0):

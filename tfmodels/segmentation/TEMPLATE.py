@@ -1,33 +1,34 @@
+from __future__ import print_function
 import tensorflow as tf
-from segmentation_basemodel import Segmentation
+from .segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 class TEMPLATE(Segmentation):
-    TEMPLATE_defaults={
-        'k_size': None,
-        'n_classes': 2,
-        'name': 'TEMPLATE',
-    }
-
     def __init__(self, **kwargs):
-        self.TEMPLATE_defaults.update(**kwargs)
+        TEMPLATE_defaults={
+            'k_size': None,
+            'n_classes': 2,
+            'name': 'TEMPLATE',
+        }
+
+        TEMPLATE_defaults.update(**kwargs)
 
         assert TEMPLATE_defaults['k_size'] is not None
-        assert TEMPLATE_defaults['n_classes'] is not None
+        assert TselfiEMPLATE_defaults['n_classes'] is not None
 
-        super(TEMPLATE, self).__init__(**self.TEMPLATE_defaults)
+        super(TEMPLATE, self).__init__(**TEMPLATE_defaults)
 
 
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'TEMPLATE Model'
+        print('TEMPLATE Model')
         k_size = self.k_size
         nonlin = self.nonlin
-        print 'Non-linearity:', nonlin
+        print('Non-linearity:', nonlin)
 
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
-            print '\t x_in', x_in.get_shape()
+            print('\t x_in', x_in.get_shape())
 
             y_hat = tf.identity(x_hat)
 

@@ -1,42 +1,43 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import sys, os
 
-from segmentation_basemodel import Segmentation
-from discriminator import SegmentationDiscriminator
+from .segmentation_basemodel import Segmentation
+from .discriminator import SegmentationDiscriminator
 
 class SegmentationAdversarial(Segmentation):
-    ## Defaults. arXiv links correspond to inspirational materials
-    adversarial_segmentation_defaults={
-        'adversary': False, ## https://arxiv.org/abs/1611.08408
-        'adversary_lr': 1e-4,
-        'adversary_lambda': 1,
-        'adversary_feature_matching': False, ## https://arxiv.org/abs/1606.03498
-        'class_weights': None, ## https://arxiv.org/abs/1511.00561
-        'dataset': None,
-        'global_step': 0,
-        'k_size': 3,
-        'learning_rate': 1e-3,
-        'log_dir': None,
-        'mode': 'TRAIN',
-        'name': 'SegmentationAdversarial',
-        'n_classes': None,
-        'pretrain_g': 2500,
-        'pretrain_d': 1000,
-        'save_dir': None,
-        'sess': None,
-        'seg_training_op_list': [],
-        'summarize_grads': False,
-        'summary_iters': 50,
-        'summary_image_iters': 250,
-        'summary_op_list': [],
-        'x_dims': [256, 256, 3],
-     }
 
     def __init__(self, **kwargs):
-        self.adversarial_segmentation_defaults.update(**kwargs)
+        ## Defaults. arXiv links correspond to inspirational materials
+        adversarial_segmentation_defaults={
+            'adversary': False, ## https://arxiv.org/abs/1611.08408
+            'adversary_lr': 1e-4,
+            'adversary_lambda': 1,
+            'adversary_feature_matching': False, ## https://arxiv.org/abs/1606.03498
+            'class_weights': None, ## https://arxiv.org/abs/1511.00561
+            'dataset': None,
+            'global_step': 0,
+            'k_size': 3,
+            'learning_rate': 1e-3,
+            'log_dir': None,
+            'mode': 'TRAIN',
+            'name': 'SegmentationAdversarial',
+            'n_classes': None,
+            'pretrain_g': 2500,
+            'pretrain_d': 1000,
+            'save_dir': None,
+            'sess': None,
+            'seg_training_op_list': [],
+            'summarize_grads': False,
+            'summary_iters': 50,
+            'summary_image_iters': 250,
+            'summary_op_list': [],
+            'x_dims': [256, 256, 3],
+         }
+        adversarial_segmentation_defaults.update(**kwargs)
 
-        super(SegmentationAdversarial, self).__init__(**self.adversarial_segmentation_defaults)
+        super(SegmentationAdversarial, self).__init__(**adversarial_segmentation_defaults)
         assert self.sess is not None
 
         ## Set the nonlinearity for all downstream models
@@ -48,7 +49,7 @@ class SegmentationAdversarial(Segmentation):
             self._test_mode()
 
     def _training_mode(self):
-        print 'Setting up {} in training mode'.format(self.name)
+        print('Setting up {} in training mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder_with_default(self.dataset.image_op,
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -64,7 +65,7 @@ class SegmentationAdversarial(Segmentation):
         self.y_hat_smax = tf.nn.softmax(self.y_hat)
         self.y_hat_mask = tf.expand_dims(tf.argmax(self.y_hat, -1), -1)
         self.y_hat_mask = tf.cast(self.y_hat_mask, tf.float32)
-        print 'Model output y_hat:', self.y_hat.get_shape()
+        print('Model output y_hat:', self.y_hat.get_shape())
 
         ## ------------------- Training ops ------------------- ##
         self.var_list = self.get_update_list()
@@ -103,7 +104,7 @@ class SegmentationAdversarial(Segmentation):
         #     self.pretrain()
 
     def _test_mode(self):
-        print 'Setting up {} in inference mode'.format(self.name)
+        print('Setting up {} in inference mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self.x_in = tf.placeholder('float',
             shape=[None, self.x_dims[0], self.x_dims[1], self.x_dims[2]],
@@ -126,7 +127,7 @@ class SegmentationAdversarial(Segmentation):
     def _adversarial_feature_matching_loss(self):
         ## Feature matching style -- I have it set to always to _adversarial_loss()
         ## and then add this to the end of it
-        print 'Setting up adversarial feature matching'
+        print('Setting up adversarial feature matching')
         features_fake = self.discriminator.fake_features
         features_real = self.discriminator.real_features
 
@@ -221,22 +222,21 @@ class SegmentationAdversarial(Segmentation):
 
     def pretrain(self):
         if not self.adversary:
-            print 'Pretraining requested but this model is not in adversarial mode'
-            print 'use adversary=True to include adversarial training'
-            print 'Continuing'
+            print('Pretraining requested but this model is not in adversarial mode')
+            print('use adversary=True to include adversarial training')
+            print('Continuing')
             return
 
-        print 'Pretraining Generator without adversary for {} iterations'.format(self.pretrain_g)
+        print('Pretraining Generator without adversary for {} iterations'.format(self.pretrain_g))
         for _ in xrange(self.pretrain_g):
             self.global_step += 1
             self.sess.run([self.seg_training_op])
-            # print '\titeration {}'.format(self.global_step)
             if self.global_step % self.summary_iters == 0:
                 self._write_scalar_summaries()
             if self.global_step % self.summary_image_iters == 0:
                 self._write_scalar_summaries()
 
-        print 'Pretraining Discriminator for {} iterations'.format(self.pretrain_d)
+        print('Pretraining Discriminator for {} iterations'.format(self.pretrain_d))
         for _ in xrange(self.pretrain_d):
             self.global_step += 1
             self.sess.run(self.discriminator.discriminator_train_op_list)

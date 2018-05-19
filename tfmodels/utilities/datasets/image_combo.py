@@ -1,7 +1,8 @@
+from __future__ import print_function
 import tensorflow as tf
 import glob
 
-from dataset_base import DataSet
+from .dataset_base import DataSet
 
 
 """
@@ -11,23 +12,22 @@ this is old --- it might be useful again one day
 
 """
 class ImageComboDataSet(DataSet):
-    image_combo_defaults = {
-        'augmentation': 'random',
-        'batch_size': 16,
-        'crop_size': 256,
-        'channels': 3,
-        'dstype': 'ImageMask',
-        'image_dir': None,
-        'image_ext': 'png',
-        'name': 'ImageCombo',
-        'ratio': 1.0,
-        'seed': 5555
-    }
 
     def __init__(self, **kwargs):
-        self.image_combo_defaults.update(kwargs)
-        # print self.defaults
-        super(ImageComboDataSet, self).__init__(**self.image_combo_defaults)
+        image_combo_defaults = {
+            'augmentation': 'random',
+            'batch_size': 16,
+            'crop_size': 256,
+            'channels': 3,
+            'dstype': 'ImageMask',
+            'image_dir': None,
+            'image_ext': 'png',
+            'name': 'ImageCombo',
+            'ratio': 1.0,
+            'seed': 5555
+        }
+        image_combo_defaults.update(kwargs)
+        super(ImageComboDataSet, self).__init__(**image_combo_defaults)
         assert self.image_dir is not None
 
         ## ----------------- Load Image Lists ------------------- ##
@@ -43,7 +43,7 @@ class ImageComboDataSet(DataSet):
         self.image_reader = tf.WholeFileReader()
         image_key, image_file = self.image_reader.read(self.feature_queue)
         image_mask = tf.image.decode_image(image_file, channels=4)
-        print 'image_mask shape:', image_mask.get_shape()
+        print('image_mask shape:', image_mask.get_shape())
 
         #with tf.device('/cpu:0'):
         image, mask = self._preprocessing(image_mask)

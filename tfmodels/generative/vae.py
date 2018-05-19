@@ -1,10 +1,11 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import sys, os
 
 from ..utilities.basemodel import BaseModel
-from encoder_basemodel import BaseEncoder
-from generator_basemodel import BaseGenerator
+from .encoder_basemodel import BaseEncoder
+from .generator_basemodel import BaseGenerator
 from ..utilities.ops import (
     conv,
     deconv,
@@ -100,17 +101,17 @@ class Encoder(BaseEncoder):
             if reuse:
                 scope.reuse_variables()
 
-            print 'Setting up VAE/Discriminator'
-            print 'Nonlinearity: ', self.nonlin
+            print('Setting up VAE/Discriminator')
+            print('Nonlinearity: ', self.nonlin)
             nonlin = self.nonlin
 
             batch_size = tf.shape(x_in)[0]
-            print '\t x_in', x_in.get_shape()
+            print('\t x_in', x_in.get_shape())
             c0 = nonlin(conv(x_in, self.enc_kernels[0], k_size=4, stride=2, var_scope='c0', selu=1))
             c1 = nonlin(conv(c0, self.enc_kernels[1], k_size=4, stride=2, var_scope='c1', selu=1))
             # c2 = nonlin(conv(c1, self.dis_kernels[1], k_size=5, stride=3, var_scope='c2'))
             flat = tf.contrib.layers.flatten(c1)
-            print '\t flat', flat.get_shape()
+            print('\t flat', flat.get_shape())
 
             flat_dropout = tf.contrib.nn.alpha_dropout(flat, keep_prob=keep_prob)
             h0 = nonlin(linear(flat_dropout, self.enc_kernels[2], var_scope='h0', selu=1))
@@ -138,13 +139,13 @@ class Generator(BaseGenerator):
             if reuse:
                 scope.reuse_variables()
 
-            print 'Setting up VAE/Generator'
-            print 'Nonlinearity: ', self.nonlin
+            print('Setting up VAE/Generator')
+            print('Nonlinearity: ', self.nonlin)
             nonlin = self.nonlin
 
             ## These first two layers will be pretty much the same in all generators
             ## Project
-            print '\t z_in', z_in.get_shape()
+            print('\t z_in', z_in.get_shape())
             # z_dim = z_in.get_shape().as_list()[-1]
             # net = tf.reshape(z_in, (-1, 1, 1, z_dim))
             # net = nonlin(deconv, net, self.gen_kernels[0], k_size=4, var)
@@ -187,13 +188,13 @@ class VAE(BaseModel):
         if self.mode=='TRAIN': assert self.dataset is not None
 
         if self.encoder is None:
-            print 'Setting up VAE Encoder with default encoder'
+            print('Setting up VAE Encoder with default encoder')
             self.encoder = Encoder(
                 enc_kernels=self.enc_kernels,
                 z_dim=self.z_dim )
 
         if self.generator is None:
-            print 'Setting up VAE Generator with default generator'
+            print('Setting up VAE Generator with default generator')
             self.generator = Generator(
                 gen_kernels=self.gen_kernels,
                 x_dims=self.x_dims )
@@ -259,7 +260,7 @@ class VAE(BaseModel):
             kld = -0.5 * tf.reduce_sum(1 + self.log_var - \
                 tf.square(self.mu) - \
                 tf.exp(self.log_var), 1)
-            print 'kld', kld.get_shape()
+            print('kld', kld.get_shape())
             # self.kld = tf.reduce_mean(self.kld)
 
         return kld
@@ -271,7 +272,7 @@ class VAE(BaseModel):
             #     labels=self.x_in), axis=[1,2,3])
             recon_loss = tf.losses.mean_squared_error(self.x_in, self.x_hat, reduction="none")
             recon_loss = tf.reduce_sum(recon_loss, axis=[1,2,3])
-            print 'recon_loss', recon_loss.get_shape()
+            print('recon_loss', recon_loss.get_shape())
 
         return recon_loss
 

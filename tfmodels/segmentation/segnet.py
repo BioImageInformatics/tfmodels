@@ -1,36 +1,37 @@
+from __future__ import print_function
 import tensorflow as tf
-from segmentation_basemodel import Segmentation
+from .segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 class SegNet(Segmentation):
-    segnet_defaults={
-        'conv_kernels': None,
-        'deconv_kernels': None,
-        'k_size': 3,
-        'name': 'segnet',
-    }
 
     def __init__(self, **kwargs):
-        self.segnet_defaults.update(**kwargs)
+        segnet_defaults={
+            'conv_kernels': None,
+            'deconv_kernels': None,
+            'k_size': 3,
+            'name': 'segnet',
+        }
+        segnet_defaults.update(**kwargs)
 
         assert segnet_defaults['n_classes'] is not None
         assert segnet_defaults['conv_kernels'] is not None
         assert segnet_defaults['deconv_kernels'] is not None
 
-        super(SegNet, self).__init__(**self.segnet_defaults)
+        super(SegNet, self).__init__(**segnet_defaults)
 
 
     ## TODO rewrite programatically for variable length conv/deconv
     def model(self, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'SegNet Model'
+        print('SegNet Model')
         k_size = self.k_size
         nonlin = self.nonlin
-        print 'Non-linearity:', nonlin
+        print('Non-linearity:', nonlin)
 
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
-            print '\t x_in', x_in.get_shape()
+            print('\t x_in', x_in.get_shape())
             conv_args = {'k_size': k_size, 'stride': 1, 'selu': True}
 
             c0_0 = nonlin(conv(x_in, self.conv_kernels[0], k_size=k_size, stride=1, var_scope='c0_0', selu=1))

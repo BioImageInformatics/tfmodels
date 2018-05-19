@@ -1,23 +1,24 @@
+from __future__ import print_function
 import tensorflow as tf
 from ..generative.discriminator_basemodel import BaseDiscriminator
 from ..utilities.ops import *
 
 class SegmentationDiscriminator(BaseDiscriminator):
-    seg_discrim_defaults={
-        'discriminator_train_op_list': [],
-        'segdis_kernels': [32, 32, 32, 512],
-        'learning_rate': 5e-5,
-        'name': 'adversary',
-        'soften_labels': True,
-        'soften_sddev': 0.01,
-        'x_in': None,
-        'y_real': None,
-        'y_fake': None,
-    }
-
     def __init__(self, **kwargs):
-        self.seg_discrim_defaults.update(kwargs)
-        super(SegmentationDiscriminator, self).__init__(**self.seg_discrim_defaults)
+        seg_discrim_defaults={
+            'discriminator_train_op_list': [],
+            'segdis_kernels': [32, 32, 32, 512],
+            'learning_rate': 5e-5,
+            'name': 'adversary',
+            'soften_labels': True,
+            'soften_sddev': 0.01,
+            'x_in': None,
+            'y_real': None,
+            'y_fake': None,
+        }
+
+        seg_discrim_defaults.update(kwargs)
+        super(SegmentationDiscriminator, self).__init__(**seg_discrim_defaults)
 
         assert self.y_fake is not None
         assert self.y_real is not None
@@ -37,17 +38,17 @@ class SegmentationDiscriminator(BaseDiscriminator):
 
 
     def model(self, y_hat, x_in, keep_prob=0.5, reuse=False, training=True):
-        print 'Convolutional Discriminator'
+        print('Convolutional Discriminator')
         nonlin = self.nonlin
-        print 'Nonlinearity: ', nonlin
+        print('Nonlinearity: ', nonlin)
 
         with tf.variable_scope(self.name) as scope:
             if reuse:
                 scope.reuse_variables()
-            print '\t y_hat', y_hat.get_shape()
+            print('\t y_hat', y_hat.get_shape())
 
             y_hat_x_in = tf.concat([y_hat, x_in], axis=-1)
-            print '\t y_hat_x_in', y_hat_x_in.get_shape()
+            print('\t y_hat_x_in', y_hat_x_in.get_shape())
 
             h0_0 = nonlin(conv(y_hat_x_in, self.segdis_kernels[0], k_size=5, stride=1, var_scope='h0_0', selu=1))
             h0_1 = nonlin(conv(h0_0, self.segdis_kernels[0], k_size=5, stride=1, var_scope='h0_1', selu=1))

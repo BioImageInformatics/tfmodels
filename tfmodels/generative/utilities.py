@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 """
 Accepts numpy arrays
@@ -57,7 +58,7 @@ def dream_manifold(model, minmax=[-2.0, 2.0], zx=None, n_samples=121, condition=
             return vis_square(model.inference(z_values=z_manifold_in),
                 ht=model.x_dims[0])
         except:
-            print 'z_manifold_in appears to have disagreed with the model'
+            print('z_manifold_in appears to have disagreed with the model')
 
     if zx is not None:
     ## Vary a particular variable, keep the rest at 0.0

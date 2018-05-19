@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -46,30 +47,30 @@ batches containing the positive class may have a variable number of
 positive examples
 """
 class BaggedMNIST(object):
-    bag_mnist_defaults = {
-        'as_images': False,
-        'batch_size': 64,
-        'name': 'MNISTDataSet',
-        'onehot': True,
-        'positive_class': [0],
-        'positive_freq': 0.5,
-        'positive_rate': 0.1, ## Rate of positive class in each positive bag
-        'samples': 10,
-        'data': None, ## One of mnist.train or mnist.test
-        'mode': 'Train',
-        # 'source_dir': None,
-    }
-
     def __init__(self, **kwargs):
-        print 'Initializing Bagged MNIST dataset'
-        self.bag_mnist_defaults.update(**kwargs)
-        for key, value in self.bag_mnist_defaults.items():
+        bag_mnist_defaults = {
+            'as_images': False,
+            'batch_size': 64,
+            'name': 'MNISTDataSet',
+            'onehot': True,
+            'positive_class': [0],
+            'positive_freq': 0.5,
+            'positive_rate': 0.1, ## Rate of positive class in each positive bag
+            'samples': 10,
+            'data': None, ## One of mnist.train or mnist.test
+            'mode': 'Train',
+            # 'source_dir': None,
+        }
+
+        print('Initializing Bagged MNIST dataset')
+        bag_mnist_defaults.update(**kwargs)
+        for key, value in bag_mnist_defaults.items():
             setattr(self, key, value)
 
         ## load without onehot for ez
         # self.data = input_data.read_data_sets(self.source_dir)
 
-        print 'Using positive class:', self.positive_class
+        print('Using positive class:', self.positive_class)
         self.negative_x, self.positive_x = _collect_mnist(self.data,
             positive_class=self.positive_class)
         self._count_examples()
@@ -80,8 +81,8 @@ class BaggedMNIST(object):
         self.negative_count = self.negative_x.shape[0]
         self.positive_count = self.positive_x.shape[0]
 
-        print 'Got negative examples', self.negative_count
-        print 'Got positive examples', self.positive_count
+        print('Got negative examples', self.negative_count)
+        print('Got positive examples', self.positive_count)
 
 
     def _get_x(self, y):
@@ -159,10 +160,10 @@ class BaggedMNIST(object):
 
 
     def print_info(self):
-        print '---------------------- {} ---------------------- '.format(self.name)
+        print('---------------------- {} ---------------------- '.format(self.name))
         for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '---------------------- {} ---------------------- '.format(self.name)
+            print('|\t', key, value)
+        print('---------------------- {} ---------------------- '.format(self.name))
 
 
 
@@ -207,7 +208,7 @@ class MNISTDataSet(object):
             yield batch_x
 
     def print_info(self):
-        print '---------------------- {} ---------------------- '.format(self.name)
+        print('---------------------- {} ---------------------- '.format(self.name))
         for key, value in sorted(self.__dict__.items()):
-            print '|\t', key, value
-        print '---------------------- {} ---------------------- '.format(self.name)
+            print('|\t', key, value)
+        print('---------------------- {} ---------------------- '.format(self.name))

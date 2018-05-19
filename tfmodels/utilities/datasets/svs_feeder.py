@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import cv2
 import numpy as np
@@ -20,16 +21,16 @@ https://www.tensorflow.org/api_docs/python/tf/data/Dataset#from_generator
 """
 
 class SVSFeeder(object):
-    svs_feeder_defaults = {
-        'svsfile': None,
-        'tile_size': 512,
-        'downsample': 0.5,
-        'overlap_fact': 1.5,
-        'level': 0, }
-
     def __init__(self, **kwargs):
-        self.svs_feeder_defaults.update(kwargs)
-        for key, val in self.svs_feeder_defaults.items():
+        svs_feeder_defaults = {
+            'svsfile': None,
+            'tile_size': 512,
+            'downsample': 0.5,
+            'overlap_fact': 1.5,
+            'level': 0, }
+
+        svs_feeder_defaults.update(kwargs)
+        for key, val in svs_feeder_defaults.items():
             setattr(self, key, val)
 
         assert self.svsffile is not None

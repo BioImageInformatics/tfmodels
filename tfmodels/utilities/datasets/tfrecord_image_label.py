@@ -1,6 +1,6 @@
+from __future__ import print_function 
 import tensorflow as tf
 import numpy as np
-
 
 """
 TODO:
@@ -31,25 +31,26 @@ TFRecordDataset(training_record = None,
 
 """
 class TFRecordImageLabel(object):
-    img_label_defaults = {'training_record': None,
-                'testing_record': None,
-                'crop_size': 512,
-                'ratio': 1.0,
-                'batch_size': 32,
-                'prefetch': 1000,
-                'shuffle_buffer': 512,
-                'n_threads': 4,
-                'sess': None,
-                'as_onehot': True,
-                'n_classes': None,
-                'img_dtype': tf.uint8,
-                'img_channels': 3,
-                'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
-                'name': 'TFRecordImageLabel' }
     def __init__(self, **kwargs):
-        self.img_label_defaults.update(kwargs)
+        img_label_defaults = {'training_record': None,
+                    'testing_record': None,
+                    'crop_size': 512,
+                    'ratio': 1.0,
+                    'batch_size': 32,
+                    'prefetch': 1000,
+                    'shuffle_buffer': 512,
+                    'n_threads': 4,
+                    'sess': None,
+                    'as_onehot': True,
+                    'n_classes': None,
+                    'img_dtype': tf.uint8,
+                    'img_channels': 3,
+                    'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
+                    'name': 'TFRecordImageLabel'
+        }
+        img_label_defaults.update(kwargs)
 
-        for key,val in self.img_label_defaults.items():
+        for key,val in img_label_defaults.items():
             setattr(self, key, val)
 
         assert self.training_record is not None
@@ -79,7 +80,7 @@ class TFRecordImageLabel(object):
         _ = sess.run([self.iterator.initializer], feed_dict=fd)
         # sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TRAIN'
-        print 'Dataset TRAINING phase'
+        print('Dataset TRAINING phase')
 
 
     def _initalize_testing(self, sess):
@@ -87,14 +88,14 @@ class TFRecordImageLabel(object):
         _ = sess.run([self.iterator.initializer], feed_dict=fd)
         # sess.run(self.iterator.initializer, feed_dict=fd)
         self.phase = 'TEST'
-        print 'Dataset TESTING phase'
+        print('Dataset TESTING phase')
 
 
     def print_info(self):
-        print '-------------------- {} ---------------------- '.format(self.name)
+        print('-------------------- {} ---------------------- '.format(self.name))
         for key, value in sorted(self.__dict__.items()):
-            print '|\t{}: {}'.format(key, value)
-        print '-------------------- {} ---------------------- '.format(self.name)
+            print('|\t{}: {}'.format(key, value))
+        print('-------------------- {} ---------------------- '.format(self.name))
 
 
     def _decode(self, example):

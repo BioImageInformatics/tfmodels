@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 from ..utilities.basemodel import BaseModel
 
@@ -19,7 +20,7 @@ class BaseGenerator(BaseModel):
 
         if self.project_shape is None:
             self.n_upsamples = len(self.gen_kernels)
-            print 'Calculating projection factor for {} upsamples'.format(self.n_upsamples)
+            print('Calculating projection factor for {} upsamples'.format(self.n_upsamples))
             ## calculate the reshape size
             lo_res_size = self.x_dims[0]//(2**self.n_upsamples)
             self.project_shape = (lo_res_size**2) * self.gen_kernels[0]
@@ -27,11 +28,11 @@ class BaseGenerator(BaseModel):
         else:
             assert self.project_shape is not None
             assert self.resize_shape is not None
-            print 'Using projection shape: {}'.format(self.project_shape)
-            print 'Using resize shape: {}'.format(self.resize_shape)
+            print('Using projection shape: {}'.format(self.project_shape))
+            print('Using resize shape: {}'.format(self.resize_shape))
 
 
-    """ 
+    """
     generator.model()
 
     Inputs:
