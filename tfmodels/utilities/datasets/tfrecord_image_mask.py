@@ -35,7 +35,7 @@ class TFRecordImageMask(object):
                     'crop_size': 512,
                     'ratio': 1.0,
                     'batch_size': 32,
-                    'prefetch': 1000,
+                    'prefetch': 256,
                     'shuffle_buffer': 128,
                     'n_threads': 4,
                     'sess': None,

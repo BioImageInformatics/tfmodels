@@ -273,9 +273,12 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
     print('Finished writing [{}]'.format(record_path))
 
 
+def image_label_2_tfrecord():
+    pass
 
+    
 def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
-    batch_size=32, prefetch=5000, n_threads=4, as_onehot=True, n_classes=None,
+    batch_size=32, prefetch=500, n_threads=4, as_onehot=True, n_classes=None,
     img_dtype=tf.uint8, mask_dtype=tf.uint8, img_channels=3, mask_channels=1, preprocess=[]):
     with tf.Session() as sess:
         dataset = TFRecordImageMask(

@@ -1,4 +1,4 @@
-from __future__ import print_function 
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 
@@ -37,7 +37,7 @@ class TFRecordImageLabel(object):
                     'crop_size': 512,
                     'ratio': 1.0,
                     'batch_size': 32,
-                    'prefetch': 1000,
+                    'prefetch': 256,
                     'shuffle_buffer': 512,
                     'n_threads': 4,
                     'sess': None,

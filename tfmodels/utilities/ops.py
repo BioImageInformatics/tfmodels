@@ -41,7 +41,6 @@ def crop_concat(x, y):
     x_y = tf.reshape(x_y, expected_shape)
     return x_y
 
-
 def weight_variable(shape, name='weight',
     initializer=tf.contrib.layers.xavier_initializer(uniform=False),
     # initializer=tf.random_normal_initializer(mean=0.0, stddev=1.0),
