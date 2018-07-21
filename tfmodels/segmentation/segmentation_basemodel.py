@@ -7,6 +7,45 @@ import sys, os
 from ..utilities.basemodel import BaseModel
 
 class Segmentation(BaseModel):
+    """Segmentation model base class.
+
+    This class tracks ops for the interior model functions including:
+        - model initialization
+        - snapshotting
+        - restoring
+        - access to hidden layer ops
+        - loss function
+        - optimization ops
+        - inference ops
+
+    It should be possible to have multiple models in the same graph
+
+    Args:
+        class_weights: A list of floats len = n_classes
+        dataset: a tfmodels.dataset object
+            - alternatively specify input ops 
+        global_step: the initial global step. Default 0
+        k_size: kernel size(s) as int or list of ints. 
+        learning_rate: initial learning rate for constant lr.
+        log_dir: path to write logs. must exist.
+        mode: string, one of 'TRAIN' or 'TEST'.
+        name: string, describing this model instance. Default 'Segmentation'
+        nonlin: tensorflow nonlinearity function. Default tf.nn.selu
+        n_classes: int, number of classes expected in the data
+        use_optimizer: string, one of 'Adam'. 
+            - TODO allow passing tensorflow optimizer class
+        save_dir: path to use for snapshotting
+        sess: tf.Session() instance
+        summarize_grads: bool, whether or not to write gradient summaries to logs
+        summary_iters: int, how often (in update steps) to log 
+        summary_image_iters: int, how often (in update steps) to log images
+            - Images make big logs
+        summary_image_n: int, how many images to log per image logging step
+        summary_op_list: default []; probably shouldn't use this.
+        with_test: bool, becomes true if the `dataset` includes a test phase
+        n_test_batches: int, how many batches to test.
+        x_dims: list of ints, the expected input shape.
+    """
 
     def __init__(self, **kwargs):
         ## Defaults. arXiv links correspond to inspirational materials
@@ -46,6 +85,16 @@ class Segmentation(BaseModel):
 
 
     def _training_mode(self):
+        """ Initializes model in training mode
+
+        Training mode includes a labelled data op, and an optimizer
+
+        Args:
+
+        Returns:
+
+        """
+
         print('Setting up {} in training mode'.format(self.name))
         ## ------------------- Input ops ------------------- ##
         self._make_input_ops()
