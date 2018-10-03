@@ -10,6 +10,8 @@ We can have multiple initialized datasets sitting around and feed the initialize
 into the placeholder via feed_dict:
 REF: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md
 
+** Eager execution is not supported **
+
 TFRecordDataset(training_record = None,
     testing_record = None,
     crop_size = 512,
@@ -63,8 +65,9 @@ class TFRecordImageMask(object):
                         .shuffle(buffer_size=self.shuffle_buffer)
                         .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
                             num_parallel_calls=self.n_threads)
+                        .batch(self.batch_size)
                         .prefetch(buffer_size=self.prefetch)
-                        .batch(self.batch_size) )
+                        )
 
         self.iterator = self.dataset.make_initializable_iterator()
         self.image_op, self.mask_op = self.iterator.get_next()

@@ -196,7 +196,7 @@ variable sized inputs, and normalize them to subimages with uniform size
 """
 def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambda x: x[:,:,::-1],
     mask_process_fn=None, name_transl_fn=None, n_classes=None, subimage_size=None,
-    oversample_factor=1.2):
+    oversample_factor=1.2, subset_pct=False):
 
     writer = tf.python_io.TFRecordWriter(record_path)
 
@@ -215,7 +215,15 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
     ## Shuffle and subset
     tmp_list = zip(img_list, mask_list)
     np.random.shuffle(tmp_list)
-    # tmp_list = tmp_list[:min(len(tmp_list), 50)]
+
+    if subset_pct:
+        assert subset_pct < 1.
+        assert subset_pct > 0.
+        subset_n = int(len(tmp_list) * float(subset_pct))
+        print('Subsetting image list: {} --> {}'.format(len(tmp_list), subset_n))
+        tmp_list = tmp_list[:min(len(tmp_list), subset_n)]
+        print('Verify new length = {}'.format(len(tmp_list)))
+
     img_list, mask_list = zip(*tmp_list)
 
     count = 0
@@ -276,7 +284,7 @@ def image_mask_2_tfrecord(img_patt, mask_patt, record_path, img_process_fn=lambd
 def image_label_2_tfrecord():
     pass
 
-    
+
 def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
     batch_size=32, prefetch=500, n_threads=4, as_onehot=True, n_classes=None,
     img_dtype=tf.uint8, mask_dtype=tf.uint8, img_channels=3, mask_channels=1, preprocess=[]):
