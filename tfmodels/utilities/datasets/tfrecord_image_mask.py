@@ -36,6 +36,7 @@ class TFRecordImageMask(object):
                     'testing_record': None,
                     'crop_size': 512,
                     'ratio': 1.0,
+                    'repeat': True,
                     'batch_size': 32,
                     'prefetch': 256,
                     'shuffle_buffer': 128,
@@ -50,7 +51,7 @@ class TFRecordImageMask(object):
                     'mask_channels': 1,
                     'preprocess': ['brightness', 'hue', 'saturation', 'contrast'],
                     'name': 'TFRecordDataset' }
-        defaults.update(kwargs)
+        defaults.update(kwargs) 
 
         for key,val in defaults.items():
             setattr(self, key, val)
@@ -60,20 +61,48 @@ class TFRecordImageMask(object):
         self.initialized = False
 
         self.record_path = tf.placeholder_with_default(self.training_record, shape=())
-        self.dataset = (tf.data.TFRecordDataset(self.record_path)
-                        .repeat()
-                        .shuffle(buffer_size=self.shuffle_buffer)
-                        .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
-                            num_parallel_calls=self.n_threads)
-                        .batch(self.batch_size)
-                        .prefetch(buffer_size=self.prefetch)
-                        )
+        self.dataset = self._make_dataset()
+        # self.dataset = (tf.data.TFRecordDataset(self.record_path)
+        #                 .repeat()
+        #                 .shuffle(buffer_size=self.shuffle_buffer)
+        #                 .map(lambda x: self._preprocessing(x, self.crop_size, self.ratio),
+        #                     num_parallel_calls=self.n_threads)
+        #                 .batch(self.batch_size) 
+        #                 .prefetch(buffer_size=self.prefetch)
+        #                 )
 
         self.iterator = self.dataset.make_initializable_iterator()
         self.image_op, self.mask_op = self.iterator.get_next()
 
         if self.sess is not None:
             self._initalize_training(self.sess)
+
+    def _make_dataset(self):
+        """ Construct the dataset functions one by one instead of assuming defaults
+
+        TODO: add argument checking and error messages
+        """
+        dataset = tf.data.TFRecordDataset(self.record_path)
+        if self.repeat:
+            dataset = dataset.repeat()
+
+        if self.shuffle_buffer:
+            dataset = dataset.shuffle(buffer_size=self.shuffle_buffer)
+
+        # We always have a crop and ratio .. ?
+        # TODO check sanity for n_threads argument
+        dataset = dataset.map(
+            lambda x: self._preprocessing(x, self.crop_size, self.ratio), 
+            num_parallel_calls=self.n_threads
+        )
+        
+        if self.batch_size:
+            dataset = dataset.batch(self.batch_size)
+
+        if self.prefetch:
+            dataset = dataset.prefetch(buffer_size=self.prefetch)
+
+        return dataset
 
     def _initalize_training(self, sess):
         fd = {self.record_path: self.training_record}
@@ -90,13 +119,10 @@ class TFRecordImageMask(object):
         self.phase = 'TEST'
         print('Dataset TESTING phase')
 
-    def print_info(self):
-        print('-------------------- {} ---------------------- '.format(self.name))
-        for key, value in sorted(self.__dict__.items()):
-            print('|\t{}: {}'.format(key, value))
-        print('-------------------- {} ---------------------- '.format(self.name))
-
     def _decode(self, example):
+        """ Decode an image / mask pair from tfrecord example
+        
+        """
         features = {'height': tf.FixedLenFeature((), tf.int64, default_value=0),
                     'width': tf.FixedLenFeature((), tf.int64, default_value=0),
                     'img': tf.FixedLenFeature((), tf.string, default_value=''),
@@ -118,8 +144,10 @@ class TFRecordImageMask(object):
 
         return height, width, img, mask
 
-
     def _preprocessing(self, example, crop_size, ratio):
+        """ Construct the preprocessing steps
+
+        """
         h, w, img, mask = self._decode(example)
         img_shape = tf.stack([h, w, self.img_channels], axis=0)
         mask_shape = tf.stack([h, w, self.mask_channels], axis=0)
@@ -168,3 +196,9 @@ class TFRecordImageMask(object):
             mask = tf.multiply(mask, 2/255.0) - 1
 
         return img, mask
+
+    def print_info(self):
+        print('-------------------- {} ---------------------- '.format(self.name))
+        for key, value in sorted(self.__dict__.items()):
+            print('|\t{}: {}'.format(key, value))
+        print('-------------------- {} ---------------------- '.format(self.name))
