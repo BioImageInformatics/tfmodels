@@ -6,7 +6,7 @@ import cv2
 import os, glob, sys, shutil
 import datetime, time
 
-from datasets import TFRecordImageMask
+from .datasets import TFRecordImageMask
 
 
 """ Save a 4D stack of images """
@@ -50,7 +50,7 @@ def bayesian_inference(model, x_in, samples, keep_prob=0.5, verbose=False):
     if verbose:
         print('y_hat initialized: {}'.format(y_hat.shape))
 
-    for tt in xrange(1, samples):
+    for tt in range(1, samples):
         y_hat_p = model.inference(x_in=x_in, keep_prob=keep_prob)
         y_hat = np.concatenate([y_hat, np.expand_dims(y_hat_p, -1)], -1)
 
@@ -299,7 +299,7 @@ def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
 
         pull_times = []
         print('Checking 25 batches of {} examples'.format(batch_size))
-        for k in xrange(iterations):
+        for k in range(iterations):
             tstart = time.time()
             img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
             pull_times.append(time.time() - tstart)
@@ -314,7 +314,7 @@ def check_tfrecord(record_path, iterations=25, crop_size=512, image_ratio=0.5,
 def check_tfrecord_dataset(dataset, iterations=25):
     pull_times = []
     print('Checking average load time for {} batches'.format(iterations))
-    for _ in xrange(iterations):
+    for _ in range(iterations):
         tstart = time.time()
         img_, mask_ = sess.run([dataset.image_op, dataset.mask_op])
         print(img_.shape, img_.dtype, img_.min(), img_.max(), mask_.dtype, mask_.min(), mask_.max())

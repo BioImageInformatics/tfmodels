@@ -1,6 +1,6 @@
 from __future__ import print_function
 import tensorflow as tf
-from dataset_base import DataSet
+from .dataset_base import DataSet
 import glob, os
 
 """

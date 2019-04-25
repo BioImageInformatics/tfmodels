@@ -1,6 +1,6 @@
 from __future__ import print_function
 import tensorflow as tf
-from segmentation_basemodel import Segmentation
+from .segmentation_basemodel import Segmentation
 from ..utilities.ops import *
 
 """
@@ -54,7 +54,7 @@ class ResNet(Segmentation):
         conv_settings = {'n_kernel': kernels, 'stride': 1, 'k_size': self.k_size, 'selu': 1}
 
         with tf.variable_scope('{}_{}'.format(name_scope, block)):
-            for stack in xrange(stacks):
+            for stack in range(stacks):
                 stack_name='{}_{}_{}_'.format(name_scope, block, stack)
                 with tf.variable_scope(stack_name):
                     x_s_1 = nonlin(conv(x_1, var_scope=stack_name+'0', **conv_settings))
@@ -86,7 +86,7 @@ class ResNet(Segmentation):
             signal = tf.nn.max_pool(p0, [1,2,2,1], [1,2,2,1], padding='VALID', name='pool_p0')
             # print '\t signal', signal.get_shape()
 
-            for block in xrange(self.modules-1):
+            for block in range(self.modules-1):
                 block_name = 'r{}_residual'.format(block)
                 # print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],
@@ -103,7 +103,7 @@ class ResNet(Segmentation):
             # print '\t intermediate: ', signal.get_shape()
             signal = tf.contrib.nn.alpha_dropout(signal, keep_prob=keep_prob)
 
-            for block in xrange(self.modules-1, 0, -1):
+            for block in range(self.modules-1, 0, -1):
                 block_name = 'd{}_residual'.format(block)
                 # print 'Block name', block_name
                 signal = self._residual_block(signal, self.kernels[block],

@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-from segmentation_basemodel import Segmentation
+from .segmentation_basemodel import Segmentation
 
 class SegmentationBayesian(Segmentation):
 
