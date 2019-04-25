@@ -10,8 +10,7 @@ We can have multiple initialized datasets sitting around and feed the initialize
 into the placeholder via feed_dict:
 REF: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md
 
-^ Maybe drawback is all their queues would keep full and flood the memory.
-^ Need to check behavior.
+** Eager execution is not supported **
 
 TFRecordDataset(training_record = None,
     testing_record = None,
